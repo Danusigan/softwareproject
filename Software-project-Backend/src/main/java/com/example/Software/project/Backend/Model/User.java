@@ -5,48 +5,40 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-
 @Entity
 @Table(name = "User")
 public class User {
 
-
     @Id
     @Column(name = "User_ID")
-    private String UserID;
-
+    private String userID; // Change to lowercase for consistency
 
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-
     @Column(name = "password", nullable = false)
     private String password;
-
 
     @Column(name = "user_type")
     private String usertype;
 
-
     public User() {
     }
 
-
-    public User(String UserId, String email, String password, String usertype) {
-        this.UserID=UserId;
+    public User(String userID, String email, String password, String usertype) {
+        this.userID = userID;
         this.email = email;
         this.password = password;
         this.usertype = usertype;
     }
 
-
-
-    public String getAdminId() {
-        return UserID;
+    // Getters and setters
+    public String getUserID() {
+        return userID;
     }
 
-    public void setAdminId(String adminId) {
-        this.UserID=UserID;
+    public void setUserID(String userID) {
+        this.userID = userID;
     }
 
     public String getEmail() {
