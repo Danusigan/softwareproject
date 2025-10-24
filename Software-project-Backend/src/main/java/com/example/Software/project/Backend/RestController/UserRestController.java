@@ -29,7 +29,7 @@ public class UserRestController {
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Login successful");
-                response.put("userId", user.getAdminId());
+                response.put("userId", user.getUserID());
                 response.put("email", user.getEmail());
                 response.put("userType", user.getUsertype());
                 response.put("status", "SUCCESS");

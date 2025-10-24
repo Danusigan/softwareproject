@@ -26,7 +26,15 @@ public class UserService {
         return Optional.empty();
     }
 
+    public Optional<User> findByUserId(String userId) {
+        return userRepository.findByUserID(userId);
+    }
+
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+
+    public Optional<User> findByUsertype(String usertype) {
+        return userRepository.findByUsertype(usertype);
     }
 }
