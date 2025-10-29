@@ -8,13 +8,13 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 py-8">
       {/* Header */}
       <Header />
-      
+
 
       {/* Navigation */}
       <div className="max-w-4xl mx-auto px-4 mb-8">
         <div className="flex justify-center space-x-8">
           <Link to="/" className="text-gray-700 hover:text-blue-600">Home</Link>
-          
+
           <a href="#" className="text-blue-600 font-semibold border-b-2 border-blue-600">Login</a>
         </div>
       </div>

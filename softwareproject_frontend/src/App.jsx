@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import LandingPage from './pages/landingpage'
-import LoginPage from './pages/loginpage' 
+import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 

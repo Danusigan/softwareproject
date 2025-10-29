@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export default function Header() {
   return (
-    <nav className="bg-blue-700 text-white">
+    <nav className="bg-blue-700 text-white ">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-24">
           {/* Logo and Branding */}
@@ -23,7 +23,7 @@ export default function Header() {
           {/* Navigation Links */}
           <div className="flex items-center gap-8">
             <Link to="/" className="hover:text-blue-200 transition">Home</Link>
-           
+
 
             {/* Login Dropdown */}
             <div className="relative group">
@@ -31,12 +31,12 @@ export default function Header() {
                 Login <span>▼</span>
               </button>
               <div className="absolute right-0 mt-2 w-32 bg-blue-600 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300">
-               <Link to="/loginpage" className="hover:text-blue-200 transition">Admin</Link>
+                <Link to="/loginpage" className="hover:text-blue-200 transition">Admin</Link>
               </div>
             </div>
 
             <button className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">
-             <Link to="/loginpage" className="hover:text-blue-200 transition">Lecturer</Link> 
+              <Link to="/loginpage" className="hover:text-blue-200 transition">Lecturer</Link>
             </button>
           </div>
         </div>
