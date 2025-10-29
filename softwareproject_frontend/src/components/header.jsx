@@ -1,4 +1,5 @@
 "use client"
+import { Link } from 'react-router-dom';
 
 export default function Header() {
   return (
@@ -21,8 +22,8 @@ export default function Header() {
 
           {/* Navigation Links */}
           <div className="flex items-center gap-8">
-            <a href="#" className="hover:text-blue-200 transition">Home</a>
-            <a href="#" className="hover:text-blue-200 transition">Signup</a>
+            <Link to="/" className="hover:text-blue-200 transition">Home</Link>
+           
 
             {/* Login Dropdown */}
             <div className="relative group">
@@ -30,12 +31,12 @@ export default function Header() {
                 Login <span>▼</span>
               </button>
               <div className="absolute right-0 mt-2 w-32 bg-blue-600 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300">
-                <a href="#" className="block px-4 py-2 hover:bg-blue-800 rounded-t">Admin</a>
+               <Link to="/loginpage" className="hover:text-blue-200 transition">Admin</Link>
               </div>
             </div>
 
             <button className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition">
-              Lecturer
+             <Link to="/loginpage" className="hover:text-blue-200 transition">Lecturer</Link> 
             </button>
           </div>
         </div>
