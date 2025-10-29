@@ -1,34 +1,20 @@
 "use client"
 import Header from '../components/header'
 import Footer from '../components/footer'
+import { Link } from 'react-router-dom';
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       {/* Header */}
       <Header />
-      <div className="bg-blue-700 text-white py-6 mb-8">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-2 rounded">
-              <div className="w-12 h-12 bg-blue-900 rounded flex items-center justify-center">
-                <span className="text-white font-bold">LO</span>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">LO-PO</h1>
-              <p className="text-sm">Faculty of Engineering</p>
-              <p className="text-sm">University of Ruhuna</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      
 
       {/* Navigation */}
       <div className="max-w-4xl mx-auto px-4 mb-8">
         <div className="flex justify-center space-x-8">
-          <a href="#" className="text-gray-700 hover:text-blue-600">Home</a>
-          <a href="#" className="text-gray-700 hover:text-blue-600">Signup</a>
+          <Link to="/" className="text-gray-700 hover:text-blue-600">Home</Link>
+          
           <a href="#" className="text-blue-600 font-semibold border-b-2 border-blue-600">Login</a>
         </div>
       </div>
