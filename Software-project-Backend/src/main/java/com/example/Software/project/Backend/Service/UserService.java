@@ -18,7 +18,7 @@ public class UserService {
 
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            // In a real application, you should use password hashing (BCrypt)
+
             if (user.getPassword().equals(password)) {
                 return Optional.of(user);
             }
