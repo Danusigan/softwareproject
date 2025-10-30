@@ -11,7 +11,7 @@ public class User {
 
     @Id
     @Column(name = "User_ID")
-    private String userID; // Change to lowercase for consistency
+    private String  username;
 
     @Column(name = "email", unique = true, nullable = false)
     private String email;
@@ -25,8 +25,8 @@ public class User {
     public User() {
     }
 
-    public User(String userID, String email, String password, String usertype) {
-        this.userID = userID;
+    public User(String username, String email, String password, String usertype) {
+        this.username = username;
         this.email = email;
         this.password = password;
         this.usertype = usertype;
@@ -34,11 +34,11 @@ public class User {
 
     // Getters and setters
     public String getUserID() {
-        return userID;
+        return username;
     }
 
     public void setUserID(String userID) {
-        this.userID = userID;
+        this.username = userID;
     }
 
     public String getEmail() {
