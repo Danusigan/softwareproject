@@ -22,7 +22,8 @@ public class UserRestController {
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
         try {
-            Optional<User> userOptional = userService.authenticateUser(loginUser.getEmail(), loginUser.getPassword());
+            // Pass the UserID (username) and password to the authentication service
+            Optional<User> userOptional = userService.authenticateUser(loginUser.getUserID(), loginUser.getPassword());
 
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
@@ -37,7 +38,8 @@ public class UserRestController {
                 return ResponseEntity.ok(response);
             } else {
                 Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Invalid email or password");
+                // Updated error message to reflect username/password validation
+                errorResponse.put("message", "Invalid username or password");
                 errorResponse.put("status", "ERROR");
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
             }

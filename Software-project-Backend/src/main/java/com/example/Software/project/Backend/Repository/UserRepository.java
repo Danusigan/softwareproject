@@ -8,7 +8,13 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, String> {
-    Optional<User> findByUserID(String userID);  // Changed from findByUserId to findByUserID
+    // CORRECTED: 'username' is the actual field name in the User entity.
+    Optional<User> findByUsername(String username);
+
+    // Note: If you want to use the getter/setter convention for the property name,
+    // it would also work with findByUsername, as the field is 'username'.
+    // The previous findByUserID was incorrect because 'userID' is not a field.
+
     Optional<User> findByUsertype(String usertype);
     Optional<User> findByEmail(String email);
 }
