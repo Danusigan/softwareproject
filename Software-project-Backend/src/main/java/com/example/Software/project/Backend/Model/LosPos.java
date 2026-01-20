@@ -10,10 +10,10 @@ public class LosPos {
 
     @Id
     @Column(name = "id", unique = true, nullable = false)
-    private String id; // Changed to String for custom ID
+    private String id;
 
     @Column(name = "name")
-    private String name; // The "Lo&Po Name"
+    private String name;
 
     // Foreign Key to Module
     @ManyToOne(fetch = FetchType.LAZY)
