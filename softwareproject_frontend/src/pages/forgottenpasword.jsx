@@ -1,140 +1,88 @@
-"use client"
+import React, { useState } from 'react';
+import Header from '../components/header';
+import Footer from '../components/footer';
+import { useNavigate, Link } from 'react-router-dom';
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage({ type: '', text: '' });
+
+    // Simulate password reset request
+    setTimeout(() => {
+      setMessage({ 
+        type: 'success', 
+        text: 'Password reset instructions have been sent to your email.' 
+      });
+      setIsLoading(false);
+      setEmail('');
+    }, 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Section */}
-      <header className="bg-blue-700 text-white py-6">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-4">
-            <div className="bg-white p-2 rounded">
-              <div className="w-12 h-12 bg-blue-900 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-lg">LO</span>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold">LO-PO</h1>
-              <p className="text-sm">Faculty of Engineering</p>
-              <p className="text-sm">University of Ruhuna</p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 py-8">
+      <Header />
 
-      {/* Navigation */}
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-center space-x-8 py-4">
-            <a href="#" className="text-gray-700 hover:text-blue-600 transition">Home</a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 transition">Signup</a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 transition">Login</a>
-          </div>
+      <div className="max-w-4xl mx-auto px-4 mb-8">
+        <div className="flex justify-center space-x-8">
+          <Link to="/" className="text-gray-700 hover:text-blue-600">Home</Link>
+          <Link to="/loginpage" className="text-gray-700 hover:text-blue-600">Login</Link>
         </div>
-      </nav>
+      </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+      <div className="max-w-md mx-auto px-4">
+        <div className="bg-white p-8 rounded-lg shadow-md">
+          <h2 className="text-2xl font-bold text-center mb-6">Forgot Password</h2>
           
-          {/* Forgot Password Form Section */}
-          <div className="bg-white rounded-lg shadow-md p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Forgotten password ??</h2>
-            
-            <form className="space-y-6">
-              {/* Username Field */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    className="mr-3 h-4 w-4 text-blue-600" 
-                    defaultChecked={false} 
-                  />
-                  <label className="text-sm font-medium text-gray-700">Enter you User Name</label>
-                </div>
-                <input
-                  type="text"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                  placeholder="Enter your username"
-                />
-              </div>
-
-              {/* Email Field */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    className="mr-3 h-4 w-4 text-blue-600" 
-                    defaultChecked={true} 
-                  />
-                  <label className="text-sm font-medium text-gray-700">Enter you email address</label>
-                </div>
-                <input
-                  type="email"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
-                  placeholder="Enter your email address"
-                />
-              </div>
-
-              {/* Submit Button */}
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input 
-                    type="checkbox" 
-                    className="mr-3 h-4 w-4 text-blue-600" 
-                    defaultChecked={false} 
-                  />
-                  <label className="text-sm font-medium text-gray-700">Submit</label>
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-blue-700 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-800 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition"
-                >
-                  Submit
-                </button>
-              </div>
-            </form>
-
-            {/* Back to Login Link */}
-            <div className="mt-6 text-center">
-              <a href="#" className="text-blue-600 hover:text-blue-800 text-sm transition">
-                ← Back to Login
-              </a>
+          {message.text && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
+              {message.text}
             </div>
-          </div>
+          )}
 
-          {/* Contact Information Section */}
-          <div className="space-y-6">
-            {/* Postal Address */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="font-bold text-lg text-gray-900 mb-3">Postal Address</h3>
-              <p className="text-gray-700">
-                Faculty of Engineering, University of Ruhuna,<br />
-                Hapugala, Galle, Sri Lanka.<br />
-                80000
-              </p>
+          <p className="text-gray-600 mb-6 text-center">
+            Enter your email address and we'll send you instructions to reset your password.
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+              <input
+                type="email"
+                className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
 
-            {/* Phone Number */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="font-bold text-lg text-gray-900 mb-3">Phone Number</h3>
-              <p className="text-gray-700">
-                + (94) 912245765,<br />
-                + (94) 912245766,<br />
-                + (94) 912245767
-              </p>
-            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-700 text-white p-3 rounded font-semibold hover:bg-blue-800 transition-colors disabled:bg-gray-400"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Sending...' : 'Reset Password'}
+            </button>
+          </form>
 
-            {/* Other Contact Info */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h3 className="font-bold text-lg text-gray-900 mb-3">Other</h3>
-              <p className="text-gray-700">
-                Fax : +94 912245762<br />
-                Email : ar@eng.ruh.ac.lk
-              </p>
-            </div>
+          <div className="mt-6 text-center">
+            <Link to="/loginpage" className="text-blue-600 hover:underline">
+              Back to Login
+            </Link>
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
-  )
+  );
 }

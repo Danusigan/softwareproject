@@ -8,6 +8,7 @@ import axios from 'axios';
 export default function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [userRole, setUserRole] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -19,17 +20,21 @@ export default function LoginPage() {
         setError('');
 
         try {
-            // 🚨 CRITICAL FIX: The key must be 'userID' to match the backend's User model
             const res = await axios.post('http://localhost:8080/api/auth/login', {
-                userID: username, // <-- CORRECTED: Use 'userID' key
+                userID: username,
                 password
             });
 
-            // Handle successful response (backend returns a JSON object with status: 'SUCCESS')
+            // Handle successful response
             if (res.data && res.data.status === "SUCCESS") {
-                const loggedInUsername = res.data.userId; // Retrieve username from response
+                const loggedInUsername = res.data.userId;
+                const userType = res.data.userType;
+                const token = res.data.token;
                 
+                // Store user data and token
                 localStorage.setItem('username', loggedInUsername);
+                localStorage.setItem('userType', userType);
+                localStorage.setItem('token', token);
 
                 if (rememberMe) {
                     localStorage.setItem('rememberMe', 'true');
@@ -37,16 +42,19 @@ export default function LoginPage() {
                     localStorage.removeItem('rememberMe');
                 }
 
-                // Navigate to the home page or dashboard
-                navigate('/');
+                // Navigate based on user role
+                if (userType === 'Superadmin' || userType === 'Admin') {
+                    navigate('/admin-dashboard');
+                } else if (userType === 'Lecture') {
+                    navigate('/lecturer-dashboard');
+                } else {
+                    navigate('/');
+                }
             } else {
-                // This block handles cases where the server returns a 200 OK 
-                // but the status is 'ERROR' (e.g., if you added custom logic)
                 setError(res.data.message || 'Login failed. Invalid response from server.');
             }
         } catch (err) {
             console.error("Login Error:", err.response ? err.response.data : err.message);
-            // This catches the 401 Unauthorized error:
             setError('Login failed. Please check your username and password.'); 
         } finally {
             setIsLoading(false);
@@ -83,13 +91,32 @@ export default function LoginPage() {
 
                         <div className="space-y-4">
                             <form onSubmit={handleLogin}>
-                                <div>
+                                {/* User Role Dropdown - ABOVE username and password */}
+                                <div className="mb-4">
                                     <div className="flex items-center mb-2">
-                                        <label>Enter Your Username</label>
+                                        <label className="font-medium">Select User Role</label>
+                                    </div>
+                                    <select
+                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                        value={userRole}
+                                        onChange={(e) => setUserRole(e.target.value)}
+                                        required
+                                    >
+                                        <option value="">-- Select User Role --</option>
+                                        <option value="Superadmin">Superadmin</option>
+                                        <option value="Admin">Admin</option>
+                                        <option value="Lecture">Lecture</option>
+                                    </select>
+                                </div>
+
+                                {/* Username Field */}
+                                <div className="mb-4">
+                                    <div className="flex items-center mb-2">
+                                        <label className="font-medium">Enter Your Username</label>
                                     </div>
                                     <input
                                         type="text"
-                                        className="w-full p-3 border rounded"
+                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Username"
                                         value={username}
                                         onChange={(e) => setUsername(e.target.value)}
@@ -97,13 +124,14 @@ export default function LoginPage() {
                                     />
                                 </div>
 
-                                <div>
+                                {/* Password Field */}
+                                <div className="mb-4">
                                     <div className="flex items-center mb-2">
-                                        <label>Enter Your Password</label>
+                                        <label className="font-medium">Enter Your Password</label>
                                     </div>
                                     <input
                                         type="password"
-                                        className="w-full p-3 border rounded"
+                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
@@ -111,7 +139,7 @@ export default function LoginPage() {
                                     />
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center mb-4">
                                     <label className="flex items-center">
                                         <input
                                             type="checkbox"
@@ -121,17 +149,28 @@ export default function LoginPage() {
                                         />
                                         <span>Remember me?</span>
                                     </label>
-                                    <a href="#" className="text-blue-600 text-sm">Forget Password</a>
+                                    <Link to="/forgottenpassword" className="text-blue-600 text-sm hover:underline">Forget Password</Link>
                                 </div>
 
                                 <button
                                     type="submit"
-                                    className="w-full bg-blue-700 text-white p-3 rounded font-semibold hover:bg-blue-800 mt-4"
+                                    className="w-full bg-blue-700 text-white p-3 rounded font-semibold hover:bg-blue-800 transition-colors disabled:bg-gray-400"
                                     disabled={isLoading}
                                 >
                                     {isLoading ? 'Logging in...' : 'Login'}
                                 </button>
                             </form>
+                        </div>
+                    </div>
+
+                    {/* Right Side Image */}
+                    <div className="hidden lg:flex items-center justify-center">
+                        <div className="bg-gradient-to-br from-blue-100 to-gray-100 rounded-lg p-8 w-full h-96 flex items-center justify-center border border-gray-300">
+                            <div className="text-center">
+                                <div className="text-6xl mb-4">🔐</div>
+                                <p className="text-blue-600 font-semibold">Secure Login Portal</p>
+                                <p className="text-gray-600 mt-2">Access your dashboard</p>
+                            </div>
                         </div>
                     </div>
                 </div>
