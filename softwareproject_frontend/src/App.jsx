@@ -2,9 +2,10 @@ import { useState } from 'react'
 import LandingPage from './pages/landingpage'
 import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
+import AdminDashboard from './pages/admindashboard'
+import LecturerDashboard from './pages/lecturerdashboard'
+import ModulesPage from './pages/modulespage'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-
-
 
 
 function App() {
@@ -16,6 +17,9 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/loginpage" element={<LoginPage />} />
         <Route path="/forgottenpassword" element={<ForgotPasswordPage />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/lecturer-dashboard" element={<LecturerDashboard />} />
+        <Route path="/modules" element={<ModulesPage />} />
       </Routes>
     </Router>
   )
