@@ -37,18 +37,13 @@ public class UserService {
         return Optional.empty();
     }
 
-    /**
-     * Finds a user by their username (which is mapped as the User_ID).
-     */
+
     public Optional<User> findByUserId(String username) {
-        // Using findByUsername, assuming it is defined in the Repository
-        // as the method that correctly queries the username field.
+
         return userRepository.findByUsername(username);
     }
 
-    /**
-     * Finds a user by their email address.
-     */
+
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
     }
@@ -58,5 +53,40 @@ public class UserService {
      */
     public Optional<User> findByUsertype(String usertype) {
         return userRepository.findByUsertype(usertype);
+    }
+
+    /**
+     * Adds a new user based on the creator's role.
+     * Superadmin can add Admin.
+     * Admin can add Lecture.
+     */
+    public User addUser(User newUser, String creatorUsername) throws Exception {
+        Optional<User> creatorOptional = userRepository.findByUsername(creatorUsername);
+        if (creatorOptional.isEmpty()) {
+            throw new Exception("Creator user not found");
+        }
+        User creator = creatorOptional.get();
+        String creatorType = creator.getUsertype();
+
+        if (creatorType == null) creatorType = "";
+
+        // Automatically assign role based on creator
+        if (creatorType.equalsIgnoreCase("Superadmin")) {
+            newUser.setUsertype("Admin");
+        } else if (creatorType.equalsIgnoreCase("Admin")) {
+            newUser.setUsertype("Lecture");
+        } else {
+            throw new Exception("You are not authorized to add users");
+        }
+
+        // Check if user exists
+        if (userRepository.findByUsername(newUser.getUserID()).isPresent()) {
+            throw new Exception("Username already exists");
+        }
+        if (userRepository.findByEmail(newUser.getEmail()).isPresent()) {
+            throw new Exception("Email already exists");
+        }
+
+        return userRepository.save(newUser);
     }
 }
