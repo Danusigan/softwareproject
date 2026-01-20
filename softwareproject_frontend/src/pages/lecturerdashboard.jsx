@@ -47,7 +47,7 @@ export default function LecturerDashboard() {
     const fetchLosForModule = async (moduleId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/los/module/${moduleId}`, {
+            const res = await axios.get(`http://localhost:8080/api/lospos/module/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setLos(res.data);
@@ -65,10 +65,10 @@ export default function LecturerDashboard() {
         try {
             const token = localStorage.getItem('token');
             await axios.post(
-                'http://localhost:8080/api/los/create',
+                `http://localhost:8080/api/lospos/${selectedModule.moduleId}/add`,
                 {
-                    ...loData,
-                    moduleId: selectedModule.moduleId
+                    id: loData.loNumber,
+                    name: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -97,11 +97,10 @@ export default function LecturerDashboard() {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/los/update/${editingLo.id}`,
+                `http://localhost:8080/api/lospos/${editingLo.id}`,
                 {
-                    loNumber: loData.loNumber,
-                    description: loData.description,
-                    moduleId: selectedModule.moduleId
+                    id: loData.loNumber,
+                    name: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -128,7 +127,7 @@ export default function LecturerDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/los/delete/${loId}`, {
+            await axios.delete(`http://localhost:8080/api/lospos/${loId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -144,7 +143,7 @@ export default function LecturerDashboard() {
 
     const openEditDialog = (lo) => {
         setEditingLo(lo);
-        setLoData({ loNumber: lo.loNumber, description: lo.description });
+        setLoData({ loNumber: lo.id, description: lo.name });
         setShowEditLoDialog(true);
     };
 
@@ -258,10 +257,10 @@ export default function LecturerDashboard() {
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                                            LO {lo.loNumber}
+                                                            {lo.id}
                                                         </span>
                                                     </div>
-                                                    <p className="text-gray-700">{lo.description}</p>
+                                                    <p className="text-gray-700">{lo.name}</p>
                                                 </div>
                                                 <div className="flex gap-2 ml-4">
                                                     {/* Edit Icon */}
