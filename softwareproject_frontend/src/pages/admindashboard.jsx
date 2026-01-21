@@ -28,6 +28,20 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
+    // Verify user is admin on mount
+    useEffect(() => {
+        const userType = localStorage.getItem('userType');
+        console.log('Admin Dashboard - User Type:', userType);
+        
+        const normalizedType = userType?.toLowerCase?.() || '';
+        const isAdmin = normalizedType === 'admin' || normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin';
+        
+        if (!isAdmin) {
+            console.log('Unauthorized! Redirecting to home. Normalized type:', normalizedType);
+            navigate('/');
+        }
+    }, [navigate]);
+
     // Fetch modules on mount
     useEffect(() => {
         fetchModules();
