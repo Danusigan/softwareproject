@@ -45,13 +45,20 @@ public class UserRestController {
 
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
-                String token = jwtUtil.generateToken(user.getUserID(), user.getUsertype());
+                String userType = user.getUsertype();
+                
+                // Normalize usertype to lowercase for consistency
+                if (userType != null) {
+                    userType = userType.toLowerCase();
+                }
+                
+                String token = jwtUtil.generateToken(user.getUserID(), userType);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Login successful");
                 response.put("userId", user.getUserID());
                 response.put("email", user.getEmail());
-                response.put("userType", user.getUsertype());
+                response.put("userType", userType);
                 response.put("token", token); // Send token to client
                 response.put("status", "SUCCESS");
 
@@ -86,6 +93,27 @@ public class UserRestController {
             errorResponse.put("message", "Failed to add user: " + e.getMessage());
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/debug/user/{username}")
+    public ResponseEntity<?> debugGetUser(@PathVariable String username) {
+        try {
+            Optional<User> userOptional = userService.findByUserId(username);
+            if (userOptional.isPresent()) {
+                User user = userOptional.get();
+                Map<String, Object> response = new HashMap<>();
+                response.put("userId", user.getUserID());
+                response.put("email", user.getEmail());
+                response.put("userType", user.getUsertype());
+                response.put("userTypeRaw", user.getUsertype());
+                response.put("status", "SUCCESS");
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "User not found", "status", "ERROR"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
         }
     }
 }
