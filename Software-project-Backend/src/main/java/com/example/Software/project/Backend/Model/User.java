@@ -62,6 +62,12 @@ public class User {
     }
 
     public void setUsertype(String usertype) {
-        this.usertype = usertype;
+        // Normalize usertype to have consistent casing
+        if (usertype != null) {
+            // Convert to lowercase for consistency
+            this.usertype = usertype.toLowerCase();
+        } else {
+            this.usertype = null;
+        }
     }
 }
