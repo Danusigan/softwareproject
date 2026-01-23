@@ -101,6 +101,13 @@ export default function AdminDashboard() {
         setLoading(true);
         setMessage({ type: '', text: '' });
 
+        // Validate moduleId: only capital letters and digits
+        if (moduleData.moduleId && !moduleData.moduleId.match(/^[A-Z0-9]+$/)) {
+            setMessage({ type: 'error', text: 'Module ID must contain only capital letters (A-Z) and digits (0-9)' });
+            setLoading(false);
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post(
@@ -132,10 +139,17 @@ export default function AdminDashboard() {
         setLoading(true);
         setMessage({ type: '', text: '' });
 
+        // Validate moduleId: only capital letters and digits
+        if (moduleData.moduleId && !moduleData.moduleId.match(/^[A-Z0-9]+$/)) {
+            setMessage({ type: 'error', text: 'Module ID must contain only capital letters (A-Z) and digits (0-9)' });
+            setLoading(false);
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/modules/update/${editingModule.moduleId}`,
+                `http://localhost:8080/api/modules/${editingModule.moduleId}`,
                 {
                     moduleId: moduleData.moduleId,
                     moduleName: moduleData.moduleName
@@ -165,7 +179,7 @@ export default function AdminDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/modules/delete/${moduleId}`, {
+            await axios.delete(`http://localhost:8080/api/modules/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -432,11 +446,12 @@ export default function AdminDashboard() {
                             <input
                                 type="text"
                                 value={moduleData.moduleId}
-                                onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value })}
+                                onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value.toUpperCase() })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="Enter the Module ID"
+                                placeholder="Enter the Module ID (e.g., SE101, CS201)"
                                 required
                             />
+                            <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
                         </div>
 
                         <button
@@ -496,11 +511,12 @@ export default function AdminDashboard() {
                                 <input
                                     type="text"
                                     value={moduleData.moduleId}
-                                    onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value })}
+                                    onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value.toUpperCase() })}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Enter the Module ID"
+                                    placeholder="Enter the Module ID (e.g., SE101, CS201)"
                                     required
                                 />
+                                <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
                             </div>
 
                             <button

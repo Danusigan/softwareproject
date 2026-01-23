@@ -89,7 +89,16 @@ export default function LoginPage() {
             console.error('Error Response:', err.response?.data);
             console.error('Error Message:', err.message);
             console.error('Full Error:', err);
-            setError('Login failed. Please check your username and password.');
+            
+            // Display specific error message from backend
+            const backendMessage = err.response?.data?.message;
+            if (backendMessage) {
+                setError(backendMessage);
+            } else if (err.response?.status === 401) {
+                setError('Login failed. Incorrect username, password, or user role is not properly configured.');
+            } else {
+                setError('Login failed. Please check your username and password.');
+            }
         } finally {
             setIsLoading(false);
         }

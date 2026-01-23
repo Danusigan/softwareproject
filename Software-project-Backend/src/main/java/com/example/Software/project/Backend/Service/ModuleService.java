@@ -37,6 +37,18 @@ public class ModuleService {
         Module module = moduleRepository.findById(id)
                 .orElseThrow(() -> new Exception("Module not found"));
         
+        String newModuleId = moduleDetails.getModuleId();
+        
+        // If moduleId is being changed, check if new ID already exists
+        if (newModuleId != null && !newModuleId.equals(id)) {
+            if (moduleRepository.existsById(newModuleId)) {
+                throw new Exception("Module ID '" + newModuleId + "' already exists");
+            }
+            // Delete old module and create new one with updated ID
+            moduleRepository.deleteById(id);
+            module.setModuleId(newModuleId);
+        }
+        
         module.setModuleName(moduleDetails.getModuleName());
         return moduleRepository.save(module);
     }

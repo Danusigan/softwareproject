@@ -22,7 +22,14 @@ public class Module {
     // --- Getters and Setters ---
 
     public String getModuleId() { return moduleId; }
-    public void setModuleId(String moduleId) { this.moduleId = moduleId; }
+    
+    public void setModuleId(String moduleId) {
+        // Validate: only capital letters and digits allowed
+        if (moduleId != null && !moduleId.matches("^[A-Z0-9]+$")) {
+            throw new IllegalArgumentException("Module ID must contain only capital letters and digits (A-Z, 0-9)");
+        }
+        this.moduleId = moduleId;
+    }
 
     public String getModuleName() { return moduleName; }
     public void setModuleName(String moduleName) { this.moduleName = moduleName; }
