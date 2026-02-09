@@ -215,7 +215,7 @@ export default function SuperAdminDashboard() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:bg-gray-400 mt-6"
+                            className="px-8 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:bg-gray-400 mt-6 max-w-xs mx-auto block"
                         >
                             {loading ? 'Adding Admin...' : 'Add Administrator'}
                         </button>

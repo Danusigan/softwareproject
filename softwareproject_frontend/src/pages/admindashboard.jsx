@@ -393,7 +393,7 @@ export default function AdminDashboard() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                            className="px-8 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
                         >
                             {loading ? 'Adding...' : 'Add Teacher'}
                         </button>
@@ -457,9 +457,9 @@ export default function AdminDashboard() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                            className="px-8 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
                         >
-                            {loading ? 'Creating...' : 'Submit'}
+                            {loading ? 'Creating...' : 'Create Module'}
                         </button>
                     </form>
                 </div>
