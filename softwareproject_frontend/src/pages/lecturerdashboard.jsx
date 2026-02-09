@@ -230,15 +230,17 @@ export default function LecturerDashboard() {
                             </div>
 
                             {/* Add LO Button */}
-                            <button
-                                onClick={() => setShowAddLoDialog(true)}
-                                className="w-full mb-6 bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                                </svg>
-                                Add Learning Outcome
-                            </button>
+                            <div className="mb-6 flex justify-center">
+                                <button
+                                    onClick={() => setShowAddLoDialog(true)}
+                                    className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    Add Learning Outcome
+                                </button>
+                            </div>
 
                             {/* LOs List */}
                             <div className="space-y-4">
@@ -347,7 +349,7 @@ export default function LecturerDashboard() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                                className="px-8 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
                             >
                                 {loading ? 'Adding...' : 'Add LO'}
                             </button>
