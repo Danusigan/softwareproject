@@ -108,4 +108,8 @@ public interface MappingRepository extends JpaRepository<Mapping, Long> {
     // Get mapping statistics by lecturer
     @Query("SELECT NEW map(m.mappedBy as lecturer, COUNT(m) as total, SUM(CASE WHEN m.status = 'APPROVED' THEN 1 ELSE 0 END) as approved) FROM Mapping m GROUP BY m.mappedBy")
     List<Object[]> getMappingStatisticsByLecturer();
+
+    // Find mappings by module (course) and status (e.g., all PENDING mappings for a course)
+    @Query("SELECT m FROM Mapping m WHERE m.losPos.moduleCode = :moduleCode AND m.status = :status")
+    List<Mapping> findByModuleCodeAndStatus(@Param("moduleCode") String moduleCode, @Param("status") MappingStatus status);
 }

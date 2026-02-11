@@ -82,4 +82,18 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
     // Find marks for OBE attainment calculation by LosPos
     @Query("SELECT sm FROM StudentMark sm WHERE sm.assignment.losPos.id = :losPosId AND sm.isAbsent = false AND sm.isMedical = false AND sm.mark IS NOT NULL")
     List<StudentMark> findValidMarksByLosPosId(@Param("losPosId") String losPosId);
+
+    // Calculate CO (LO) attainment per module and academic year using aggregate query
+    // Returns rows: [losPosId (String), loId (String), academicYear (String), attainmentPercentage (Double)]
+    @Query("SELECT lp.id, lp.loId, s.academicYear, " +
+           "AVG(CASE WHEN sm.isAbsent = false AND sm.isMedical = false AND sm.mark IS NOT NULL AND sm.mark >= :passThreshold THEN 1.0 ELSE 0.0 END) * 100.0 " +
+           "FROM StudentMark sm " +
+           "JOIN sm.student s " +
+           "JOIN sm.assignment a " +
+           "JOIN a.losPos lp " +
+           "WHERE lp.moduleCode = :moduleCode AND s.academicYear IN :academicYears " +
+           "GROUP BY lp.id, lp.loId, s.academicYear")
+    List<Object[]> calculateLoAttainmentByModuleAndYears(@Param("moduleCode") String moduleCode,
+                                                         @Param("academicYears") List<String> academicYears,
+                                                         @Param("passThreshold") Double passThreshold);
 }
