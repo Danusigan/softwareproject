@@ -6,6 +6,7 @@ public class UserRepository {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 import java.util.Optional;
 
 @Repository
@@ -21,6 +22,9 @@ public interface UserRepository extends JpaRepository<User, String> {
         return findByUsername(userID);
     }
 }
+=======
+}
+>>>>>>> Stashed changes
 =======
 }
 >>>>>>> Stashed changes
