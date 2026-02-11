@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -41,8 +42,8 @@ public class AssignmentRestController {
             assignment.setAssignmentId(assignmentId);
             assignment.setAssignmentName(assignmentName);
 
-            LosPos updatedLosPos = assignmentService.addAssignmentToLosPos(losPosId, assignment, file);
-            return ResponseEntity.ok(updatedLosPos);
+            Assignment addedAssignment = assignmentService.addAssignmentToLosPos(losPosId, assignment, file);
+            return ResponseEntity.ok(addedAssignment);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
         }
@@ -100,8 +101,81 @@ public class AssignmentRestController {
         }
     }
 
+    // Import student marks from Excel/CSV file (Admin/Lecture Only)
+    @PostMapping("/{assignmentId}/import-marks")
+    public ResponseEntity<?> importStudentMarks(
+            @PathVariable String assignmentId,
+            @RequestParam("excelFile") MultipartFile excelFile,
+            @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access Denied: Only Lecturers/Admins can import student marks");
+            }
+
+            if (excelFile.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error: Excel file is required");
+            }
+
+            String result = assignmentService.importMarksFromExcel(assignmentId, excelFile);
+            return ResponseEntity.ok(Map.of(
+                "message", "Student marks imported successfully",
+                "details", result,
+                "assignmentId", assignmentId,
+                "fileName", excelFile.getOriginalFilename(),
+                "format", "3-column (Student ID, Name, Mark)",
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to import student marks",
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
+    // Import student marks from Excel using OBE format (Admin/Lecture Only)
+    @PostMapping("/{assignmentId}/import-marks-obe")
+    public ResponseEntity<?> importStudentMarksOBE(
+            @PathVariable String assignmentId,
+            @RequestParam("excelFile") MultipartFile excelFile,
+            @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Access Denied: Only Lecturers/Admins can import student marks");
+            }
+
+            if (excelFile.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Error: Excel file is required");
+            }
+
+            String result = assignmentService.importMarksFromExcelOBEFormat(assignmentId, excelFile);
+            return ResponseEntity.ok(Map.of(
+                "message", "Student marks imported successfully (OBE Format)",
+                "details", result,
+                "assignmentId", assignmentId,
+                "fileName", excelFile.getOriginalFilename(),
+                "format", "2-column (Student Index, Mark)",
+                "dataCleaning", "Non-numeric values set to 0.0, marks clamped 0-100",
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to import student marks (OBE Format)",
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
     private boolean isLecture(String token) {
         String role = jwtUtil.extractRole(token.substring(7));
-        return "Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        return "lecture".equalsIgnoreCase(role) || "admin".equalsIgnoreCase(role) || "superadmin".equalsIgnoreCase(role);
     }
 }

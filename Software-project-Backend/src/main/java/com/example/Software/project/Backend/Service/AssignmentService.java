@@ -20,8 +20,11 @@ public class AssignmentService {
     @Autowired
     private LosPosRepository losPosRepository;
 
+    @Autowired
+    private ExcelImportService excelImportService;
+
     // Create (Lecture) - Add to LosPos
-    public LosPos addAssignmentToLosPos(String losPosId, Assignment assignment, MultipartFile file) throws Exception {
+    public Assignment addAssignmentToLosPos(String losPosId, Assignment assignment, MultipartFile file) throws Exception {
         Optional<LosPos> losPosOptional = losPosRepository.findById(losPosId);
         if (losPosOptional.isEmpty()) {
             throw new Exception("LosPos not found");
@@ -38,12 +41,13 @@ public class AssignmentService {
             assignment.setFileName(file.getOriginalFilename());
         }
 
-        // Save assignment first
-        Assignment savedAssignment = assignmentRepository.save(assignment);
+        // Link assignment to LosPos (NEW relationship structure)
+        assignment.setLosPos(losPos);
 
-        // Link assignment to LosPos
-        losPos.setAssignment(savedAssignment);
-        return losPosRepository.save(losPos);
+        // Save assignment
+        Assignment savedAssignment = assignmentRepository.save(assignment);
+        
+        return savedAssignment;
     }
 
     // Read All Assignments (Global)
@@ -53,11 +57,9 @@ public class AssignmentService {
 
     // Read Assignment by LosPos ID
     public Optional<Assignment> getAssignmentByLosPosId(String losPosId) {
-        Optional<LosPos> losPos = losPosRepository.findById(losPosId);
-        if (losPos.isPresent() && losPos.get().getAssignment() != null) {
-            return Optional.of(losPos.get().getAssignment());
-        }
-        return Optional.empty();
+        // With new relationship, find assignments by LosPos ID
+        List<Assignment> assignments = assignmentRepository.findByLosPosId(losPosId);
+        return assignments.isEmpty() ? Optional.empty() : Optional.of(assignments.get(0));
     }
 
     // Read One Assignment
@@ -88,15 +90,18 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Assignment not found"));
         
-        // Unlink from LosPos before deleting
-        List<LosPos> allLosPos = losPosRepository.findAll();
-        for (LosPos lp : allLosPos) {
-            if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
-                lp.setAssignment(null);
-                losPosRepository.save(lp);
-            }
-        }
-        
+        // With new relationship structure, just delete the assignment
+        // The relationship will be automatically handled by JPA
         assignmentRepository.deleteById(id);
+    }
+
+    // Import marks from Excel (delegates to ExcelImportService)
+    public String importMarksFromExcel(String assignmentId, MultipartFile excelFile) {
+        return excelImportService.importStudentMarksFromExcel(assignmentId, excelFile);
+    }
+
+    // Import marks from Excel using OBE format (2 columns: Student Index, Mark)
+    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
+        return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
 }

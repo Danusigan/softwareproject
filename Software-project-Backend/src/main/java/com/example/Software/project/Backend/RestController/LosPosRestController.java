@@ -23,23 +23,25 @@ public class LosPosRestController {
     private JwtUtil jwtUtil;
 
     // Create (Lecture Only) - Add to Module
-    @PostMapping("/{moduleId}/add")
-    public ResponseEntity<?> addLosPos(@PathVariable String moduleId, @RequestBody LosPos losPos, @RequestHeader("Authorization") String token) {
+    @PostMapping("/{moduleCode}/add")
+    public ResponseEntity<?> addLosPos(@PathVariable String moduleCode, @RequestBody LosPos losPos, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture can add LosPos");
             }
-            LosPos createdLosPos = losPosService.addLosPosToModule(moduleId, losPos);
+            // Extract user from token
+            String username = jwtUtil.extractUsername(token.substring(7));
+            LosPos createdLosPos = losPosService.createLosPos(losPos.getLoId(), losPos.getLoDescription(), moduleCode, username);
             return ResponseEntity.ok(createdLosPos);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
         }
     }
 
-    // Read All by Module ID (The main way to get LosPos)
-    @GetMapping("/module/{moduleId}")
-    public List<LosPos> getLosPosByModuleId(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
-        return losPosService.getLosPosByModuleId(moduleId);
+    // Read All by Module Code
+    @GetMapping("/module/{moduleCode}")
+    public List<LosPos> getLosPosByModuleCode(@PathVariable String moduleCode, @RequestHeader("Authorization") String token) {
+        return losPosService.getLosPosByModuleCode(moduleCode);
     }
 
     // Read One
@@ -56,7 +58,9 @@ public class LosPosRestController {
             if (!isLecture(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture can update LosPos");
             }
-            LosPos updatedLosPos = losPosService.updateLosPos(id, losPosDetails);
+            // Extract user from token
+            String username = jwtUtil.extractUsername(token.substring(7));
+            LosPos updatedLosPos = losPosService.updateLosPos(id, losPosDetails.getLoDescription(), username);
             return ResponseEntity.ok(updatedLosPos);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
@@ -70,7 +74,9 @@ public class LosPosRestController {
             if (!isLecture(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture can delete LosPos");
             }
-            losPosService.deleteLosPos(id);
+            // Extract user from token
+            String username = jwtUtil.extractUsername(token.substring(7));
+            losPosService.deleteLosPos(id, username);
             return ResponseEntity.ok("LosPos deleted successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
@@ -79,6 +85,6 @@ public class LosPosRestController {
 
     private boolean isLecture(String token) {
         String role = jwtUtil.extractRole(token.substring(7));
-        return "Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        return "lecture".equalsIgnoreCase(role);
     }
 }
