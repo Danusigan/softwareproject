@@ -6,6 +6,7 @@ public class UserRestController {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 
     @Autowired
     private UserService userService;
@@ -139,6 +140,9 @@ public class UserRestController {
         }
     }
 }
+=======
+}
+>>>>>>> Stashed changes
 =======
 }
 >>>>>>> Stashed changes
