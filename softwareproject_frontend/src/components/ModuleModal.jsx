@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 const ModuleModal = ({ module, onClose }) => {
     const [losPosList, setLosPosList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -12,6 +13,8 @@ const ModuleModal = ({ module, onClose }) => {
             fetchLosPos();
         }
 =======
+=======
+>>>>>>> Stashed changes
 export default function ModuleModal({ module, onClose }) {
     const [losPosList, setLosPosList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -22,11 +25,15 @@ export default function ModuleModal({ module, onClose }) {
 
     useEffect(() => {
         fetchLosPos();
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     }, [module]);
 
     const fetchLosPos = async () => {
         try {
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
             setLoading(true);
             setError(null);
@@ -38,6 +45,8 @@ export default function ModuleModal({ module, onClose }) {
             setError('Failed to load learning outcomes');
             setLosPosList([]);
 =======
+=======
+>>>>>>> Stashed changes
             const token = localStorage.getItem('token');
             const res = await axios.get(
                 `http://localhost:8080/api/lospos/module/${module.moduleId}`,
@@ -48,12 +57,16 @@ export default function ModuleModal({ module, onClose }) {
             setLosPosList(res.data);
         } catch (err) {
             console.error('Error fetching LOs:', err);
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
         } finally {
             setLoading(false);
         }
     };
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
     const handleBackdropClick = (e) => {
         if (e.target === e.currentTarget) {
@@ -84,6 +97,8 @@ export default function ModuleModal({ module, onClose }) {
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
 =======
+=======
+>>>>>>> Stashed changes
     const handleEditLo = (lo) => {
         setEditingLo({ ...lo });
     };
@@ -159,6 +174,9 @@ export default function ModuleModal({ module, onClose }) {
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
                             </svg>
                         </button>
@@ -166,6 +184,7 @@ export default function ModuleModal({ module, onClose }) {
                 </div>
 
                 {/* Content */}
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
                 <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                     <div className="mb-6">
@@ -236,6 +255,8 @@ export default function ModuleModal({ module, onClose }) {
 
 export default ModuleModal;
 =======
+=======
+>>>>>>> Stashed changes
                 <div className="flex-1 overflow-y-auto p-6">
                     {/* Add New Button */}
                     <div className="mb-4">
@@ -419,4 +440,7 @@ export default ModuleModal;
         </div>
     );
 }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
