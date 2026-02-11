@@ -1,9 +1,8 @@
 package com.example.Software.project.Backend.Repository;
 
-import com.example.Software.project.Backend.Model.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+public class UserRepository {
 
+<<<<<<< Updated upstream
 import java.util.Optional;
 
 @Repository
@@ -19,3 +18,6 @@ public interface UserRepository extends JpaRepository<User, String> {
         return findByUsername(userID);
     }
 }
+=======
+}
+>>>>>>> Stashed changes
