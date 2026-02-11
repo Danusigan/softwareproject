@@ -5,6 +5,7 @@ import axios from 'axios';
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 const ModuleModal = ({ module, onClose }) => {
     const [losPosList, setLosPosList] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -15,6 +16,8 @@ const ModuleModal = ({ module, onClose }) => {
             fetchLosPos();
         }
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -34,6 +37,9 @@ export default function ModuleModal({ module, onClose }) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -45,6 +51,7 @@ export default function ModuleModal({ module, onClose }) {
 
     const fetchLosPos = async () => {
         try {
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
@@ -65,6 +72,8 @@ export default function ModuleModal({ module, onClose }) {
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
             const token = localStorage.getItem('token');
             const res = await axios.get(
                 `http://localhost:8080/api/lospos/module/${module.moduleId}`,
@@ -78,6 +87,9 @@ export default function ModuleModal({ module, onClose }) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -90,6 +102,7 @@ export default function ModuleModal({ module, onClose }) {
         }
     };
 
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
@@ -123,6 +136,8 @@ export default function ModuleModal({ module, onClose }) {
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -207,6 +222,9 @@ export default function ModuleModal({ module, onClose }) {
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
@@ -220,6 +238,7 @@ export default function ModuleModal({ module, onClose }) {
                 </div>
 
                 {/* Content */}
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
@@ -293,6 +312,8 @@ export default function ModuleModal({ module, onClose }) {
 
 export default ModuleModal;
 =======
+=======
+>>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
 =======
@@ -485,6 +506,9 @@ export default ModuleModal;
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 =======
 >>>>>>> Stashed changes
