@@ -25,22 +25,11 @@ export default function LoginPage() {
                 password
             });
 
-            console.log('=== LOGIN RESPONSE ===');
-            console.log('Full Response:', res.data);
-            console.log('Response Status:', res.data.status);
-            console.log('Response Keys:', Object.keys(res.data));
-
             // Handle successful response
             if (res.data && res.data.status === "SUCCESS") {
                 const loggedInUsername = res.data.userId;
                 const userType = res.data.userType;
                 const token = res.data.token;
-                
-                console.log('=== EXTRACTED VALUES ===');
-                console.log('Username:', loggedInUsername);
-                console.log('UserType:', userType);
-                console.log('UserType Type:', typeof userType);
-                console.log('Token:', token ? 'Received' : 'Missing');
                 
                 // Store user data and token
                 localStorage.setItem('username', loggedInUsername);
@@ -53,52 +42,20 @@ export default function LoginPage() {
                     localStorage.removeItem('rememberMe');
                 }
 
-                // Debug: log the userType to console
-                const storedUserType = localStorage.getItem('userType');
-                console.log('=== STORED IN LOCALSTORAGE ===');
-                console.log('Stored UserType:', storedUserType);
-                console.log('Stored UserType Type:', typeof storedUserType);
-
                 // Navigate based on user role
-                console.log('=== NAVIGATION LOGIC ===');
-                console.log('Checking if userType === "superadmin":', userType === 'superadmin');
-                console.log('Checking if userType === "admin":', userType === 'admin');
-                console.log('Checking if userType === "lecture":', userType === 'lecture');
-                
-                // Normalize for comparison - handle various capitalizations
-                const normalizedType = userType?.toLowerCase?.() || '';
-                
-                if (normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin') {
-                    console.log('✓ Navigating to superadmin dashboard');
-                    navigate('/super-admin-dashboard');
-                } else if (normalizedType === 'admin') {
-                    console.log('✓ Navigating to admin dashboard');
+                if (userType === 'Superadmin' || userType === 'Admin') {
                     navigate('/admin-dashboard');
-                } else if (normalizedType === 'lecture') {
-                    console.log('✓ Navigating to lecturer dashboard');
+                } else if (userType === 'Lecture') {
                     navigate('/lecturer-dashboard');
                 } else {
-                    console.log('✗ Unknown user type:', userType, 'normalized:', normalizedType, '- Navigating to home');
                     navigate('/');
                 }
             } else {
                 setError(res.data.message || 'Login failed. Invalid response from server.');
             }
         } catch (err) {
-            console.error('=== LOGIN ERROR ===');
-            console.error('Error Response:', err.response?.data);
-            console.error('Error Message:', err.message);
-            console.error('Full Error:', err);
-            
-            // Display specific error message from backend
-            const backendMessage = err.response?.data?.message;
-            if (backendMessage) {
-                setError(backendMessage);
-            } else if (err.response?.status === 401) {
-                setError('Login failed. Incorrect username, password, or user role is not properly configured.');
-            } else {
-                setError('Login failed. Please check your username and password.');
-            }
+            console.error("Login Error:", err.response ? err.response.data : err.message);
+            setError('Login failed. Please check your username and password.'); 
         } finally {
             setIsLoading(false);
         }

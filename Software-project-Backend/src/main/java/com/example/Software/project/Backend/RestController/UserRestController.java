@@ -1,26 +1,7 @@
 package com.example.Software.project.Backend.RestController;
 
-import com.example.Software.project.Backend.Model.User;
-import com.example.Software.project.Backend.Security.JwtUtil;
-import com.example.Software.project.Backend.Service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-
-@RestController
-@RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class UserRestController {
+<<<<<<< Updated upstream
 
     @Autowired
     private UserService userService;
@@ -154,3 +135,6 @@ public class UserRestController {
         }
     }
 }
+=======
+}
+>>>>>>> Stashed changes
