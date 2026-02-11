@@ -52,4 +52,7 @@ public interface LosPosRepository extends JpaRepository<LosPos, String> {
     // Find LosPos without mappings
     @Query("SELECT lp FROM LosPos lp WHERE SIZE(lp.mappings) = 0")
     List<LosPos> findLosPosWithoutMappings();
+
+    // Find LosPos by module code and creator (used to restrict lecturers to their own courses)
+    List<LosPos> findByModuleCodeAndCreatedBy(String moduleCode, String createdBy);
 }

@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -251,5 +253,103 @@ public class MappingService {
             case 3 -> "High Correlation";
             default -> "Invalid Weight";
         };
+    }
+
+    // ======================== BULK & COURSE-LEVEL OPERATIONS ========================
+
+    /**
+     * Bulk create LO-PO mappings in PENDING status for a course/module.
+     * Each request entry is equivalent to a single createMapping call.
+     */
+    @Transactional
+    public List<Mapping> bulkCreateMappings(List<BulkMappingRequest> requests, String mappedBy) {
+        return requests.stream()
+                .map(req -> createMapping(req.getLoId(), req.getPoId(), req.getWeight(), mappedBy, null))
+                .toList();
+    }
+
+    /**
+     * Approve all PENDING mappings for a given course/module code.
+     */
+    @Transactional
+    public List<Mapping> approveCourseMappings(String moduleCode, String reviewedBy, String adminRemarks) {
+        List<Mapping> pendingMappings = mappingRepository.findByModuleCodeAndStatus(moduleCode, MappingStatus.PENDING);
+        for (Mapping mapping : pendingMappings) {
+            mapping.approve(reviewedBy, adminRemarks);
+        }
+        return mappingRepository.saveAll(pendingMappings);
+    }
+
+    /**
+     * Build a frontend-friendly LO-PO weight matrix for a given course/module.
+     * Example structure:
+     * { "LO1": { "PO1": 3, "PO2": 0 }, "LO2": { "PO1": 2, "PO2": 1 } }
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Map<String, Integer>> getCourseMappingMatrix(String moduleCode) {
+        // All LOs (COs) for this course/module
+        List<LosPos> losForModule = losPosRepository.findByModuleCodeOrderByLoId(moduleCode);
+
+        // All active POs
+        List<ProgramOutcome> activePOs = programOutcomeRepository.findByIsActiveTrueOrderByPoCode();
+
+        Map<String, Map<String, Integer>> matrix = new HashMap<>();
+
+        for (LosPos lo : losForModule) {
+            Map<String, Integer> poWeights = new HashMap<>();
+
+            // Default all POs to weight 0 (no correlation)
+            for (ProgramOutcome po : activePOs) {
+                poWeights.put(po.getPoCode(), 0);
+            }
+
+            // Apply existing mappings for this LO
+            List<Mapping> mappingsForLo = mappingRepository.findByLosPos(lo);
+            for (Mapping mapping : mappingsForLo) {
+                String poCode = mapping.getProgramOutcome().getPoCode();
+                Integer weight = mapping.getWeight();
+                if (poWeights.containsKey(poCode) && weight != null) {
+                    poWeights.put(poCode, weight);
+                }
+            }
+
+            // Use LO code (loId) as key, since this matches typical course outcome labels
+            matrix.put(lo.getLoId(), poWeights);
+        }
+
+        return matrix;
+    }
+
+    // DTO for bulk mapping requests (used by REST layer)
+    public static class BulkMappingRequest {
+        // In this context, loId refers to the internal LosPos ID
+        private String loId;
+        // poId refers to ProgramOutcome primary key ID
+        private Long poId;
+        private Integer weight;
+
+        public String getLoId() {
+            return loId;
+        }
+
+        public void setLoId(String loId) {
+            this.loId = loId;
+        }
+
+        public Long getPoId() {
+            return poId;
+        }
+
+        public void setPoId(Long poId) {
+            this.poId = poId;
+        }
+
+        public Integer getWeight() {
+            return weight;
+        }
+
+        public void setWeight(Integer weight) {
+            this.weight = weight;
+        }
     }
 }

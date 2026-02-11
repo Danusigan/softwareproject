@@ -4,6 +4,7 @@ import com.example.Software.project.Backend.Model.Mapping;
 import com.example.Software.project.Backend.Model.Mapping.MappingStatus;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.MappingService;
+import com.example.Software.project.Backend.Service.MappingService.BulkMappingRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,6 +43,44 @@ public class MappingRestController {
             return ResponseEntity.status(HttpStatus.CREATED).body(mapping);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Bulk save LO-PO mappings in PENDING status.
+     * Endpoint: POST /api/mappings/bulk-save
+     * Request body: [ { "loId": "<losPosId>", "poId": 1, "weight": 3 }, ... ]
+     */
+    @PostMapping("/bulk-save")
+    public ResponseEntity<?> bulkSaveMappings(
+            @RequestBody List<BulkMappingRequest> requests,
+            @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Access Denied: Only Lecturers can create LO-PO mappings");
+            }
+
+            if (requests == null || requests.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Request body must contain at least one mapping entry");
+            }
+
+            String lecturerEmail = jwtUtil.extractUsername(token.substring(7));
+            var createdMappings = mappingService.bulkCreateMappings(requests, lecturerEmail);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                    "message", "Bulk mappings created successfully",
+                    "count", createdMappings.size(),
+                    "status", "PENDING",
+                    "mappings", createdMappings
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "message", "Failed to bulk-save mappings",
+                            "error", e.getMessage()
+                    ));
         }
     }
 
@@ -346,6 +385,38 @@ public class MappingRestController {
             return ResponseEntity.ok(description);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * Frontend-friendly LO-PO matrix for a course/module.
+     * GET /api/mappings/matrix/{courseId}
+     * courseId is mapped to the internal moduleCode via String.valueOf(courseId).
+     */
+    @GetMapping("/matrix/{courseId}")
+    public ResponseEntity<?> getCourseMappingMatrix(
+            @PathVariable Long courseId,
+            @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAuthenticated(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+
+            String moduleCode = String.valueOf(courseId);
+            Map<String, Map<String, Integer>> matrix = mappingService.getCourseMappingMatrix(moduleCode);
+
+            return ResponseEntity.ok(Map.of(
+                    "courseId", courseId,
+                    "moduleCode", moduleCode,
+                    "matrix", matrix
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "message", "Failed to build course mapping matrix",
+                            "error", e.getMessage(),
+                            "courseId", courseId
+                    ));
         }
     }
 

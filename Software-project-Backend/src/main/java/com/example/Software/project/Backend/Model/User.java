@@ -5,48 +5,40 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-
 @Entity
 @Table(name = "User")
 public class User {
 
-
     @Id
     @Column(name = "User_ID")
-    private String UserID;
-
+    private String  username;
 
     @Column(name = "email", unique = true, nullable = false)
     private String email;
 
-
     @Column(name = "password", nullable = false)
     private String password;
-
 
     @Column(name = "user_type")
     private String usertype;
 
-
     public User() {
     }
 
-
-    public User(String UserId, String email, String password, String usertype) {
-        this.UserID=UserId;
+    public User(String username, String email, String password, String usertype) {
+        this.username = username;
         this.email = email;
         this.password = password;
         this.usertype = usertype;
     }
 
-
-
-    public String getAdminId() {
-        return UserID;
+    // Getters and setters
+    public String getUserID() {
+        return username;
     }
 
-    public void setAdminId(String adminId) {
-        this.UserID=UserID;
+    public void setUserID(String userID) {
+        this.username = userID;
     }
 
     public String getEmail() {
@@ -70,6 +62,12 @@ public class User {
     }
 
     public void setUsertype(String usertype) {
-        this.usertype = usertype;
+        // Normalize usertype to have consistent casing
+        if (usertype != null) {
+            // Convert to lowercase for consistency
+            this.usertype = usertype.toLowerCase();
+        } else {
+            this.usertype = null;
+        }
     }
 }

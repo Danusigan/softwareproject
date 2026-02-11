@@ -453,7 +453,9 @@ public class AttainmentService {
                 .orElse(0.0);
         
         Map<String, Object> result = new HashMap<>();
+        // LO is treated as CO in OBE context; expose both identifiers for clarity
         result.put("loId", lo.getLoId());
+        result.put("coId", lo.getLoId());
         result.put("loDescription", lo.getLoDescription());
         result.put("attainmentPercentage", Math.round(passPercentage * 100.0) / 100.0);
         result.put("level", level);
@@ -510,13 +512,24 @@ public class AttainmentService {
         int mappedCOCount = 0;
         
         for (Map<String, Object> coAttainment : coAttainments) {
+            // COs are represented by LO IDs; support both keys for robustness
             String coId = (String) coAttainment.get("coId");
+            if (coId == null) {
+                coId = (String) coAttainment.get("loId");
+            }
+            if (coId == null) {
+                continue;
+            }
             
             // Find CO-PO mapping for this CO and PO
             Optional<LosPos> losPosOpt = losPosRepository.findByLoIdAndModuleCode(coId, moduleCode);
             if (losPosOpt.isPresent()) {
                 List<Mapping> mappings = mappingRepository.findByLosPosIdAndProgramOutcomeId(
-                    losPosOpt.get().getId(), po.getId());
+                        losPosOpt.get().getId(), po.getId())
+                        .stream()
+                        .filter(m -> m.getStatus() == Mapping.MappingStatus.APPROVED)
+                        .filter(m -> m.getWeight() != null && m.getWeight() > 0)
+                        .toList();
                 
                 for (Mapping mapping : mappings) {
                     int weight = mapping.getWeight();
@@ -551,6 +564,7 @@ public class AttainmentService {
     private Map<String, Object> createEmptyCOAttainment(LosPos lo) {
         Map<String, Object> result = new HashMap<>();
         result.put("loId", lo.getLoId());
+        result.put("coId", lo.getLoId());
         result.put("loDescription", lo.getLoDescription());
         result.put("attainmentPercentage", 0.0);
         result.put("level", 0);
@@ -559,5 +573,208 @@ public class AttainmentService {
         result.put("averageMark", 0.0);
         result.put("assessmentCount", 0);
         return result;
+    }
+
+    // ======================== TREND ANALYSIS (CQI) ========================
+
+    /**
+     * Comparative trend analysis across academic years for a given course/module.
+     * Calculates average CO (LO) and PO attainment per year and summarizes shifts.
+     */
+    public TrendReportDTO getPerformanceTrend(Long courseId, List<String> academicYears) {
+        if (academicYears == null || academicYears.isEmpty()) {
+            throw new RuntimeException("At least one academic year must be provided");
+        }
+
+        // Normalize and sort years
+        List<String> years = academicYears.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(y -> !y.isEmpty())
+                .distinct()
+                .sorted()
+                .toList();
+
+        if (years.isEmpty()) {
+            throw new RuntimeException("No valid academic years provided");
+        }
+
+        String moduleCode = String.valueOf(courseId);
+        Optional<com.example.Software.project.Backend.Model.Module> moduleOpt = moduleRepository.findById(moduleCode);
+        if (moduleOpt.isEmpty()) {
+            throw new RuntimeException("Course/Module not found: " + courseId);
+        }
+
+        // Aggregate LO (CO) attainment per year using JPQL
+        List<Object[]> loRows = studentMarkRepository.calculateLoAttainmentByModuleAndYears(
+                moduleCode, years, PASS_THRESHOLD);
+
+        // year -> (losPosId -> attainmentPercentage)
+        Map<String, Map<String, Double>> loAttainmentByYear = new HashMap<>();
+        for (Object[] row : loRows) {
+            String losPosId = (String) row[0];
+            String year = (String) row[2];
+            Double attainment = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+
+            loAttainmentByYear
+                    .computeIfAbsent(year, y -> new HashMap<>())
+                    .put(losPosId, attainment);
+        }
+
+        // Average CO attainment per year
+        Map<String, Double> avgCoByYear = new LinkedHashMap<>();
+        for (String year : years) {
+            Map<String, Double> loMap = loAttainmentByYear.getOrDefault(year, Collections.emptyMap());
+            double avg = loMap.isEmpty() ? 0.0 : loMap.values().stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(0.0);
+            avgCoByYear.put(year, round2(avg));
+        }
+
+        // Build LO -> approved mappings for this module
+        List<Mapping> approvedMappings = mappingRepository.findApprovedMappingsByModuleCode(moduleCode);
+        Map<String, List<Mapping>> mappingsByLo = new HashMap<>();
+        for (Mapping mapping : approvedMappings) {
+            if (mapping.getWeight() != null && mapping.getWeight() > 0) {
+                String losPosId = mapping.getLosPos().getId();
+                mappingsByLo.computeIfAbsent(losPosId, k -> new ArrayList<>()).add(mapping);
+            }
+        }
+
+        // Compute PO attainment per year using CO levels and mapping weights
+        Map<String, Map<String, Double>> poWeightedSumByYear = new HashMap<>(); // year -> (poCode -> sum(level * weight))
+        Map<String, Map<String, Double>> poWeightSumByYear = new HashMap<>();   // year -> (poCode -> sum(weight))
+
+        for (String year : years) {
+            Map<String, Double> loMap = loAttainmentByYear.getOrDefault(year, Collections.emptyMap());
+            if (loMap.isEmpty()) continue;
+
+            for (Map.Entry<String, Double> entry : loMap.entrySet()) {
+                String losPosId = entry.getKey();
+                double loAttainment = entry.getValue();
+                int level = assignCOLevel(loAttainment);
+
+                List<Mapping> mappingsForLo = mappingsByLo.get(losPosId);
+                if (mappingsForLo == null || mappingsForLo.isEmpty()) continue;
+
+                for (Mapping mapping : mappingsForLo) {
+                    String poCode = mapping.getProgramOutcome().getPoCode();
+                    int weight = mapping.getWeight();
+
+                    poWeightedSumByYear
+                            .computeIfAbsent(year, y -> new HashMap<>())
+                            .merge(poCode, level * (double) weight, Double::sum);
+
+                    poWeightSumByYear
+                            .computeIfAbsent(year, y -> new HashMap<>())
+                            .merge(poCode, (double) weight, Double::sum);
+                }
+            }
+        }
+
+        // PO attainment per year (as percentage, scaling level 0-3 to 0-100)
+        Map<String, Map<String, Double>> poAttainmentByYear = new LinkedHashMap<>(); // year -> (poCode -> %)
+        Map<String, Double> avgPoByYear = new LinkedHashMap<>();
+
+        for (String year : years) {
+            Map<String, Double> weighted = poWeightedSumByYear.getOrDefault(year, Collections.emptyMap());
+            Map<String, Double> weights = poWeightSumByYear.getOrDefault(year, Collections.emptyMap());
+
+            Map<String, Double> poYearMap = new LinkedHashMap<>();
+            if (!weighted.isEmpty()) {
+                for (Map.Entry<String, Double> e : weighted.entrySet()) {
+                    String poCode = e.getKey();
+                    double sum = e.getValue();
+                    double totalW = weights.getOrDefault(poCode, 0.0);
+                    if (totalW > 0.0) {
+                        double levelScore = sum / totalW;           // 0-3
+                        double percent = (levelScore / 3.0) * 100.0; // 0-100
+                        poYearMap.put(poCode, round2(percent));
+                    }
+                }
+            }
+
+            poAttainmentByYear.put(year, poYearMap);
+
+            double avgPo = poYearMap.isEmpty() ? 0.0 : poYearMap.values().stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(0.0);
+            avgPoByYear.put(year, round2(avgPo));
+        }
+
+        // Performance shift and status relative to baseline year
+        String baselineYear = years.get(0);
+        double baselinePo = avgPoByYear.getOrDefault(baselineYear, 0.0);
+
+        Map<String, String> statusByYear = new LinkedHashMap<>();
+        for (String year : years) {
+            double currentPo = avgPoByYear.getOrDefault(year, 0.0);
+            double delta = currentPo - baselinePo;
+            String status;
+            if (Math.abs(delta) <= 5.0) {
+                status = "STABLE";
+            } else if (delta > 5.0) {
+                status = "IMPROVED";
+            } else {
+                status = "DECLINED";
+            }
+            statusByYear.put(year, status);
+        }
+
+        // Highest improved / most declined PO between baseline and latest year
+        String latestYear = years.get(years.size() - 1);
+        Map<String, Double> baselinePoMap = poAttainmentByYear.getOrDefault(baselineYear, Collections.emptyMap());
+        Map<String, Double> latestPoMap = poAttainmentByYear.getOrDefault(latestYear, Collections.emptyMap());
+
+        String highestImprovedPO = null;
+        double highestImprovedDelta = 0.0;
+        String mostDeclinedPO = null;
+        double mostDeclinedDelta = 0.0;
+
+        for (Map.Entry<String, Double> entry : latestPoMap.entrySet()) {
+            String poCode = entry.getKey();
+            if (!baselinePoMap.containsKey(poCode)) continue;
+
+            double delta = entry.getValue() - baselinePoMap.get(poCode);
+            if (delta > highestImprovedDelta) {
+                highestImprovedDelta = delta;
+                highestImprovedPO = poCode;
+            }
+            if (delta < mostDeclinedDelta) {
+                mostDeclinedDelta = delta;
+                mostDeclinedPO = poCode;
+            }
+        }
+
+        // Summary string comparing latest vs baseline
+        double overallDelta = avgPoByYear.getOrDefault(latestYear, 0.0) - baselinePo;
+        overallDelta = round2(overallDelta);
+        String summary;
+        if (overallDelta > 0.0) {
+            summary = String.format("Overall performance improved by %.2f%% compared to %s", overallDelta, baselineYear);
+        } else if (overallDelta < 0.0) {
+            summary = String.format("Overall performance declined by %.2f%% compared to %s", Math.abs(overallDelta), baselineYear);
+        } else {
+            summary = String.format("Overall performance remained stable compared to %s", baselineYear);
+        }
+
+        TrendReportDTO dto = new TrendReportDTO();
+        dto.setAverageCoAttainmentByYear(avgCoByYear);
+        dto.setAveragePoAttainmentByYear(avgPoByYear);
+        dto.setPerformanceStatusByYear(statusByYear);
+        dto.setPoAttainmentByYear(poAttainmentByYear);
+        dto.setHighestImprovedPO(highestImprovedPO);
+        dto.setHighestImprovedDelta(round2(highestImprovedDelta));
+        dto.setMostDeclinedPO(mostDeclinedPO);
+        dto.setMostDeclinedDelta(round2(mostDeclinedDelta));
+        dto.setSummary(summary);
+
+        return dto;
+    }
+
+    private double round2(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }
