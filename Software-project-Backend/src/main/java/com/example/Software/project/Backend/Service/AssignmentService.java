@@ -41,11 +41,12 @@ public class AssignmentService {
             assignment.setFileName(file.getOriginalFilename());
         }
 
-        // Link assignment to LosPos (NEW relationship structure)
-        assignment.setLosPos(losPos);
-
-        // Save assignment
+        // Save assignment first
         Assignment savedAssignment = assignmentRepository.save(assignment);
+
+        // Link assignment to LosPos (LosPos is the owner)
+        losPos.setAssignment(savedAssignment);
+        losPosRepository.save(losPos);
         
         return savedAssignment;
     }
@@ -57,9 +58,11 @@ public class AssignmentService {
 
     // Read Assignment by LosPos ID
     public Optional<Assignment> getAssignmentByLosPosId(String losPosId) {
-        // With new relationship, find assignments by LosPos ID
-        List<Assignment> assignments = assignmentRepository.findByLosPosId(losPosId);
-        return assignments.isEmpty() ? Optional.empty() : Optional.of(assignments.get(0));
+        Optional<LosPos> losPos = losPosRepository.findById(losPosId);
+        if (losPos.isPresent() && losPos.get().getAssignment() != null) {
+            return Optional.of(losPos.get().getAssignment());
+        }
+        return Optional.empty();
     }
 
     // Read One Assignment
@@ -90,8 +93,27 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Assignment not found"));
         
-        // With new relationship structure, just delete the assignment
-        // The relationship will be automatically handled by JPA
+        // Unlink from LosPos before deleting
+        // Since LosPos owns the relationship with CascadeType.ALL, we need to be careful.
+        // If we delete Assignment directly, JPA might complain if LosPos still references it.
+        // We should set LosPos assignment to null first.
+        
+        if (assignment.getLosPos() != null) {
+            LosPos losPos = assignment.getLosPos();
+            losPos.setAssignment(null);
+            losPosRepository.save(losPos);
+        } else {
+            // Fallback search if bidirectional link isn't set
+            List<LosPos> allLosPos = losPosRepository.findAll();
+            for (LosPos lp : allLosPos) {
+                if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
+                    lp.setAssignment(null);
+                    losPosRepository.save(lp);
+                    break;
+                }
+            }
+        }
+        
         assignmentRepository.deleteById(id);
     }
 
