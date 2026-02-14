@@ -18,7 +18,8 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     List<Assignment> findByAssignmentNameContainingIgnoreCase(String assignmentName);
     
     // Find assignments by LosPos Module Code
-    @Query("SELECT a FROM Assignment a WHERE a.losPos.moduleCode = :moduleCode")
+    // Fixed: a.losPos.module.moduleId instead of a.losPos.moduleCode
+    @Query("SELECT a FROM Assignment a WHERE a.losPos.module.moduleId = :moduleCode")
     List<Assignment> findByModuleCode(@Param("moduleCode") String moduleCode);
     
     // Find assignments created by a specific user

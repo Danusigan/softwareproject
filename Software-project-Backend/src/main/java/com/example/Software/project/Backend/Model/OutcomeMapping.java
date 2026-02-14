@@ -1,12 +1,13 @@
 package com.example.Software.project.Backend.Model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "lo_po_mappings")
-public class Mapping {
+public class OutcomeMapping {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -14,12 +15,12 @@ public class Mapping {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lospos_id", nullable = false)
-    @JsonBackReference
-    private LosPos losPos;
+    @JsonIgnore // Ignore getter to prevent recursion
+    private LosPos learningOutcome;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "program_outcome_id", nullable = false)
-    @JsonBackReference
+    @JsonIgnore // Ignore getter to prevent recursion
     private ProgramOutcome programOutcome;
     
     @Column(name = "weight", nullable = false)
@@ -27,7 +28,7 @@ public class Mapping {
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private MappingStatus status = MappingStatus.PENDING;
+    private ApprovalStatus status = ApprovalStatus.PENDING;
     
     @Column(name = "lecturer_remarks", columnDefinition = "TEXT")
     private String lecturerRemarks;
@@ -50,7 +51,7 @@ public class Mapping {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
-    public enum MappingStatus {
+    public enum ApprovalStatus {
         PENDING,    // Waiting for admin approval
         APPROVED,   // Approved by admin
         REJECTED    // Rejected by admin
@@ -61,7 +62,7 @@ public class Mapping {
         mappedAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (status == null) {
-            status = MappingStatus.PENDING;
+            status = ApprovalStatus.PENDING;
         }
         // Validate weight range
         if (weight != null && (weight < 0 || weight > 3)) {
@@ -79,15 +80,15 @@ public class Mapping {
     }
     
     // Default constructor
-    public Mapping() {}
+    public OutcomeMapping() {}
     
     // Constructor
-    public Mapping(LosPos losPos, ProgramOutcome programOutcome, Integer weight, String mappedBy) {
-        this.losPos = losPos;
+    public OutcomeMapping(LosPos learningOutcome, ProgramOutcome programOutcome, Integer weight, String mappedBy) {
+        this.learningOutcome = learningOutcome;
         this.programOutcome = programOutcome;
         this.weight = weight;
         this.mappedBy = mappedBy;
-        this.status = MappingStatus.PENDING;
+        this.status = ApprovalStatus.PENDING;
     }
     
     // Getters and setters
@@ -99,20 +100,35 @@ public class Mapping {
         this.id = id;
     }
     
-    public LosPos getLosPos() {
-        return losPos;
+    @JsonIgnore // Hide full object from output
+    public LosPos getLearningOutcome() {
+        return learningOutcome;
     }
     
-    public void setLosPos(LosPos losPos) {
-        this.losPos = losPos;
+    @JsonProperty("learningOutcome") // Allow setting full object from input
+    public void setLearningOutcome(LosPos learningOutcome) {
+        this.learningOutcome = learningOutcome;
     }
     
+    @JsonIgnore // Hide full object from output
     public ProgramOutcome getProgramOutcome() {
         return programOutcome;
     }
     
+    @JsonProperty("programOutcome") // Allow setting full object from input
     public void setProgramOutcome(ProgramOutcome programOutcome) {
         this.programOutcome = programOutcome;
+    }
+    
+    // Custom getters for IDs to be included in JSON output
+    @JsonProperty("learningOutcomeId")
+    public String getLearningOutcomeId() {
+        return learningOutcome != null ? learningOutcome.getId() : null;
+    }
+    
+    @JsonProperty("programOutcomeCode")
+    public String getProgramOutcomeCode() {
+        return programOutcome != null ? programOutcome.getCode() : null;
     }
     
     public Integer getWeight() {
@@ -128,11 +144,11 @@ public class Mapping {
         }
     }
     
-    public MappingStatus getStatus() {
+    public ApprovalStatus getStatus() {
         return status;
     }
     
-    public void setStatus(MappingStatus status) {
+    public void setStatus(ApprovalStatus status) {
         this.status = status;
     }
     
@@ -194,15 +210,15 @@ public class Mapping {
     
     // Helper methods
     public boolean isApproved() {
-        return status == MappingStatus.APPROVED;
+        return status == ApprovalStatus.APPROVED;
     }
     
     public boolean isPending() {
-        return status == MappingStatus.PENDING;
+        return status == ApprovalStatus.PENDING;
     }
     
     public boolean isRejected() {
-        return status == MappingStatus.REJECTED;
+        return status == ApprovalStatus.REJECTED;
     }
     
     public String getWeightDescription() {
@@ -217,7 +233,7 @@ public class Mapping {
     
     // Approve this mapping
     public void approve(String reviewedBy, String adminRemarks) {
-        this.status = MappingStatus.APPROVED;
+        this.status = ApprovalStatus.APPROVED;
         this.reviewedBy = reviewedBy;
         this.adminRemarks = adminRemarks;
         this.reviewedAt = LocalDateTime.now();
@@ -225,7 +241,7 @@ public class Mapping {
     
     // Reject this mapping
     public void reject(String reviewedBy, String adminRemarks) {
-        this.status = MappingStatus.REJECTED;
+        this.status = ApprovalStatus.REJECTED;
         this.reviewedBy = reviewedBy;
         this.adminRemarks = adminRemarks;
         this.reviewedAt = LocalDateTime.now();
@@ -233,10 +249,10 @@ public class Mapping {
     
     @Override
     public String toString() {
-        return "Mapping{" +
+        return "OutcomeMapping{" +
                 "id=" + id +
-                ", losPos=" + (losPos != null ? losPos.getLoId() : "null") +
-                ", programOutcome=" + (programOutcome != null ? programOutcome.getPoCode() : "null") +
+                ", learningOutcome=" + (learningOutcome != null ? learningOutcome.getId() : "null") +
+                ", programOutcome=" + (programOutcome != null ? programOutcome.getCode() : "null") +
                 ", weight=" + weight +
                 ", status=" + status +
                 ", mappedBy='" + mappedBy + '\'' +

@@ -37,13 +37,13 @@ public class ModuleRestController {
 
     // Read All (Public/Auth)
     @GetMapping("/all")
-    public List<com.example.Software.project.Backend.Model.Module> getAllModules() {
-        return moduleService.getAllModules();
+    public ResponseEntity<List<com.example.Software.project.Backend.Model.Module>> getAllModules(@RequestHeader("Authorization") String token) {
+        return ResponseEntity.ok(moduleService.getAllModules());
     }
 
     // Read One
     @GetMapping("/{id}")
-    public ResponseEntity<?> getModuleById(@PathVariable String id) {
+    public ResponseEntity<?> getModuleById(@PathVariable String id, @RequestHeader("Authorization") String token) {
         Optional<com.example.Software.project.Backend.Model.Module> module = moduleService.getModuleById(id);
         return module.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
