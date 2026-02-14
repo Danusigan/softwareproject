@@ -38,8 +38,8 @@ public interface StudentRepository extends JpaRepository<Student, String> {
     // Count students by academic year
     long countByAcademicYear(String academicYear);
     
-    // Find students who have submitted at least one assignment
-    @Query("SELECT DISTINCT s FROM Student s JOIN s.studentMarks sm WHERE sm.mark IS NOT NULL")
+    // Find students who have submitted at least one assignment (Fixed: sm.score instead of sm.mark)
+    @Query("SELECT DISTINCT s FROM Student s JOIN s.studentMarks sm WHERE sm.score IS NOT NULL")
     List<Student> findStudentsWithMarks();
     
     // Find students by part of student ID (useful for batch operations)
