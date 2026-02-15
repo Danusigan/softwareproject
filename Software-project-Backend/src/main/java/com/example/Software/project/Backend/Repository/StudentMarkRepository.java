@@ -10,8 +10,7 @@ import java.util.List;
 public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> {
     List<StudentMark> findByAssessment_AssignmentId(String assessmentId);
 
-    // Trend Analysis Query
-    // Updated to use a.academicYear instead of m.academicYear
+    // Module-level Trend (General Average)
     @Query("SELECT a.academicYear, AVG(sm.score) " +
            "FROM StudentMark sm " +
            "JOIN sm.assessment a " +
@@ -21,4 +20,15 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
            "GROUP BY a.academicYear " +
            "ORDER BY a.academicYear ASC")
     List<Object[]> findYearlyAverageByCourse(String courseId);
+
+    // LO-level Trend (Average per LO per Year)
+    @Query("SELECT lo.id, lo.name, a.academicYear, AVG(sm.score) " +
+           "FROM StudentMark sm " +
+           "JOIN sm.assessment a " +
+           "JOIN a.losPos lo " +
+           "JOIN lo.module m " +
+           "WHERE m.moduleId = :courseId " +
+           "GROUP BY lo.id, lo.name, a.academicYear " +
+           "ORDER BY lo.id, a.academicYear ASC")
+    List<Object[]> findLoTrendByCourse(String courseId);
 }

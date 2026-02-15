@@ -12,10 +12,37 @@ public class TrendService {
     @Autowired
     private StudentMarkRepository markRepository;
 
+    // Original Module-level trend
     public List<Map<String, Object>> getCourseTrend(String courseId) {
         List<Object[]> rawData = markRepository.findYearlyAverageByCourse(courseId);
-        List<Map<String, Object>> result = new ArrayList<>();
+        return processTrendData(rawData);
+    }
 
+    // New LO-level trend
+    public Map<String, List<Map<String, Object>>> getLoTrend(String courseId) {
+        List<Object[]> rawData = markRepository.findLoTrendByCourse(courseId);
+        Map<String, List<Map<String, Object>>> result = new HashMap<>();
+
+        // Group raw data by LO ID
+        Map<String, List<Object[]>> groupedData = new LinkedHashMap<>();
+        for (Object[] row : rawData) {
+            String loId = (String) row[0];
+            String loName = (String) row[1];
+            String key = loId + " - " + loName;
+            
+            groupedData.computeIfAbsent(key, k -> new ArrayList<>()).add(new Object[]{row[2], row[3]}); // year, avg
+        }
+
+        // Process trend for each LO
+        for (Map.Entry<String, List<Object[]>> entry : groupedData.entrySet()) {
+            result.put(entry.getKey(), processTrendData(entry.getValue()));
+        }
+
+        return result;
+    }
+
+    private List<Map<String, Object>> processTrendData(List<Object[]> rawData) {
+        List<Map<String, Object>> result = new ArrayList<>();
         Double previousAvg = null;
 
         for (Object[] row : rawData) {

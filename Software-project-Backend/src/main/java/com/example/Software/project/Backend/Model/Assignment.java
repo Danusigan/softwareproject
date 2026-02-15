@@ -15,7 +15,7 @@ public class Assignment {
     @Column(name = "assignment_name")
     private String assignmentName;
     
-    @Column(name = "academic_year")
+    @Column(name = "academic_year", nullable = false)
     private String academicYear; // e.g., "2023-2024"
 
     // Storing the CSV file content inside the DB
