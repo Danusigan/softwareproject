@@ -96,10 +96,16 @@ public class OBEController {
         return ResponseEntity.ok(poScores);
     }
 
-    // --- ANALYSIS: Trend ---
+    // --- ANALYSIS: Module Trend ---
     @GetMapping("/analysis/trend/{moduleId}")
     public ResponseEntity<?> getTrend(@PathVariable String moduleId) {
         return ResponseEntity.ok(trendService.getCourseTrend(moduleId));
+    }
+
+    // --- ANALYSIS: LO Trend (New) ---
+    @GetMapping("/analysis/trend/lo/{moduleId}")
+    public ResponseEntity<?> getLoTrend(@PathVariable String moduleId) {
+        return ResponseEntity.ok(trendService.getLoTrend(moduleId));
     }
 
     // Helper RBAC
