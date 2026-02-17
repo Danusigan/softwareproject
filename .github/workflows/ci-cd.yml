@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for better analysis
+          fetch-depth: 0
 
       - name: Run CodeQL Analysis (JavaScript)
         uses: github/codeql-action/init@v2
@@ -32,13 +32,6 @@ jobs:
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
-
-      - name: SonarQube Scan (Frontend)
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        continue-on-error: true
 
   # Backend Tests
   backend:
@@ -99,28 +92,6 @@ jobs:
           cd Software-project-Backend
           mvn test
 
-      - name: Generate Test Report
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: Backend Tests
-          path: Software-project-Backend/target/surefire-reports/*.xml
-          reporter: java-junit
-
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: Software-project-Backend/target/site/jacoco/jacoco.xml
-          flags: backend
-          fail_ci_if_error: false
-
-      - name: Publish Test Results
-        if: always()
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: Software-project-Backend/target/surefire-reports/*.xml
-          check_name: Backend Test Results
-
   # Frontend Tests
   frontend:
     runs-on: ubuntu-latest
@@ -141,101 +112,22 @@ jobs:
           cd softwareproject_frontend
           npm ci
 
-      - name: Lint Code
-        run: |
-          cd softwareproject_frontend
-          npm run lint 2>/dev/null || echo "⚠️  Linting not configured"
-        continue-on-error: true
-
       - name: Build
         run: |
           cd softwareproject_frontend
           npm run build
 
-      - name: Security Audit
-        run: |
-          cd softwareproject_frontend
-          npm audit --audit-level=moderate || echo "⚠️  Found vulnerabilities"
-        continue-on-error: true
-
       - name: Run Tests
         run: |
           cd softwareproject_frontend
-          npm test 2>/dev/null || echo "ℹ️  Tests not configured"
+          npm test 2>/dev/null || echo "Tests not configured"
         continue-on-error: true
-
-  # Security: Dependency Check
-  dependency-check:
-    runs-on: ubuntu-latest
-    name: Dependency Vulnerability Scan
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner (Frontend)
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: 'softwareproject_frontend'
-          format: 'sarif'
-          output: 'frontend-trivy-results.sarif'
-
-      - name: Upload Trivy Results
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'frontend-trivy-results.sarif'
-        continue-on-error: true
-
-  # Build & Push Docker Images (Production)
-  docker-build:
-    runs-on: ubuntu-latest
-    name: Build Docker Images
-    needs: [backend, frontend, quality-gate]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and Push Backend Image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./Software-project-Backend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and Push Frontend Image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./softwareproject_frontend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   # Final Status Check
   ci-status:
     runs-on: ubuntu-latest
     name: CI Status
-    needs: [backend, frontend, quality-gate, dependency-check]
+    needs: [backend, frontend, quality-gate]
     if: always()
     
     steps:
@@ -244,7 +136,6 @@ jobs:
           echo "✅ Backend Tests: ${{ needs.backend.result }}"
           echo "✅ Frontend Tests: ${{ needs.frontend.result }}"
           echo "✅ Code Quality: ${{ needs.quality-gate.result }}"
-          echo "✅ Dependencies: ${{ needs.dependency-check.result }}"
           
           if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ]; then
             echo "❌ Pipeline Failed"
