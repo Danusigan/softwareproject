@@ -129,13 +129,6 @@ security-audit:
 	@cd Software-project-Backend && mvn dependency-check:check || true
 	@echo "✅ Security audit complete"
 
-# Git operations
-git-push:
-	@echo "📤 Pushing to GitHub..."
-	git add .
-	git commit -m "Update from automated workflow"
-	git push origin main
-
 # Stats
 stats:
 	@echo "📊 Project Statistics:"

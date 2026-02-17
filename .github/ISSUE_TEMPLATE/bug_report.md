@@ -29,14 +29,6 @@ If applicable, add screenshots to help explain your problem.
 ## 💻 Environment
 - OS: [e.g., Windows 10, macOS 12, Ubuntu 22.04]
 - Browser: [e.g., Chrome, Firefox, Safari]
-- Backend Version: [check application properties]
-- Frontend Version: [check package.json]
 
 ## 📋 Additional Context
 Add any other context about the problem here.
-
-## 🔍 Logs
-If applicable, paste relevant error logs or stack traces:
-```
-Paste logs here
-```
