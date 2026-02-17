@@ -107,15 +107,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: softwareproject_frontend/package-lock.json
 
-      - name: Install Dependencies
+      - name: Clean Install Dependencies
         run: |
           cd softwareproject_frontend
-          npm install --legacy-peer-deps
-
-      - name: Rebuild Native Modules
-        run: |
-          cd softwareproject_frontend
-          npm rebuild
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Build
         run: |
