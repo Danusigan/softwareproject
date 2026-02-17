@@ -110,7 +110,12 @@ jobs:
       - name: Install Dependencies
         run: |
           cd softwareproject_frontend
-          npm ci
+          npm install --legacy-peer-deps
+
+      - name: Rebuild Native Modules
+        run: |
+          cd softwareproject_frontend
+          npm rebuild
 
       - name: Build
         run: |
