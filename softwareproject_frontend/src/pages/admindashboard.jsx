@@ -206,7 +206,7 @@ export default function AdminDashboard() {
             {/* Main Content */}
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800">dmin Dashboard</h1>
+                    <h1 className="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
                     <button
                         onClick={() => navigate('/modules')}
                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
