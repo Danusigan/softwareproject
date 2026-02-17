@@ -1,0 +1,64 @@
+# Ignore local environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+package-lock.json.lock
+
+# Maven
+target/
+.m2/
+*.jar
+
+# Docker
+docker-compose.override.yml
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Logs
+logs/
+*.log
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Git
+.git/
+
+# Credentials (never commit)
+**/application-dev.properties
+**/*.key
+**/*.pem
+**/secrets/
+
+# Database
+*.db
+*.sqlite
+
+# Cache
+.cache/
+.vite/
