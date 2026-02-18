@@ -1,0 +1,5 @@
+# ⚠️ DEPRECATED - Use ci-cd.yml instead
+# This file is kept for reference only
+# The enterprise-grade CI/CD pipeline is now in: .github/workflows/ci-cd.yml
+#
+# See CI_CD_SETUP.md for complete documentation

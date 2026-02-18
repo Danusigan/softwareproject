@@ -11,37 +11,22 @@ import java.util.List;
 @Repository
 public interface AssignmentRepository extends JpaRepository<Assignment, String> {
     
-    // Since Assignment doesn't have a direct "LosPos" field (LosPos has the Assignment),
-    // we need to find assignments by looking at the LosPos table.
-    // However, usually the relationship is bidirectional or we query LosPos.
+    // Find assignments by LosPos ID
+    List<Assignment> findByLosPosId(String losPosId);
     
-    // Let's check the LosPos model again.
-    // LosPos has: @ManyToOne Assignment assignment;
-    // This means LosPos OWNS the relationship. One LosPos has One Assignment?
-    // Or One LosPos has Many Assignments?
+    // Find assignments by assignment name
+    List<Assignment> findByAssignmentNameContainingIgnoreCase(String assignmentName);
     
-    // In your LosPos.java:
-    // @ManyToOne @JoinColumn(name = "assignment_id") private Assignment assignment;
+    // Find assignments by LosPos Module Code
+    // Fixed: a.losPos.module.moduleId instead of a.losPos.moduleCode
+    @Query("SELECT a FROM Assignment a WHERE a.losPos.module.moduleId = :moduleCode")
+    List<Assignment> findByModuleCode(@Param("moduleCode") String moduleCode);
     
-    // This implies MANY LosPos can share ONE Assignment.
-    // BUT usually, it's the other way around: One LosPos has MANY Assignments.
-    // If One LosPos has Many Assignments, then Assignment should have "private LosPos losPos".
+    // Find assignments created by a specific user
+    List<Assignment> findByCreatedByOrderByCreatedAtDesc(String createdBy);
     
-    // If the current design is: LosPos -> Assignment (Many-to-One), then one LosPos can only have ONE assignment.
-    // If that is the case, finding "Assignments for a LosPos" just means getting THE assignment for that LosPos.
-    
-    // Let's assume you want One LosPos to have MANY Assignments.
-    // If so, the Foreign Key should be in the Assignment table (pointing to LosPos).
-    
-    // CURRENT STATE CHECK:
-    // LosPos.java: private Assignment assignment; (FK is in LosPos table)
-    // This means a LosPos can only have ONE assignment.
-    
-    // If you want multiple assignments per LosPos, we need to change the relationship.
-    // But based on your previous requests ("add assignment to LosPos"), it seems you might want 1-to-1 or Many-to-1.
-    
-    // If 1 LosPos has 1 Assignment:
-    // We can find the assignment by finding the LosPos first, then getting .getAssignment().
-    
-    // I will implement the Service method to find the assignment via LosPos repository.
+    // Find assignments within a date range
+    @Query("SELECT a FROM Assignment a WHERE a.createdAt BETWEEN :startDate AND :endDate ORDER BY a.createdAt DESC")
+    List<Assignment> findByCreatedAtBetween(@Param("startDate") java.time.LocalDateTime startDate, 
+                                          @Param("endDate") java.time.LocalDateTime endDate);
 }
