@@ -3,6 +3,7 @@ package com.example.Software.project.Backend.Service;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -14,6 +15,9 @@ public class UserService {
     // Optional<User> findByUsername(String username);
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     /**
      * Authenticates a user using their username and password.
@@ -87,6 +91,30 @@ public class UserService {
             throw new Exception("Email already exists");
         }
 
+        // Store password as plain text (for development only)
+        // newUser.setPassword(passwordEncoder.encode(newUser.getPassword())); // Commented out for plain text
+
         return userRepository.save(newUser);
+    }
+    
+    /**
+     * Creates a test user with plain text password - for development/testing only
+     */
+    public User createTestUser(String username, String password, String email, String userType) throws Exception {
+        // Check if user already exists
+        if (userRepository.findByUsername(username).isPresent()) {
+            throw new Exception("Username already exists");
+        }
+        if (userRepository.findByEmail(email).isPresent()) {
+            throw new Exception("Email already exists");
+        }
+        
+        User testUser = new User();
+        testUser.setUserID(username);
+        testUser.setPassword(password); // Plain text password for now
+        testUser.setEmail(email);
+        testUser.setUsertype(userType);
+        
+        return userRepository.save(testUser);
     }
 }

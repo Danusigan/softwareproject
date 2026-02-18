@@ -133,4 +133,24 @@ public class UserRestController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
         }
     }
+
+    @PostMapping("/create-test-user")
+    public ResponseEntity<?> createTestUser() {
+        try {
+            User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Test user created successfully");
+            response.put("userId", testUser.getUserID());
+            response.put("email", testUser.getEmail());
+            response.put("userType", testUser.getUsertype());
+            response.put("status", "SUCCESS");
+            response.put("loginInfo", "You can now login with username: admin, password: password123");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to create test user: " + e.getMessage());
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
 }
