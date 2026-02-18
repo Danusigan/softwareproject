@@ -8,5 +8,7 @@ import java.util.List;
 
 @Repository
 public interface LosPosRepository extends JpaRepository<LosPos, String> {
+    
+    // Find all LosPos belonging to a specific module (by Module ID)
     List<LosPos> findByModule_ModuleId(String moduleId);
 }

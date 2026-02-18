@@ -14,9 +14,12 @@ public class Module {
 
     @Column(name = "module_name")
     private String moduleName;
+    
+    // Removed academicYear as requested
 
     // Relationship: One Module has many LosPos
-    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    // Removed @JsonManagedReference to avoid deserialization issues
+    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<LosPos> losPosList;
 
     // --- Getters and Setters ---

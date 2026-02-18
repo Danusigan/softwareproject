@@ -20,8 +20,11 @@ public class AssignmentService {
     @Autowired
     private LosPosRepository losPosRepository;
 
+    @Autowired
+    private ExcelImportService excelImportService;
+
     // Create (Lecture) - Add to LosPos
-    public LosPos addAssignmentToLosPos(String losPosId, Assignment assignment, MultipartFile file) throws Exception {
+    public Assignment addAssignmentToLosPos(String losPosId, Assignment assignment, MultipartFile file) throws Exception {
         Optional<LosPos> losPosOptional = losPosRepository.findById(losPosId);
         if (losPosOptional.isEmpty()) {
             throw new Exception("LosPos not found");
@@ -41,9 +44,11 @@ public class AssignmentService {
         // Save assignment first
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // Link assignment to LosPos
+        // Link assignment to LosPos (LosPos is the owner)
         losPos.setAssignment(savedAssignment);
-        return losPosRepository.save(losPos);
+        losPosRepository.save(losPos);
+        
+        return savedAssignment;
     }
 
     // Read All Assignments (Global)
@@ -89,14 +94,36 @@ public class AssignmentService {
                 .orElseThrow(() -> new Exception("Assignment not found"));
         
         // Unlink from LosPos before deleting
-        List<LosPos> allLosPos = losPosRepository.findAll();
-        for (LosPos lp : allLosPos) {
-            if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
-                lp.setAssignment(null);
-                losPosRepository.save(lp);
+        // Since LosPos owns the relationship with CascadeType.ALL, we need to be careful.
+        // If we delete Assignment directly, JPA might complain if LosPos still references it.
+        // We should set LosPos assignment to null first.
+        
+        if (assignment.getLosPos() != null) {
+            LosPos losPos = assignment.getLosPos();
+            losPos.setAssignment(null);
+            losPosRepository.save(losPos);
+        } else {
+            // Fallback search if bidirectional link isn't set
+            List<LosPos> allLosPos = losPosRepository.findAll();
+            for (LosPos lp : allLosPos) {
+                if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
+                    lp.setAssignment(null);
+                    losPosRepository.save(lp);
+                    break;
+                }
             }
         }
         
         assignmentRepository.deleteById(id);
+    }
+
+    // Import marks from Excel (delegates to ExcelImportService)
+    public String importMarksFromExcel(String assignmentId, MultipartFile excelFile) {
+        return excelImportService.importStudentMarksFromExcel(assignmentId, excelFile);
+    }
+
+    // Import marks from Excel using OBE format (2 columns: Student Index, Mark)
+    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
+        return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
 }
