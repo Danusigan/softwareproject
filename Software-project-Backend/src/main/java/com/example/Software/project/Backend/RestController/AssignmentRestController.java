@@ -1,7 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.Assignment;
-import com.example.Software.project.Backend.Model.LosPos;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AssignmentService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,15 +24,21 @@ public class AssignmentRestController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // Create (Lecture Only) - Add to LosPos
-    @PostMapping("/{losPosId}/add")
+    // Create (Lecture Only) - Add to Los
+    @PostMapping("/{losId}/add")
     public ResponseEntity<?> addAssignment(
-            @PathVariable String losPosId,
+            @PathVariable String losId,
             @RequestParam("assignmentId") String assignmentId,
             @RequestParam("assignmentName") String assignmentName,
+            @RequestParam("academicYear") String academicYear,
             @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestHeader("Authorization") String token) {
         try {
+            System.out.println("Received Add Assignment Request:");
+            System.out.println("Los ID: " + losId);
+            System.out.println("Assignment ID: " + assignmentId);
+            System.out.println("Academic Year: " + academicYear);
+
             if (!isLecture(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture can add Assignments");
             }
@@ -41,10 +46,12 @@ public class AssignmentRestController {
             Assignment assignment = new Assignment();
             assignment.setAssignmentId(assignmentId);
             assignment.setAssignmentName(assignmentName);
+            assignment.setAcademicYear(academicYear);
 
-            Assignment addedAssignment = assignmentService.addAssignmentToLosPos(losPosId, assignment, file);
+            Assignment addedAssignment = assignmentService.addAssignmentToLos(losId, assignment, file);
             return ResponseEntity.ok(addedAssignment);
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
         }
     }
@@ -55,10 +62,10 @@ public class AssignmentRestController {
         return ResponseEntity.ok(assignmentService.getAllAssignments());
     }
 
-    // Read Assignment by LosPos ID
-    @GetMapping("/lospos/{losPosId}")
-    public ResponseEntity<?> getAssignmentByLosPosId(@PathVariable String losPosId, @RequestHeader("Authorization") String token) {
-        Optional<Assignment> assignment = assignmentService.getAssignmentByLosPosId(losPosId);
+    // Read Assignment by Los ID
+    @GetMapping("/lospos/{losId}") // Kept endpoint name for compatibility, but param is losId
+    public ResponseEntity<?> getAssignmentByLosId(@PathVariable String losId, @RequestHeader("Authorization") String token) {
+        Optional<Assignment> assignment = assignmentService.getAssignmentByLosId(losId);
         return assignment.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
