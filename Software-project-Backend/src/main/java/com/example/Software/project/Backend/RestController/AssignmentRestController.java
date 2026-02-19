@@ -30,7 +30,8 @@ public class AssignmentRestController {
             @PathVariable String losId,
             @RequestParam("assignmentId") String assignmentId,
             @RequestParam("assignmentName") String assignmentName,
-            @RequestParam("academicYear") String academicYear,
+            @RequestParam(value = "academicYear", required = false) String academicYear,
+            @RequestParam(value = "batch", required = false) String batch,
             @RequestParam(value = "file", required = false) MultipartFile file,
             @RequestHeader("Authorization") String token) {
         try {
@@ -46,7 +47,8 @@ public class AssignmentRestController {
             Assignment assignment = new Assignment();
             assignment.setAssignmentId(assignmentId);
             assignment.setAssignmentName(assignmentName);
-            assignment.setAcademicYear(academicYear);
+            assignment.setAcademicYear(academicYear != null ? academicYear : "2024/25");
+            assignment.setBatch(batch);
 
             Assignment addedAssignment = assignmentService.addAssignmentToLos(losId, assignment, file);
             return ResponseEntity.ok(addedAssignment);
@@ -149,6 +151,8 @@ public class AssignmentRestController {
     public ResponseEntity<?> importStudentMarksOBE(
             @PathVariable String assignmentId,
             @RequestParam("excelFile") MultipartFile excelFile,
+            @RequestParam(value = "academicYear", required = false) String academicYear,
+            @RequestParam(value = "batch", required = false) String batch,
             @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -161,7 +165,7 @@ public class AssignmentRestController {
                     .body("Error: Excel file is required");
             }
 
-            String result = assignmentService.importMarksFromExcelOBEFormat(assignmentId, excelFile);
+            String result = assignmentService.importMarksFromExcelOBEFormat(assignmentId, excelFile, academicYear, batch);
             return ResponseEntity.ok(Map.of(
                 "message", "Student marks imported successfully (OBE Format)",
                 "details", result,
