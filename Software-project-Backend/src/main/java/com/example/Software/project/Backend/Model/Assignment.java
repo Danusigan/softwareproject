@@ -18,6 +18,9 @@ public class Assignment {
     @Column(name = "academic_year", nullable = false)
     private String academicYear; // e.g., "2023-2024"
 
+    @Column(name = "batch")
+    private String batch; // e.g., "20", "21"
+
     // Storing the CSV file content inside the DB
     // @Lob indicates a Large Object (BLOB)
     @Lob
@@ -27,8 +30,9 @@ public class Assignment {
     // Optional: Store filename if needed
     private String fileName;
     
-    // Bidirectional relationship for JPQL queries
-    @OneToOne(mappedBy = "assignment")
+    // Relationship to LosPos (Many Assignments for one LO)
+    @ManyToOne
+    @JoinColumn(name = "los_pos_id")
     @JsonIgnore // Prevent infinite recursion
     private LosPos losPos;
 
@@ -63,6 +67,9 @@ public class Assignment {
     
     public String getAcademicYear() { return academicYear; }
     public void setAcademicYear(String academicYear) { this.academicYear = academicYear; }
+
+    public String getBatch() { return batch; }
+    public void setBatch(String batch) { this.batch = batch; }
 
     public byte[] getMarksCsvFile() { return marksCsvFile; }
     public void setMarksCsvFile(byte[] marksCsvFile) { this.marksCsvFile = marksCsvFile; }

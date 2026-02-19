@@ -16,16 +16,24 @@ public class LosPos {
     @Column(name = "name")
     private String name; // The "Lo&Po Name"
 
+    @Column(name = "lo_id")
+    private String loId;
+
+    @Column(name = "lo_description")
+    private String loDescription;
+
+    @Column(name = "module_code")
+    private String moduleCode;
+
     // Foreign Key to Module
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "module_id", nullable = false)
     @JsonIgnore // Prevent infinite recursion
     private Module module;
 
-    // Relationship to Assignment
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "assignment_id")
-    private Assignment assignment;
+    // Relationship to Assignments (One LO has many result batches)
+    @OneToMany(mappedBy = "losPos", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<Assignment> assignments;
     
     // Relationship to OutcomeMapping
     @OneToMany(mappedBy = "learningOutcome", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -40,11 +48,20 @@ public class LosPos {
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    public String getLoId() { return loId; }
+    public void setLoId(String loId) { this.loId = loId; }
+
+    public String getLoDescription() { return loDescription; }
+    public void setLoDescription(String loDescription) { this.loDescription = loDescription; }
+
+    public String getModuleCode() { return moduleCode; }
+    public void setModuleCode(String moduleCode) { this.moduleCode = moduleCode; }
+
     public Module getModule() { return module; }
     public void setModule(Module module) { this.module = module; }
 
-    public Assignment getAssignment() { return assignment; }
-    public void setAssignment(Assignment assignment) { this.assignment = assignment; }
+    public List<Assignment> getAssignments() { return assignments; }
+    public void setAssignments(List<Assignment> assignments) { this.assignments = assignments; }
     
     public List<OutcomeMapping> getMappings() { return mappings; }
     public void setMappings(List<OutcomeMapping> mappings) { this.mappings = mappings; }

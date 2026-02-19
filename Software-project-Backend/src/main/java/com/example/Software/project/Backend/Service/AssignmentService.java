@@ -41,12 +41,17 @@ public class AssignmentService {
             assignment.setFileName(file.getOriginalFilename());
         }
 
-        // Save assignment first
+        // Link assignment to LosPos (Many assignments pointing to one LosPos)
+        assignment.setLosPos(losPos);
+        
+        // Save assignment
         Assignment savedAssignment = assignmentRepository.save(assignment);
-
-        // Link assignment to LosPos (LosPos is the owner)
-        losPos.setAssignment(savedAssignment);
-        losPosRepository.save(losPos);
+        
+        // We don't need to save losPos explicitly if there's no changes to it,
+        // but if we want to ensure the relationship is refreshed:
+        if (losPos.getAssignments() != null) {
+            losPos.getAssignments().add(savedAssignment);
+        }
         
         return savedAssignment;
     }
@@ -56,13 +61,12 @@ public class AssignmentService {
         return assignmentRepository.findAll();
     }
 
-    // Read Assignment by LosPos ID
-    public Optional<Assignment> getAssignmentByLosPosId(String losPosId) {
+    public List<Assignment> getAssignmentsByLosPosId(String losPosId) {
         Optional<LosPos> losPos = losPosRepository.findById(losPosId);
-        if (losPos.isPresent() && losPos.get().getAssignment() != null) {
-            return Optional.of(losPos.get().getAssignment());
+        if (losPos.isPresent()) {
+            return losPos.get().getAssignments();
         }
-        return Optional.empty();
+        return List.of();
     }
 
     // Read One Assignment
@@ -100,17 +104,8 @@ public class AssignmentService {
         
         if (assignment.getLosPos() != null) {
             LosPos losPos = assignment.getLosPos();
-            losPos.setAssignment(null);
-            losPosRepository.save(losPos);
-        } else {
-            // Fallback search if bidirectional link isn't set
-            List<LosPos> allLosPos = losPosRepository.findAll();
-            for (LosPos lp : allLosPos) {
-                if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
-                    lp.setAssignment(null);
-                    losPosRepository.save(lp);
-                    break;
-                }
+            if (losPos.getAssignments() != null) {
+                losPos.getAssignments().remove(assignment);
             }
         }
         
@@ -123,7 +118,22 @@ public class AssignmentService {
     }
 
     // Import marks from Excel using OBE format (2 columns: Student Index, Mark)
-    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
+    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile, String academicYear, String batch) {
+        // Ensure academicYear and batch are updated if provided
+        assignmentRepository.findById(assignmentId).ifPresent(a -> {
+            boolean changed = false;
+            if (academicYear != null && !academicYear.trim().isEmpty()) {
+                a.setAcademicYear(academicYear);
+                changed = true;
+            }
+            if (batch != null && !batch.trim().isEmpty()) {
+                a.setBatch(batch);
+                changed = true;
+            }
+            if (changed) {
+                assignmentRepository.save(a);
+            }
+        });
         return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
 }

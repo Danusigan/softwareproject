@@ -26,12 +26,27 @@ public class LosPosRestController {
     @PostMapping("/{moduleId}/add")
     public ResponseEntity<?> addLosPos(@PathVariable String moduleId, @RequestBody LosPos losPos, @RequestHeader("Authorization") String token) {
         try {
-            if (!isLecture(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture can add LosPos");
+            String role = null;
+            try {
+                if (token != null && token.startsWith("Bearer ")) {
+                    role = jwtUtil.extractRole(token.substring(7));
+                }
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired session. Please logout and login again.");
             }
+
+            if (role == null || !isLectureRole(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Lecture/Admin can add LosPos. Current role: " + role);
+            }
+
+            if (losPos.getId() == null || losPos.getId().trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: Learning Outcome ID is required");
+            }
+
             LosPos createdLosPos = losPosService.addLosPosToModule(moduleId, losPos);
             return ResponseEntity.ok(createdLosPos);
         } catch (Exception e) {
+            e.printStackTrace(); // Helpful for server-side debugging
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
         }
     }
@@ -79,6 +94,10 @@ public class LosPosRestController {
 
     private boolean isLecture(String token) {
         String role = jwtUtil.extractRole(token.substring(7));
+        return isLectureRole(role);
+    }
+
+    private boolean isLectureRole(String role) {
         return "Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
     }
 }

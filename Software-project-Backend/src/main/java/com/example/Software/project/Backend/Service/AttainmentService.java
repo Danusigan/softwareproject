@@ -21,13 +21,17 @@ public class AttainmentService {
     // 1. Calculate LO Attainment Level (1, 2, or 3)
     public int calculateLOLevel(String loId) {
         LosPos lo = losPosRepository.findById(loId).orElse(null);
-        if (lo == null || lo.getAssignment() == null) return 0;
+        if (lo == null || lo.getAssignments() == null || lo.getAssignments().isEmpty()) return 0;
 
-        List<StudentMark> marks = markRepository.findByAssessment_AssignmentId(lo.getAssignment().getAssignmentId());
-        if (marks.isEmpty()) return 0;
+        List<StudentMark> allMarks = new ArrayList<>();
+        for (Assignment assignment : lo.getAssignments()) {
+            allMarks.addAll(markRepository.findByAssessment_AssignmentId(assignment.getAssignmentId()));
+        }
 
-        long totalStudents = marks.size();
-        long passedStudents = marks.stream().filter(m -> m.getScore() >= 50.0).count();
+        if (allMarks.isEmpty()) return 0;
+
+        long totalStudents = allMarks.size();
+        long passedStudents = allMarks.stream().filter(m -> m.getScore() >= 50.0).count();
         
         double percentage = (double) passedStudents / totalStudents * 100;
 
