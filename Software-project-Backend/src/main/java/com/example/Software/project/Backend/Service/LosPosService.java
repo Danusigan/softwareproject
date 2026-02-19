@@ -25,9 +25,21 @@ public class LosPosService {
         if (moduleOptional.isEmpty()) {
             throw new Exception("Module not found");
         }
-        if (losPosRepository.existsById(losPos.getId())) {
-            throw new Exception("LosPos ID already exists");
+        
+        // Ensure ID uniqueness by prefixing it with moduleId
+        if (losPos.getId() == null || losPos.getId().trim().isEmpty()) {
+            throw new Exception("Learning Outcome ID cannot be empty");
         }
+        
+        String rawLoId = losPos.getId().trim();
+        String uniqueId = moduleId + "_" + rawLoId;
+        if (losPosRepository.existsById(uniqueId)) {
+            throw new Exception("Learning Outcome with ID " + rawLoId + " already exists for this module.");
+        }
+        
+        losPos.setId(uniqueId);
+        losPos.setLoId(rawLoId);
+        losPos.setModuleCode(moduleId);
         losPos.setModule(moduleOptional.get());
         return losPosRepository.save(losPos);
     }
@@ -48,6 +60,9 @@ public class LosPosService {
                 .orElseThrow(() -> new Exception("LosPos not found"));
         
         losPos.setName(losPosDetails.getName());
+        losPos.setLoId(losPosDetails.getLoId());
+        losPos.setLoDescription(losPosDetails.getLoDescription());
+        losPos.setModuleCode(losPosDetails.getModuleCode());
         return losPosRepository.save(losPos);
     }
 

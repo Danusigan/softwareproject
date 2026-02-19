@@ -6,6 +6,9 @@ import AdminDashboard from './pages/admindashboard'
 import SuperAdminDashboard from './pages/superadmindashboard'
 import LecturerDashboard from './pages/lecturerdashboard'
 import ModulesPage from './pages/modulespage'
+import LODetailPage from './pages/LODetailPage'
+import AddResultsPage from './pages/AddResultsPage'
+import ComparisonPage from './pages/ComparisonPage'
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 
 
@@ -22,6 +25,9 @@ function App() {
         <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
         <Route path="/lecturer-dashboard" element={<LecturerDashboard />} />
         <Route path="/modules" element={<ModulesPage />} />
+        <Route path="/lo-detail/:loId" element={<LODetailPage />} />
+        <Route path="/lo-detail/:loId/add-results" element={<AddResultsPage />} />
+        <Route path="/lo-detail/:loId/comparisons" element={<ComparisonPage />} />
       </Routes>
     </Router>
   )
