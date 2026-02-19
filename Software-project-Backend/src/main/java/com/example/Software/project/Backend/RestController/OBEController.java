@@ -20,7 +20,7 @@ public class OBEController {
 
     @Autowired private ProgramOutcomeRepository poRepo;
     @Autowired private OutcomeMappingRepository mapRepo;
-    @Autowired private LosPosRepository loRepo;
+    @Autowired private LosRepository losRepo;
     @Autowired private ExcelImportService excelService;
     @Autowired private AttainmentService attainmentService;
     @Autowired private TrendService trendService;
@@ -37,17 +37,17 @@ public class OBEController {
     @PostMapping("/mappings/bulk-save")
     public ResponseEntity<?> saveMappings(@RequestBody List<OutcomeMapping> mappings, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
-        
+
         try {
             // Ensure LO and PO exist before saving
             for (OutcomeMapping m : mappings) {
                 m.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
-                
+
                 // Fetch existing Learning Outcome
                 if (m.getLearningOutcome() != null && m.getLearningOutcome().getId() != null) {
-                    LosPos lo = loRepo.findById(m.getLearningOutcome().getId())
+                    Los los = losRepo.findById(m.getLearningOutcome().getId())
                             .orElseThrow(() -> new RuntimeException("Learning Outcome not found: " + m.getLearningOutcome().getId()));
-                    m.setLearningOutcome(lo);
+                    m.setLearningOutcome(los);
                 } else {
                     throw new RuntimeException("Learning Outcome ID is required");
                 }
@@ -71,7 +71,7 @@ public class OBEController {
     @PutMapping("/admin/approve-mapping/{id}")
     public ResponseEntity<?> approveMapping(@PathVariable Long id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admin only");
-        
+
         OutcomeMapping mapping = mapRepo.findById(id).orElseThrow();
         mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
         return ResponseEntity.ok(mapRepo.save(mapping));
