@@ -14,7 +14,7 @@ export default function LecturerDashboard() {
     const [showAddLoDialog, setShowAddLoDialog] = useState(false);
     const [showEditLoDialog, setShowEditLoDialog] = useState(false);
     const [editingLo, setEditingLo] = useState(null);
-    
+
     const [loData, setLoData] = useState({
         loNumber: '',
         description: ''
@@ -68,7 +68,8 @@ export default function LecturerDashboard() {
                 `http://localhost:8080/api/lospos/${selectedModule.moduleId}/add`,
                 {
                     id: loData.loNumber,
-                    name: loData.description
+                    name: `LO ${loData.loNumber}`,
+                    loDescription: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -80,10 +81,12 @@ export default function LecturerDashboard() {
             setShowAddLoDialog(false);
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to add LO' 
+            const errorMsg = err.response?.data || 'Failed to add LO';
+            setMessage({
+                type: 'error',
+                text: errorMsg
             });
+            alert(typeof errorMsg === 'object' ? JSON.stringify(errorMsg) : errorMsg);
         } finally {
             setLoading(false);
         }
@@ -100,7 +103,8 @@ export default function LecturerDashboard() {
                 `http://localhost:8080/api/lospos/${editingLo.id}`,
                 {
                     id: loData.loNumber,
-                    name: loData.description
+                    name: `LO ${loData.loNumber}`,
+                    loDescription: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -113,9 +117,9 @@ export default function LecturerDashboard() {
             setLoData({ loNumber: '', description: '' });
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to update LO' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to update LO'
             });
         } finally {
             setLoading(false);
@@ -134,16 +138,16 @@ export default function LecturerDashboard() {
             setMessage({ type: 'success', text: 'LO deleted successfully!' });
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to delete LO' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to delete LO'
             });
         }
     };
 
     const openEditDialog = (lo) => {
         setEditingLo(lo);
-        setLoData({ loNumber: lo.id, description: lo.name });
+        setLoData({ loNumber: lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id, description: lo.loDescription || lo.name });
         setShowEditLoDialog(true);
     };
 
@@ -165,9 +169,8 @@ export default function LecturerDashboard() {
                 </div>
 
                 {message.text && (
-                    <div className={`mb-4 p-4 rounded-lg ${
-                        message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
+                    <div className={`mb-4 p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
                         {message.text}
                     </div>
                 )}
@@ -253,16 +256,21 @@ export default function LecturerDashboard() {
                                     los.map((lo) => (
                                         <div
                                             key={lo.id}
-                                            className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors"
+                                            onClick={() => {
+                                                const loNum = lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id;
+                                                sessionStorage.setItem('currentLoNumber', loNum);
+                                                navigate(`/lo-detail/${lo.id}`);
+                                            }}
+                                            className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group"
                                         >
                                             <div className="flex justify-between items-start">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">
-                                                            {lo.id}
+                                                            {lo.id?.includes('_') ? `LO ${lo.id.split('_').pop()}` : lo.id}
                                                         </span>
                                                     </div>
-                                                    <p className="text-gray-700">{lo.name}</p>
+                                                    <p className="text-gray-700 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => navigate(`/lo-detail/${lo.id}`)}>{lo.loDescription || lo.name}</p>
                                                 </div>
                                                 <div className="flex gap-2 ml-4">
                                                     {/* Edit Icon */}

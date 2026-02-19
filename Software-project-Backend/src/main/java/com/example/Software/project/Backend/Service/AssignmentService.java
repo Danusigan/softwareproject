@@ -43,7 +43,10 @@ public class AssignmentService {
             assignment.setFileName(file.getOriginalFilename());
         }
 
-        // Save assignment first
+        // Link assignment to LosPos (Many assignments pointing to one LosPos)
+        assignment.setLosPos(losPos);
+
+        // Save assignment
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
         // Link assignment to Los (Los is the owner)
@@ -64,7 +67,7 @@ public class AssignmentService {
         if (los.isPresent() && los.get().getAssignment() != null) {
             return Optional.of(los.get().getAssignment());
         }
-        return Optional.empty();
+        return List.of();
     }
 
     // Read One Assignment
@@ -123,7 +126,22 @@ public class AssignmentService {
     }
 
     // Import marks from Excel using OBE format (2 columns: Student Index, Mark)
-    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
+    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile, String academicYear, String batch) {
+        // Ensure academicYear and batch are updated if provided
+        assignmentRepository.findById(assignmentId).ifPresent(a -> {
+            boolean changed = false;
+            if (academicYear != null && !academicYear.trim().isEmpty()) {
+                a.setAcademicYear(academicYear);
+                changed = true;
+            }
+            if (batch != null && !batch.trim().isEmpty()) {
+                a.setBatch(batch);
+                changed = true;
+            }
+            if (changed) {
+                assignmentRepository.save(a);
+            }
+        });
         return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
 }
