@@ -14,7 +14,7 @@ public class Assignment {
 
     @Column(name = "assignment_name")
     private String assignmentName;
-    
+
     @Column(name = "academic_year", nullable = false)
     private String academicYear; // e.g., "2023-2024"
 
@@ -26,11 +26,11 @@ public class Assignment {
 
     // Optional: Store filename if needed
     private String fileName;
-    
+
     // Bidirectional relationship for JPQL queries
     @OneToOne(mappedBy = "assignment")
     @JsonIgnore // Prevent infinite recursion
-    private LosPos losPos;
+    private Los los; // Renamed from losPos
 
     // Audit fields
     @Column(name = "created_by")
@@ -60,7 +60,7 @@ public class Assignment {
 
     public String getAssignmentName() { return assignmentName; }
     public void setAssignmentName(String assignmentName) { this.assignmentName = assignmentName; }
-    
+
     public String getAcademicYear() { return academicYear; }
     public void setAcademicYear(String academicYear) { this.academicYear = academicYear; }
 
@@ -69,9 +69,9 @@ public class Assignment {
 
     public String getFileName() { return fileName; }
     public void setFileName(String fileName) { this.fileName = fileName; }
-    
-    public LosPos getLosPos() { return losPos; }
-    public void setLosPos(LosPos losPos) { this.losPos = losPos; }
+
+    public Los getLos() { return los; }
+    public void setLos(Los los) { this.los = los; }
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }

@@ -1,11 +1,12 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Assignment;
-import com.example.Software.project.Backend.Model.LosPos;
+import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Repository.AssignmentRepository;
-import com.example.Software.project.Backend.Repository.LosPosRepository;
+import com.example.Software.project.Backend.Repository.LosRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -18,22 +19,23 @@ public class AssignmentService {
     private AssignmentRepository assignmentRepository;
 
     @Autowired
-    private LosPosRepository losPosRepository;
+    private LosRepository losRepository;
 
     @Autowired
     private ExcelImportService excelImportService;
 
-    // Create (Lecture) - Add to LosPos
-    public Assignment addAssignmentToLosPos(String losPosId, Assignment assignment, MultipartFile file) throws Exception {
-        Optional<LosPos> losPosOptional = losPosRepository.findById(losPosId);
-        if (losPosOptional.isEmpty()) {
-            throw new Exception("LosPos not found");
+    // Create (Lecture) - Add to Los
+    @Transactional
+    public Assignment addAssignmentToLos(String losId, Assignment assignment, MultipartFile file) throws Exception {
+        Optional<Los> losOptional = losRepository.findById(losId);
+        if (losOptional.isEmpty()) {
+            throw new Exception("Los not found");
         }
         if (assignmentRepository.existsById(assignment.getAssignmentId())) {
             throw new Exception("Assignment ID already exists");
         }
 
-        LosPos losPos = losPosOptional.get();
+        Los los = losOptional.get();
 
         // Process file if present (Optional)
         if (file != null && !file.isEmpty()) {
@@ -44,10 +46,10 @@ public class AssignmentService {
         // Save assignment first
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // Link assignment to LosPos (LosPos is the owner)
-        losPos.setAssignment(savedAssignment);
-        losPosRepository.save(losPos);
-        
+        // Link assignment to Los (Los is the owner)
+        los.setAssignment(savedAssignment);
+        losRepository.save(los);
+
         return savedAssignment;
     }
 
@@ -56,11 +58,11 @@ public class AssignmentService {
         return assignmentRepository.findAll();
     }
 
-    // Read Assignment by LosPos ID
-    public Optional<Assignment> getAssignmentByLosPosId(String losPosId) {
-        Optional<LosPos> losPos = losPosRepository.findById(losPosId);
-        if (losPos.isPresent() && losPos.get().getAssignment() != null) {
-            return Optional.of(losPos.get().getAssignment());
+    // Read Assignment by Los ID
+    public Optional<Assignment> getAssignmentByLosId(String losId) {
+        Optional<Los> los = losRepository.findById(losId);
+        if (los.isPresent() && los.get().getAssignment() != null) {
+            return Optional.of(los.get().getAssignment());
         }
         return Optional.empty();
     }
@@ -71,6 +73,7 @@ public class AssignmentService {
     }
 
     // Update Assignment (Lecture)
+    @Transactional
     public Assignment updateAssignment(String id, String newName, MultipartFile file) throws Exception {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Assignment not found"));
@@ -78,42 +81,39 @@ public class AssignmentService {
         if (newName != null && !newName.isEmpty()) {
             assignment.setAssignmentName(newName);
         }
-        
+
         // File is optional during update
         if (file != null && !file.isEmpty()) {
             assignment.setMarksCsvFile(file.getBytes());
             assignment.setFileName(file.getOriginalFilename());
         }
-        
+
         return assignmentRepository.save(assignment);
     }
 
     // Delete Assignment (Lecture)
+    @Transactional
     public void deleteAssignment(String id) throws Exception {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Assignment not found"));
-        
-        // Unlink from LosPos before deleting
-        // Since LosPos owns the relationship with CascadeType.ALL, we need to be careful.
-        // If we delete Assignment directly, JPA might complain if LosPos still references it.
-        // We should set LosPos assignment to null first.
-        
-        if (assignment.getLosPos() != null) {
-            LosPos losPos = assignment.getLosPos();
-            losPos.setAssignment(null);
-            losPosRepository.save(losPos);
+
+        // Unlink from Los before deleting
+        if (assignment.getLos() != null) {
+            Los los = assignment.getLos();
+            los.setAssignment(null);
+            losRepository.save(los);
         } else {
             // Fallback search if bidirectional link isn't set
-            List<LosPos> allLosPos = losPosRepository.findAll();
-            for (LosPos lp : allLosPos) {
+            List<Los> allLos = losRepository.findAll();
+            for (Los lp : allLos) {
                 if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
                     lp.setAssignment(null);
-                    losPosRepository.save(lp);
+                    losRepository.save(lp);
                     break;
                 }
             }
         }
-        
+
         assignmentRepository.deleteById(id);
     }
 
