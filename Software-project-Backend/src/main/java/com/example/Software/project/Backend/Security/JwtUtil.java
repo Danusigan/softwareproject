@@ -15,7 +15,10 @@ import java.util.function.Function;
 @Component
 public class JwtUtil {
 
-    private final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    // Use a fixed secret key to ensure tokens remain valid across restarts.
+    // In production, this should be loaded from environment variables.
+    private static final String SECRET_STRING = "your_very_secret_and_long_string_for_jwt_signing_256_bits";
+    private final Key SECRET_KEY = Keys.hmacShaKeyFor(SECRET_STRING.getBytes());
 
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
