@@ -10,23 +10,23 @@ import java.util.List;
 
 @Repository
 public interface AssignmentRepository extends JpaRepository<Assignment, String> {
-    
-    // Find assignments by LosPos ID
-    List<Assignment> findByLosPosId(String losPosId);
-    
+
+    // Find assignments by Los ID (Renamed from LosPos)
+    List<Assignment> findByLosId(String losId);
+
     // Find assignments by assignment name
     List<Assignment> findByAssignmentNameContainingIgnoreCase(String assignmentName);
-    
-    // Find assignments by LosPos Module Code
-    // Fixed: a.losPos.module.moduleId instead of a.losPos.moduleCode
-    @Query("SELECT a FROM Assignment a WHERE a.losPos.module.moduleId = :moduleCode")
+
+    // Find assignments by Los Module Code
+    // Fixed: a.los.module.moduleId instead of a.losPos.module.moduleId
+    @Query("SELECT a FROM Assignment a WHERE a.los.module.moduleId = :moduleCode")
     List<Assignment> findByModuleCode(@Param("moduleCode") String moduleCode);
-    
+
     // Find assignments created by a specific user
     List<Assignment> findByCreatedByOrderByCreatedAtDesc(String createdBy);
-    
+
     // Find assignments within a date range
     @Query("SELECT a FROM Assignment a WHERE a.createdAt BETWEEN :startDate AND :endDate ORDER BY a.createdAt DESC")
-    List<Assignment> findByCreatedAtBetween(@Param("startDate") java.time.LocalDateTime startDate, 
+    List<Assignment> findByCreatedAtBetween(@Param("startDate") java.time.LocalDateTime startDate,
                                           @Param("endDate") java.time.LocalDateTime endDate);
 }

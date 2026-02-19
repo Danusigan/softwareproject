@@ -14,7 +14,7 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
     @Query("SELECT a.academicYear, AVG(sm.score) " +
            "FROM StudentMark sm " +
            "JOIN sm.assessment a " +
-           "JOIN a.losPos lo " + 
+           "JOIN a.los lo " + // Renamed from losPos to los
            "JOIN lo.module m " +
            "WHERE m.moduleId = :courseId " +
            "GROUP BY a.academicYear " +
@@ -25,7 +25,7 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
     @Query("SELECT lo.id, lo.name, a.academicYear, AVG(sm.score) " +
            "FROM StudentMark sm " +
            "JOIN sm.assessment a " +
-           "JOIN a.losPos lo " +
+           "JOIN a.los lo " + // Renamed from losPos to los
            "JOIN lo.module m " +
            "WHERE m.moduleId = :courseId " +
            "GROUP BY lo.id, lo.name, a.academicYear " +
