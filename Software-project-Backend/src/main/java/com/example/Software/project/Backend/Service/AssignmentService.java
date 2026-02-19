@@ -43,17 +43,12 @@ public class AssignmentService {
             assignment.setFileName(file.getOriginalFilename());
         }
 
-        // Link assignment to LosPos (Many assignments pointing to one LosPos)
-        assignment.setLosPos(losPos);
-
-        // Save assignment
+        // Save assignment first
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // We don't need to save losPos explicitly if there's no changes to it,
-        // but if we want to ensure the relationship is refreshed:
-        if (losPos.getAssignments() != null) {
-            losPos.getAssignments().add(savedAssignment);
-        }
+        // Link assignment to Los (Los is the owner)
+        los.setAssignment(savedAssignment);
+        losRepository.save(los);
 
         return savedAssignment;
     }
@@ -63,12 +58,13 @@ public class AssignmentService {
         return assignmentRepository.findAll();
     }
 
-    public List<Assignment> getAssignmentsByLosPosId(String losPosId) {
-        Optional<LosPos> losPos = losPosRepository.findById(losPosId);
-        if (losPos.isPresent()) {
-            return losPos.get().getAssignments();
+    // Read Assignment by Los ID
+    public Optional<Assignment> getAssignmentByLosId(String losId) {
+        Optional<Los> los = losRepository.findById(losId);
+        if (los.isPresent() && los.get().getAssignment() != null) {
+            return Optional.of(los.get().getAssignment());
         }
-        return List.of();
+        return Optional.empty();
     }
 
     // Read One Assignment
@@ -101,15 +97,20 @@ public class AssignmentService {
         Assignment assignment = assignmentRepository.findById(id)
                 .orElseThrow(() -> new Exception("Assignment not found"));
 
-        // Unlink from LosPos before deleting
-        // Since LosPos owns the relationship with CascadeType.ALL, we need to be careful.
-        // If we delete Assignment directly, JPA might complain if LosPos still references it.
-        // We should set LosPos assignment to null first.
-
-        if (assignment.getLosPos() != null) {
-            LosPos losPos = assignment.getLosPos();
-            if (losPos.getAssignments() != null) {
-                losPos.getAssignments().remove(assignment);
+        // Unlink from Los before deleting
+        if (assignment.getLos() != null) {
+            Los los = assignment.getLos();
+            los.setAssignment(null);
+            losRepository.save(los);
+        } else {
+            // Fallback search if bidirectional link isn't set
+            List<Los> allLos = losRepository.findAll();
+            for (Los lp : allLos) {
+                if (lp.getAssignment() != null && lp.getAssignment().getAssignmentId().equals(id)) {
+                    lp.setAssignment(null);
+                    losRepository.save(lp);
+                    break;
+                }
             }
         }
 
@@ -122,22 +123,7 @@ public class AssignmentService {
     }
 
     // Import marks from Excel using OBE format (2 columns: Student Index, Mark)
-    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile, String academicYear, String batch) {
-        // Ensure academicYear and batch are updated if provided
-        assignmentRepository.findById(assignmentId).ifPresent(a -> {
-            boolean changed = false;
-            if (academicYear != null && !academicYear.trim().isEmpty()) {
-                a.setAcademicYear(academicYear);
-                changed = true;
-            }
-            if (batch != null && !batch.trim().isEmpty()) {
-                a.setBatch(batch);
-                changed = true;
-            }
-            if (changed) {
-                assignmentRepository.save(a);
-            }
-        });
+    public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
         return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
 }
