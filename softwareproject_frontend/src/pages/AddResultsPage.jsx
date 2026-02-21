@@ -158,150 +158,163 @@ export default function AddResultsPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-            {/* Main Container - The Blue Frame from screenshot */}
-            <div className="w-full max-w-4xl bg-white border-[3px] border-[#3b82f6] shadow-2xl relative overflow-hidden flex flex-col items-center py-10 px-6 sm:px-12 md:px-20 min-h-[600px]">
+        <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-6 relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-                {/* Close Button 'X' (Top Right) */}
+            <div className="w-full max-w-4xl glass-card rounded-[2rem] relative overflow-hidden flex flex-col items-center py-12 px-8 sm:px-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+                {/* Close Button */}
                 <button
                     onClick={() => navigate(-1)}
-                    className="absolute top-4 right-6 text-black hover:text-gray-600 transition-colors z-10"
+                    className="absolute top-6 right-8 p-2 hover:bg-slate-100 rounded-full transition-all duration-300 text-slate-400 hover:text-slate-600 group"
                 >
-                    <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                    <svg className="w-8 h-8 group-hover:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                 </button>
 
                 {/* Header Title */}
-                <h1 className="text-4xl sm:text-5xl font-bold text-center mb-16 text-black tracking-tight mt-4">
-                    Add Your activity results here {loNumber && <span className="text-blue-600"> (LO {loNumber})</span>}
-                </h1>
+                <div className="text-center mb-12">
+                    <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-sm font-bold tracking-wider uppercase mb-4 inline-block">
+                        Results Portal
+                    </span>
+                    <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
+                        Upload Activity Results
+                        {loNumber && <span className="text-indigo-600 ml-2">LO {loNumber}</span>}
+                    </h1>
+                    <p className="mt-4 text-slate-500 max-w-md mx-auto">
+                        Seamlessly import student marks and track performance outcomes across different batches.
+                    </p>
+                </div>
 
-                {/* Content Section */}
-                <div className="w-full space-y-12 flex flex-col items-start max-w-2xl mx-auto">
+                {/* Form Section */}
+                <div className="w-full max-w-2xl space-y-8">
 
-                    {/* Batch Selection section */}
-                    <div className="w-full flex flex-col sm:flex-row gap-8">
-                        <div className="flex-1 space-y-4">
-                            <label className="text-3xl sm:text-4xl font-normal text-black block text-left">
-                                The batch
+                    {/* Batch & Year Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">
+                                Selection Batch
                             </label>
                             <select
                                 value={batch}
                                 onChange={(e) => setBatch(e.target.value)}
-                                className="w-full bg-[#f0f5ff] text-[#6b7280] px-6 py-4 rounded-sm border-none shadow-sm focus:ring-0 text-xl font-serif italic"
+                                className="input-field appearance-none"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
                             >
-                                <option value="" disabled>Select batch</option>
+                                <option value="" disabled>Select Batch Number</option>
                                 {batches.map(v => (
-                                    <option key={v} value={v} className="not-italic text-black font-sans">{v}</option>
+                                    <option key={v} value={v}>Batch {v}</option>
                                 ))}
                             </select>
                         </div>
 
-                        <div className="flex-1 space-y-4">
-                            <label className="text-3xl sm:text-4xl font-normal text-black block text-left">
+                        <div className="space-y-2">
+                            <label className="text-sm font-bold text-slate-700 ml-1">
                                 Academic Year
                             </label>
                             <select
                                 value={academicYear}
                                 onChange={(e) => setAcademicYear(e.target.value)}
-                                className="w-full bg-[#f0f5ff] text-[#6b7280] px-6 py-4 rounded-sm border-none shadow-sm focus:ring-0 text-xl font-serif italic"
+                                className="input-field appearance-none"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
                             >
-                                <option value="" disabled>Select year</option>
-                                <option value="2022/23" className="not-italic text-black font-sans">2022/23</option>
-                                <option value="2023/24" className="not-italic text-black font-sans">2023/24</option>
-                                <option value="2024/25" className="not-italic text-black font-sans">2024/25</option>
-                                <option value="2025/26" className="not-italic text-black font-sans">2025/26</option>
+                                <option value="" disabled>Select Year</option>
+                                {['2022/23', '2023/24', '2024/25', '2025/26'].map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
                             </select>
                         </div>
                     </div>
 
-                    {/* Upload Results section */}
-                    <div className="w-full space-y-4">
-                        <label className="text-3xl sm:text-4xl font-normal text-black block text-left">
-                            Upload the results
+                    {/* Upload Box */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700 ml-1">
+                            Document Upload
                         </label>
+                        <div
+                            className={`w-full group p-10 border-2 border-dashed rounded-[2rem] transition-all duration-300 flex flex-col items-center justify-center cursor-pointer
+                                ${dragActive ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400 bg-white/30'}`}
+                            onDragEnter={handleDrag}
+                            onDragLeave={handleDrag}
+                            onDragOver={handleDrag}
+                            onDrop={handleDrop}
+                            onClick={onButtonClick}
+                        >
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                onChange={handleChange}
+                                accept=".xlsx,.xls,.csv"
+                            />
 
-                        {/* Drag and Drop Container */}
-                        <div className="relative w-full">
-                            {/* Inner Cross button to clear file if needed (from screenshot) */}
+                            <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 text-indigo-600 transition-transform group-hover:scale-110 duration-300">
+                                {file ? (
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                ) : (
+                                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                )}
+                            </div>
+
+                            <div className="text-center">
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                                    {file ? file.name : 'Drop your file here'}
+                                </h3>
+                                <p className="text-slate-500 text-sm">
+                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : 'Click to browse or drag & drop (Excel, CSV)'}
+                                </p>
+                            </div>
+
                             {file && (
                                 <button
                                     onClick={clearFile}
-                                    className="absolute -top-6 left-[50%] transform -translate-x-1/2 text-black hover:text-red-500 z-20"
+                                    className="mt-6 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
                                 >
-                                    <svg className="w-6 h-6 font-bold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
+                                    Select Different File
                                 </button>
                             )}
-                            {/* The specific 'x' from the design above the text area */}
-                            {!file && (
-                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-black text-2xl font-bold">×</span>
-                            )}
-
-                            <div
-                                className={`w-full h-80 bg-[#f0f5ff] transition-all duration-300 flex items-center justify-center cursor-pointer border border-transparent
-                                    ${dragActive ? 'bg-blue-50 ring-2 ring-blue-300' : ''}`}
-                                onDragEnter={handleDrag}
-                                onDragLeave={handleDrag}
-                                onDragOver={handleDrag}
-                                onDrop={handleDrop}
-                                onClick={onButtonClick}
-                            >
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    className="hidden"
-                                    onChange={handleChange}
-                                    accept=".xlsx,.xls,.csv"
-                                />
-
-                                <div className="text-center p-4">
-                                    <h3 className="text-5xl sm:text-6xl font-serif font-light text-black px-4 leading-[1.3] text-center max-w-lg">
-                                        {file ? file.name : 'Drag and drop the file here'}
-                                    </h3>
-                                    {loading && <div className="mt-4 animate-pulse text-blue-600 font-bold">Uploading...</div>}
-                                </div>
-                            </div>
                         </div>
                     </div>
 
-                    {/* Success/Error Message */}
+                    {/* Notification Message */}
                     {message.text && (
-                        <div className={`w-full text-center p-3 rounded-md text-lg font-semibold ${message.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className={`flex items-center gap-3 p-4 rounded-xl text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-300
+                            ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                            <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={message.type === 'success' ? "M5 13l4 4L19 7" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} />
+                            </svg>
                             {message.text}
                         </div>
                     )}
 
                     {/* Action Button */}
-                    <div className="w-full flex justify-center py-6">
+                    <div className="pt-4">
                         <button
                             onClick={handleUpload}
                             disabled={loading || !file || !batch || !academicYear}
-                            className={`px-16 py-4 rounded-xl text-white font-medium text-2xl shadow-md transition-all transform active:scale-95
+                            className={`w-full py-4 px-8 rounded-2xl text-white font-bold text-lg shadow-xl shadow-indigo-100 transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3
                                 ${loading || !file || !batch || !academicYear
-                                    ? 'bg-[#1d63ed] opacity-60 cursor-not-allowed'
-                                    : 'bg-[#1d63ed] hover:bg-[#1557d1] hover:shadow-xl'}`}
+                                    ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200'}`}
                         >
-                            Upload the file
+                            {loading && (
+                                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                            )}
+                            {loading ? 'Processing Data...' : 'Confirm and Upload'}
                         </button>
                     </div>
                 </div>
             </div>
-
-            {/* Global style for fonts if not already loaded */}
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;700&display=swap');
-                
-                .font-serif {
-                    font-family: 'Playfair Display', serif;
-                }
-                .font-sans {
-                    font-family: 'Inter', sans-serif;
-                }
-            `}} />
         </div>
     );
 }

@@ -90,69 +90,92 @@ export default function ModulesPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col relative overflow-hidden">
             <Header />
 
-            <div className="max-w-7xl mx-auto px-4 py-8">
-                <div className="flex items-center justify-between mb-8">
-                    <h1 className="text-3xl font-bold text-gray-800">My Courses</h1>
-                    <div className="space-x-4">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                        >
-                            Home
-                        </button>
+            {/* Background Decorations */}
+            <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <main className="flex-1 max-w-7xl mx-auto px-6 py-12 w-full relative z-10 animate-in fade-in duration-700">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-12">
+                    <div className="space-y-2">
+                        <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black tracking-widest uppercase inline-block">
+                            Course Repository
+                        </span>
+                        <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
+                            Module Management
+                        </h1>
                     </div>
                 </div>
 
                 {loading ? (
-                    <div className="text-center py-12">
-                        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="flex flex-col items-center justify-center py-24 glass-card rounded-[2.5rem]">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-indigo-100 rounded-full"></div>
+                            <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                        </div>
+                        <p className="text-slate-500 font-bold mt-8 tracking-wide">Syncing module database...</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {modules.map((module, index) => (
-                            <div key={module.moduleId} className="bg-white rounded-lg shadow-lg overflow-hidden">
-                                {/* Module Color Header */}
+                            <div key={module.moduleId} className="glass-card group rounded-[2.5rem] overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 bg-white/40">
+                                {/* Module Header Visual */}
                                 <div
-                                    className={`${moduleColors[index % moduleColors.length]} h-32 cursor-pointer hover:opacity-90 transition-opacity`}
+                                    className={`h-40 cursor-pointer overflow-hidden relative group-hover:scale-[1.02] transition-transform duration-700 ${moduleColors[index % moduleColors.length]} opacity-80`}
                                     onClick={() => handleModuleClick(module)}
-                                />
-                                
-                                {/* Module Info */}
-                                <div className="p-4">
-                                    <h3 className="text-lg font-bold text-gray-800 mb-2">{module.moduleId} {module.moduleName}</h3>
-                                    
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2 mt-4">
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent"></div>
+                                    <div className="absolute bottom-6 left-8">
+                                        <div className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-white text-[10px] font-black uppercase tracking-widest border border-white/20">
+                                            {module.moduleId}
+                                        </div>
+                                    </div>
+                                    {/* Abstract shapes for premium feel */}
+                                    <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
+                                </div>
+
+                                {/* Module Content */}
+                                <div className="p-8">
+                                    <h3 className="text-xl font-black text-slate-800 mb-8 leading-tight group-hover:text-indigo-600 transition-colors min-h-[3.5rem]">
+                                        {module.moduleName}
+                                    </h3>
+
+                                    <div className="space-y-4">
                                         <button
                                             onClick={() => handleModuleClick(module)}
-                                            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                                            className="w-full btn-primary flex items-center justify-center gap-2 group/btn"
                                         >
-                                            View LOs
+                                            Explore LOs
+                                            <svg className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 7l5 5-5 5M6 7l5 5-5 5" />
+                                            </svg>
                                         </button>
-                                        <button
-                                            onClick={(e) => handleEdit(module, e)}
-                                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={(e) => handleDelete(module, e)}
-                                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                                        >
-                                            Delete
-                                        </button>
+
+                                        <div className="flex gap-4">
+                                            <button
+                                                onClick={(e) => handleEdit(module, e)}
+                                                className="flex-1 btn-secondary text-xs font-black uppercase tracking-widest py-3 border-slate-100"
+                                            >
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(module, e)}
+                                                className="flex-1 px-4 py-3 bg-red-50 text-red-500 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all duration-300 transform active:scale-95"
+                                            >
+                                                Delete
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
-            </div>
+            </main>
 
-            {/* Modals */}
+            {/* View Modal */}
             {modalType === 'view' && selectedModule && (
                 <ModuleModal
                     module={selectedModule}
@@ -163,77 +186,106 @@ export default function ModulesPage() {
                 />
             )}
 
+            {/* Edit Modal */}
             {modalType === 'edit' && selectedModule && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                        <h2 className="text-2xl font-bold mb-4">Edit Module</h2>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.target);
-                            handleUpdate({
-                                moduleId: selectedModule.moduleId,
-                                moduleName: formData.get('moduleName')
-                            });
-                        }}>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Module ID</label>
-                                <input
-                                    type="text"
-                                    value={selectedModule.moduleId}
-                                    disabled
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100"
-                                />
-                            </div>
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Module Name</label>
-                                <input
-                                    type="text"
-                                    name="moduleName"
-                                    defaultValue={selectedModule.moduleName}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                                    required
-                                />
-                            </div>
-                            <div className="flex gap-2">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
+                        <div className="p-10">
+                            <div className="flex justify-between items-center mb-10">
+                                <div>
+                                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 block">Editor</span>
+                                    <h3 className="heading-lg">Modify Module</h3>
+                                </div>
                                 <button
-                                    type="button"
                                     onClick={() => setModalType(null)}
-                                    className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                                    className="p-3 bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-2xl transition-colors"
                                 >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                                >
-                                    Update
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
                                 </button>
                             </div>
-                        </form>
+
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.target);
+                                handleUpdate({
+                                    moduleId: selectedModule.moduleId,
+                                    moduleName: formData.get('moduleName')
+                                });
+                            }} className="space-y-8">
+                                <div className="space-y-3">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Unique Module Identifier</label>
+                                    <input
+                                        type="text"
+                                        value={selectedModule.moduleId}
+                                        disabled
+                                        className="input-field bg-slate-50 opacity-60 cursor-not-allowed font-black text-slate-400"
+                                    />
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Module Designation</label>
+                                    <input
+                                        type="text"
+                                        name="moduleName"
+                                        defaultValue={selectedModule.moduleName}
+                                        className="input-field py-4 text-lg font-bold"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="pt-4 flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setModalType(null)}
+                                        className="btn-secondary flex-1 py-4 font-black uppercase text-xs tracking-widest text-slate-400"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="btn-primary flex-1 py-4 font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20"
+                                    >
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             )}
 
+            {/* Delete Confirmation Modal */}
             {modalType === 'delete' && selectedModule && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-full max-w-md">
-                        <h2 className="text-2xl font-bold mb-4 text-red-600">Delete Module</h2>
-                        <p className="mb-6">
-                            Are you sure you want to delete <strong>{selectedModule.moduleName}</strong>? This action cannot be undone.
-                        </p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setModalType(null)}
-                                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                            >
-                                Delete
-                            </button>
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden border border-red-50">
+                        <div className="p-10 text-center">
+                            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </div>
+
+                            <h2 className="heading-lg text-slate-900 mb-4">Confirm Deletion</h2>
+                            <p className="text-slate-500 leading-relaxed mb-10 text-sm">
+                                You are about to permanently remove <span className="text-red-600 font-bold">{selectedModule.moduleName}</span>. All associated Learning Outcomes and results will be lost.
+                            </p>
+
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={() => setModalType(null)}
+                                    className="btn-secondary flex-1 py-4 font-black uppercase text-xs tracking-widest text-slate-400"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="px-6 py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-red-600 transition-colors shadow-xl shadow-red-500/20 flex-1 transform active:scale-95"
+                                >
+                                    Delete Module
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
