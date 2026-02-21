@@ -3,7 +3,7 @@ import Header from '../components/header'
 import Footer from '../components/footer'
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios'; 
+import axios from 'axios';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -35,13 +35,13 @@ export default function LoginPage() {
                 const loggedInUsername = res.data.userId;
                 const userType = res.data.userType;
                 const token = res.data.token;
-                
+
                 console.log('=== EXTRACTED VALUES ===');
                 console.log('Username:', loggedInUsername);
                 console.log('UserType:', userType);
                 console.log('UserType Type:', typeof userType);
                 console.log('Token:', token ? 'Received' : 'Missing');
-                
+
                 // Store user data and token
                 localStorage.setItem('username', loggedInUsername);
                 localStorage.setItem('userType', userType);
@@ -64,10 +64,10 @@ export default function LoginPage() {
                 console.log('Checking if userType === "superadmin":', userType === 'superadmin');
                 console.log('Checking if userType === "admin":', userType === 'admin');
                 console.log('Checking if userType === "lecture":', userType === 'lecture');
-                
+
                 // Normalize for comparison - handle various capitalizations
                 const normalizedType = userType?.toLowerCase?.() || '';
-                
+
                 if (normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin') {
                     console.log('✓ Navigating to superadmin dashboard');
                     navigate('/super-admin-dashboard');
@@ -89,7 +89,7 @@ export default function LoginPage() {
             console.error('Error Response:', err.response?.data);
             console.error('Error Message:', err.message);
             console.error('Full Error:', err);
-            
+
             // Display specific error message from backend
             const backendMessage = err.response?.data?.message;
             if (backendMessage) {
@@ -105,120 +105,121 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            {/* Header */}
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
+
             <Header />
 
-            {/* Navigation */}
-            <div className="max-w-4xl mx-auto px-4 mb-8">
-                <div className="flex justify-center space-x-8">
-                    <Link to="/" className="text-gray-700 hover:text-blue-600">Home</Link>
-                    <a href="#" className="text-blue-600 font-semibold border-b-2 border-blue-600">Login</a>
-                </div>
-            </div>
+            <main className="flex-1 flex items-center justify-center p-6 relative z-10 animate-in fade-in zoom-in-95 duration-700">
+                <div className="w-full max-w-lg glass-card rounded-[2.5rem] overflow-hidden shadow-2xl shadow-indigo-500/10">
 
-            {/* Main Content */}
-            <div className="max-w-6xl mx-auto px-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                    {/* Login Form */}
-                    <div className="bg-white p-8 rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-center mb-6">Login</h2>
+                    {/* Login Form Section */}
+                    <div className="p-10 md:p-16 flex flex-col justify-center">
+                        <div className="mb-10 text-center">
+                            <h2 className="heading-xl mb-4 text-slate-900">Welcome Back</h2>
+                            <p className="text-slate-500 font-medium">Please enter your credentials to access the analytics terminal.</p>
+                        </div>
 
                         {/* Error Message */}
                         {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                                {error}
+                            <div className="bg-red-50/50 border border-red-100 text-red-600 px-6 py-4 rounded-2xl mb-8 flex items-center gap-3 animate-shake">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-sm font-bold">{error}</span>
                             </div>
                         )}
 
-                        <div className="space-y-4">
-                            <form onSubmit={handleLogin}>
-                                {/* User Role Dropdown - ABOVE username and password */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Select User Role</label>
-                                    </div>
-                                    <select
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        value={userRole}
-                                        onChange={(e) => setUserRole(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">-- Select User Role --</option>
-                                        <option value="Superadmin">Superadmin</option>
-                                        <option value="Admin">Admin</option>
-                                        <option value="Lecture">Lecture</option>
-                                    </select>
-                                </div>
+                        <form onSubmit={handleLogin} className="space-y-6">
+                            {/* User Role */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Identity Profile</label>
+                                <select
+                                    className="input-field appearance-none bg-white/50"
+                                    value={userRole}
+                                    onChange={(e) => setUserRole(e.target.value)}
+                                    required
+                                >
+                                    <option value="">Select User Role</option>
+                                    <option value="Superadmin">Superadmin</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Lecture">Lecturer</option>
+                                </select>
+                            </div>
 
-                                {/* Username Field */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Enter Your Username</label>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Username"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                            {/* Username */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="yourId@domain.com"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                                {/* Password Field */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Enter Your Password</label>
-                                    </div>
-                                    <input
-                                        type="password"
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                            {/* Password */}
+                            <div className="space-y-2">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Access Token</label>
+                                <input
+                                    type="password"
+                                    className="input-field"
+                                    placeholder="••••••••"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                                <div className="flex justify-between items-center mb-4">
-                                    <label className="flex items-center">
+                            <div className="flex justify-between items-center py-2">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className="relative flex items-center">
                                         <input
                                             type="checkbox"
-                                            className="mr-2"
+                                            className="peer sr-only"
                                             checked={rememberMe}
                                             onChange={(e) => setRememberMe(e.target.checked)}
                                         />
-                                        <span>Remember me?</span>
-                                    </label>
-                                    <Link to="/forgottenpassword" className="text-blue-600 text-sm hover:underline">Forget Password</Link>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    className="w-full bg-blue-700 text-white p-3 rounded font-semibold hover:bg-blue-800 transition-colors disabled:bg-gray-400"
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? 'Logging in...' : 'Login'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Right Side Image */}
-                    <div className="hidden lg:flex items-center justify-center">
-                        <div className="bg-gradient-to-br from-blue-100 to-gray-100 rounded-lg p-8 w-full h-96 flex items-center justify-center border border-gray-300">
-                            <div className="text-center">
-                                <div className="text-6xl mb-4">🔐</div>
-                                <p className="text-blue-600 font-semibold">Secure Login Portal</p>
-                                <p className="text-gray-600 mt-2">Access your dashboard</p>
+                                        <div className="w-5 h-5 border-2 border-slate-200 rounded-lg peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all duration-300 shadow-sm" />
+                                        <svg className="absolute w-3 h-3 text-white left-1 opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-500 group-hover:text-slate-700 transition-colors">Keep me signed in</span>
+                                </label>
+                                <Link to="/forgottenpassword" title="Forget Password?" className="text-sm font-black text-indigo-600 hover:text-indigo-700 transition-colors uppercase tracking-widest">Forgot Access?</Link>
                             </div>
-                        </div>
+
+                            <button
+                                type="submit"
+                                className={`w-full py-4 px-8 rounded-2xl text-white font-bold text-sm uppercase tracking-[0.2em] shadow-xl transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3
+                                    ${isLoading
+                                        ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200'}`}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Authorizing...
+                                    </>
+                                ) : 'Initialize Access'}
+                            </button>
+                        </form>
                     </div>
+
+
                 </div>
-            </div>
+            </main>
+
             <Footer />
         </div>
-    )
+    );
 }
