@@ -19,33 +19,33 @@ export default function LoginPage() {
         setIsLoading(true);
         setError('');
 
+        // ✅ FIX 1: Validate role is selected
+        if (!userRole) {
+            setError('Please select a user role.');
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const res = await axios.post('http://localhost:8080/api/auth/login', {
                 userID: username,
-                password
+                password,
+                userType: userRole  // ✅ FIX 2: Send userRole to backend
             });
 
             console.log('=== LOGIN RESPONSE ===');
             console.log('Full Response:', res.data);
-            console.log('Response Status:', res.data.status);
-            console.log('Response Keys:', Object.keys(res.data));
 
-            // Handle successful response
             if (res.data && res.data.status === "SUCCESS") {
                 const loggedInUsername = res.data.userId;
-                const userType = res.data.userType;
+                const userType = res.data.userType || userRole; // ✅ FIX 3: Fallback to selected role
                 const token = res.data.token;
-
-                console.log('=== EXTRACTED VALUES ===');
-                console.log('Username:', loggedInUsername);
-                console.log('UserType:', userType);
-                console.log('UserType Type:', typeof userType);
-                console.log('Token:', token ? 'Received' : 'Missing');
 
                 // Store user data and token
                 localStorage.setItem('username', loggedInUsername);
                 localStorage.setItem('userType', userType);
                 localStorage.setItem('token', token);
+                localStorage.setItem('isLoggedIn', 'true'); // ✅ FIX 4: Store login state
 
                 if (rememberMe) {
                     localStorage.setItem('rememberMe', 'true');
@@ -53,51 +53,38 @@ export default function LoginPage() {
                     localStorage.removeItem('rememberMe');
                 }
 
-                // Debug: log the userType to console
-                const storedUserType = localStorage.getItem('userType');
-                console.log('=== STORED IN LOCALSTORAGE ===');
-                console.log('Stored UserType:', storedUserType);
-                console.log('Stored UserType Type:', typeof storedUserType);
+                // ✅ FIX 5: Normalize userType for comparison
+                const normalizedType = userType?.toLowerCase?.().trim() || '';
 
-                // Navigate based on user role
-                console.log('=== NAVIGATION LOGIC ===');
-                console.log('Checking if userType === "superadmin":', userType === 'superadmin');
-                console.log('Checking if userType === "admin":', userType === 'admin');
-                console.log('Checking if userType === "lecture":', userType === 'lecture');
-
-                // Normalize for comparison - handle various capitalizations
-                const normalizedType = userType?.toLowerCase?.() || '';
+                console.log('Navigating for userType:', normalizedType);
 
                 if (normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin') {
-                    console.log('✓ Navigating to superadmin dashboard');
-                    navigate('/super-admin-dashboard');
+                    navigate('/super-admin-dashboard', { replace: true });
                 } else if (normalizedType === 'admin') {
-                    console.log('✓ Navigating to admin dashboard');
-                    navigate('/admin-dashboard');
-                } else if (normalizedType === 'lecture') {
-                    console.log('✓ Navigating to lecturer dashboard');
-                    navigate('/lecturer-dashboard');
+                    navigate('/admin-dashboard', { replace: true });
+                } else if (normalizedType === 'lecture' || normalizedType === 'lecturer') {
+                    navigate('/lecturer-dashboard', { replace: true });
                 } else {
-                    console.log('✗ Unknown user type:', userType, 'normalized:', normalizedType, '- Navigating to home');
-                    navigate('/');
+                    console.warn('Unknown userType:', userType);
+                    navigate('/', { replace: true });
                 }
+
             } else {
                 setError(res.data.message || 'Login failed. Invalid response from server.');
             }
         } catch (err) {
             console.error('=== LOGIN ERROR ===');
-            console.error('Error Response:', err.response?.data);
-            console.error('Error Message:', err.message);
-            console.error('Full Error:', err);
+            console.error('Error:', err.response?.data || err.message);
 
-            // Display specific error message from backend
             const backendMessage = err.response?.data?.message;
             if (backendMessage) {
                 setError(backendMessage);
             } else if (err.response?.status === 401) {
-                setError('Login failed. Incorrect username, password, or user role is not properly configured.');
+                setError('Login failed. Incorrect username, password, or user role.');
+            } else if (err.response?.status === 403) {
+                setError('Access denied. Your role does not match the selected profile.');
             } else {
-                setError('Login failed. Please check your username and password.');
+                setError('Login failed. Please check your credentials.');
             }
         } finally {
             setIsLoading(false);
@@ -143,9 +130,9 @@ export default function LoginPage() {
                                     required
                                 >
                                     <option value="">Select User Role</option>
-                                    <option value="Superadmin">Superadmin</option>
-                                    <option value="Admin">Admin</option>
-                                    <option value="Lecture">Lecturer</option>
+                                    <option value="superadmin">Superadmin</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="lecture">Lecturer</option>
                                 </select>
                             </div>
 
@@ -214,8 +201,6 @@ export default function LoginPage() {
                             </button>
                         </form>
                     </div>
-
-
                 </div>
             </main>
 
