@@ -112,6 +112,7 @@ Currently using test configuration. No setup required yet.
 | [README.md](./README.md) | This file |
 | [CI_CD_SETUP.md](./CI_CD_SETUP.md) | CI/CD pipeline guide |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Development guidelines |
+| [CONTRIBUTORS.md](./CONTRIBUTORS.md) | Project collaborators |
 | [Makefile](./Makefile) | Available commands |
 
 ---
