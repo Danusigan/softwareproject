@@ -126,4 +126,49 @@ public class AssignmentService {
     public String importMarksFromExcelOBEFormat(String assignmentId, MultipartFile excelFile) {
         return excelImportService.importMarksOBEFormat(assignmentId, excelFile);
     }
+
+    // Import marks by LO without replacing/deleting assignments
+    @Transactional
+    public String importMarksForLosOBEFormat(String losId, String batch, String academicYear, MultipartFile excelFile) throws Exception {
+        Assignment assignment = resolveOrCreateAssignmentForLos(losId, batch, academicYear);
+        return excelImportService.importMarksOBEFormat(assignment.getAssignmentId(), excelFile);
+    }
+
+    @Transactional
+    public Assignment resolveOrCreateAssignmentForLos(String losId, String batch, String academicYear) throws Exception {
+        Los los = losRepository.findById(losId)
+                .orElseThrow(() -> new Exception("Los not found"));
+
+        Assignment existingAssignment = los.getAssignment();
+        if (existingAssignment != null) {
+            if (academicYear != null && !academicYear.isBlank()) {
+                existingAssignment.setAcademicYear(academicYear);
+            }
+            if (batch != null && !batch.isBlank()) {
+                existingAssignment.setBatch(batch);
+            }
+            return assignmentRepository.save(existingAssignment);
+        }
+
+        String baseAssignmentId = "LO-" + losId + "-MARKS";
+        String generatedAssignmentId = baseAssignmentId;
+        int suffix = 1;
+        while (assignmentRepository.existsById(generatedAssignmentId)) {
+            generatedAssignmentId = baseAssignmentId + "-" + suffix;
+            suffix++;
+        }
+
+        Assignment assignment = new Assignment();
+        assignment.setAssignmentId(generatedAssignmentId);
+        assignment.setAssignmentName("LO " + losId + " Marks");
+        assignment.setAcademicYear((academicYear != null && !academicYear.isBlank()) ? academicYear : "N/A");
+        assignment.setBatch(batch);
+        assignment.setLos(los);
+
+        Assignment savedAssignment = assignmentRepository.save(assignment);
+        los.setAssignment(savedAssignment);
+        losRepository.save(los);
+
+        return savedAssignment;
+    }
 }

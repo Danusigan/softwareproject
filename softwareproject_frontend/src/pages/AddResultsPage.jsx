@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -9,29 +9,12 @@ export default function AddResultsPage() {
     const [academicYear, setAcademicYear] = useState('');
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [lo, setLo] = useState(null);
     const [dragActive, setDragActive] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
     const loNumber = sessionStorage.getItem('currentLoNumber') || '';
     const fileInputRef = useRef(null);
 
     const batches = ['20', '21', '22', '23', '24', '25'];
-
-    useEffect(() => {
-        fetchLODetails();
-    }, [loId]);
-
-    const fetchLODetails = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setLo(res.data);
-        } catch (err) {
-            console.error('Error fetching LO details:', err);
-        }
-    };
 
     const handleDrag = (e) => {
         e.preventDefault();
@@ -95,36 +78,6 @@ export default function AddResultsPage() {
 
         try {
             const token = localStorage.getItem('token');
-            let currentAssignmentId;
-
-            // Find if an assignment for the specific batch and academic year already exists
-            const existingAssignment = lo?.assignments?.find(a => a.academicYear === academicYear && a.batch === batch);
-
-            if (existingAssignment) {
-                currentAssignmentId = existingAssignment.assignmentId;
-            } else {
-                // Create a unique assignment ID for this batch + year
-                currentAssignmentId = `${loId}-${batch}-${academicYear.replace('/', '-')}`;
-
-                const formDataAssign = new FormData();
-                formDataAssign.append('assignmentId', currentAssignmentId);
-                formDataAssign.append('assignmentName', `LO ${loNumber} - ${academicYear} (Batch ${batch})`);
-                formDataAssign.append('academicYear', academicYear);
-                formDataAssign.append('batch', batch);
-
-                // Create the assignment link
-                const assignRes = await axios.post(
-                    `http://localhost:8080/api/assignments/${loId}/add`,
-                    formDataAssign,
-                    { headers: { 'Authorization': `Bearer ${token}` } }
-                );
-
-                // Update local lo state to include this new assignment
-                setLo(prev => ({
-                    ...prev,
-                    assignments: [...(prev.assignments || []), assignRes.data]
-                }));
-            }
 
             const formData = new FormData();
             formData.append('excelFile', file);
@@ -132,9 +85,9 @@ export default function AddResultsPage() {
             formData.append('loNumber', loNumber);
             formData.append('academicYear', academicYear);
 
-            // Import marks using the linked assignment ID
-            const res = await axios.post(
-                `http://localhost:8080/api/assignments/${currentAssignmentId}/import-marks-obe`,
+            // Import marks directly for the selected LO
+            await axios.post(
+                `http://localhost:8080/api/lospos/${loId}/marks/import-obe`,
                 formData,
                 {
                     headers: {

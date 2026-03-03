@@ -1,14 +1,18 @@
 package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.Los;
+import com.example.Software.project.Backend.Model.Assignment;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AssignmentService;
 import com.example.Software.project.Backend.Service.LosService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -18,6 +22,9 @@ public class LosRestController {
 
     @Autowired
     private LosService losService;
+
+    @Autowired
+    private AssignmentService assignmentService;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -77,8 +84,61 @@ public class LosRestController {
         }
     }
 
+    // Import student marks directly for a specific LO (Lecture/Admin Only)
+    @PostMapping("/{loId}/marks/import-obe")
+    public ResponseEntity<?> importMarksForLo(
+            @PathVariable String loId,
+            @RequestParam("excelFile") MultipartFile excelFile,
+            @RequestParam(value = "batch", required = false) String batch,
+            @RequestParam(value = "academicYear", required = false) String academicYear,
+            @RequestParam(value = "loNumber", required = false) String loNumber,
+            @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Access Denied: Only Lecturers/Admins can import student marks");
+            }
+
+            if (excelFile == null || excelFile.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("Error: Excel file is required");
+            }
+
+            Assignment assignment = assignmentService.resolveOrCreateAssignmentForLos(loId, batch, academicYear);
+            String result = assignmentService.importMarksFromExcelOBEFormat(assignment.getAssignmentId(), excelFile);
+            String assignmentId = assignment.getAssignmentId();
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Student marks imported successfully (LO OBE Format)",
+                    "details", result,
+                    "loId", loId,
+                    "loNumber", loNumber == null ? "" : loNumber,
+                    "assignmentId", assignmentId,
+                    "fileName", excelFile.getOriginalFilename(),
+                    "format", "2-column (Student Index, Mark)",
+                    "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                            "message", "Failed to import student marks for LO",
+                            "error", e.getMessage(),
+                            "status", "ERROR"
+                    ));
+        }
+    }
+
     private boolean isLecture(String token) {
-        String role = jwtUtil.extractRole(token.substring(7));
-        return "Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim();
+            return role != null && ("Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }
