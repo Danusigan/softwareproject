@@ -4,6 +4,7 @@ import Footer from '../components/footer'
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import authService from '../services/authService';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -38,22 +39,13 @@ export default function LoginPage() {
 
             if (res.data && res.data.status === "SUCCESS") {
                 const loggedInUsername = res.data.userId;
-                const userType = res.data.userType || userRole; // ✅ FIX 3: Fallback to selected role
+                const userType = res.data.userType || userRole;
                 const token = res.data.token;
 
-                // Store user data and token
-                localStorage.setItem('username', loggedInUsername);
-                localStorage.setItem('userType', userType);
-                localStorage.setItem('token', token);
-                localStorage.setItem('isLoggedIn', 'true'); // ✅ FIX 4: Store login state
+                // ✅ Use authService to store login with 2-hour expiration
+                authService.storeLogin(token, loggedInUsername, userType, rememberMe);
 
-                if (rememberMe) {
-                    localStorage.setItem('rememberMe', 'true');
-                } else {
-                    localStorage.removeItem('rememberMe');
-                }
-
-                // ✅ FIX 5: Normalize userType for comparison
+                // ✅ Normalize userType for comparison
                 const normalizedType = userType?.toLowerCase?.().trim() || '';
 
                 console.log('Navigating for userType:', normalizedType);

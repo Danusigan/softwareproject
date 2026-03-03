@@ -1,26 +1,38 @@
 "use client"
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import authService from '../services/authService';
 
 export default function Header() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const username = localStorage.getItem('username');
-    const userType = localStorage.getItem('userType');
-    if (username && userType) {
-      setUser({ username, userType });
+    // ✅ Check login status
+    const userInfo = authService.getUserInfo();
+    if (userInfo) {
+      setUser(userInfo);
     }
-  }, []);
+
+    // ✅ Auto-logout when token expires
+    const interval = setInterval(() => {
+      if (authService.isLoggedIn()) {
+        const remaining = authService.getTimeRemaining();
+        if (remaining <= 0) {
+          handleLogout();
+        }
+      } else if (user) {
+        setUser(null);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = () => {
-    localStorage.removeItem('username');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('token');
-    localStorage.removeItem('rememberMe');
+    authService.logout();
     setUser(null);
-    navigate('/');
+    navigate('/loginpage', { replace: true });
   };
 
   return (

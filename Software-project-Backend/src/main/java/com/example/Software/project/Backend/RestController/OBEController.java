@@ -91,30 +91,51 @@ public class OBEController {
 
     // --- REPORT: Course Attainment (Flat JSON for Charts) ---
     @GetMapping("/reports/course/{moduleId}")
-    public ResponseEntity<?> getCourseReport(@PathVariable String moduleId) {
+    public ResponseEntity<?> getCourseReport(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         Map<String, Double> poScores = attainmentService.getPOAttainment(moduleId);
         return ResponseEntity.ok(poScores);
     }
 
     // --- ANALYSIS: Module Trend ---
     @GetMapping("/analysis/trend/{moduleId}")
-    public ResponseEntity<?> getTrend(@PathVariable String moduleId) {
+    public ResponseEntity<?> getTrend(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         return ResponseEntity.ok(trendService.getCourseTrend(moduleId));
     }
 
     // --- ANALYSIS: LO Trend (New) ---
     @GetMapping("/analysis/trend/lo/{moduleId}")
-    public ResponseEntity<?> getLoTrend(@PathVariable String moduleId) {
+    public ResponseEntity<?> getLoTrend(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
     }
 
     // Helper RBAC
     private boolean isAdmin(String token) {
-        String role = jwtUtil.extractRole(token.substring(7));
-        return "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim();
+            return role != null && ("Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role));
+        } catch (Exception e) {
+            return false;
+        }
     }
     private boolean isLecture(String token) {
-        String role = jwtUtil.extractRole(token.substring(7));
-        return "Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim();
+            return role != null && ("Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

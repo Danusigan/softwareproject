@@ -46,7 +46,7 @@ public class UserRestController {
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
                 String userType = user.getUsertype();
-                
+
                 // Validate that user has a valid role
                 if (userType == null || userType.trim().isEmpty()) {
                     Map<String, String> errorResponse = new HashMap<>();
@@ -54,7 +54,7 @@ public class UserRestController {
                     errorResponse.put("status", "ERROR");
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
                 }
-                
+
                 // Validate that usertype is one of the allowed roles
                 String normalizedType = userType.toLowerCase().trim();
                 if (!normalizedType.equals("admin") && !normalizedType.equals("lecture") && !normalizedType.equals("superadmin")) {
@@ -63,12 +63,12 @@ public class UserRestController {
                     errorResponse.put("status", "ERROR");
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
                 }
-                
-                // Normalize usertype to lowercase for consistency
+
+                // Normalize usertype to lowercase and trim spaces for consistency
                 if (userType != null) {
-                    userType = userType.toLowerCase();
+                    userType = userType.toLowerCase().trim();
                 }
-                
+
                 String token = jwtUtil.generateToken(user.getUserID(), userType);
 
                 Map<String, Object> response = new HashMap<>();
