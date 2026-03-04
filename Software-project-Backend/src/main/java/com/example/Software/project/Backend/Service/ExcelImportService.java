@@ -1,9 +1,9 @@
 package com.example.Software.project.Backend.Service;
 
-import com.example.Software.project.Backend.Model.Assignment;
+import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.Student;
 import com.example.Software.project.Backend.Model.StudentMark;
-import com.example.Software.project.Backend.Repository.AssignmentRepository;
+import com.example.Software.project.Backend.Repository.LosRepository;
 import com.example.Software.project.Backend.Repository.StudentMarkRepository;
 import com.example.Software.project.Backend.Repository.StudentRepository;
 import org.apache.poi.ss.usermodel.*;
@@ -21,15 +21,15 @@ public class ExcelImportService {
     @Autowired
     private StudentMarkRepository markRepository;
     @Autowired
-    private AssignmentRepository assignmentRepository;
+    private LosRepository losRepository;
     @Autowired
     private StudentRepository studentRepository;
 
     @Transactional
-    public String importMarksOBEFormat(String assessmentId, MultipartFile file) {
+    public String importMarksOBEFormat(String losId, MultipartFile file, String batch) {
         try {
-            Assignment assessment = assignmentRepository.findById(assessmentId)
-                    .orElseThrow(() -> new Exception("Assessment not found"));
+            Los los = losRepository.findById(losId)
+                    .orElseThrow(() -> new Exception("Learning Outcome not found"));
 
             try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
                 Sheet sheet = workbook.getSheetAt(0);
@@ -75,7 +75,8 @@ public class ExcelImportService {
                     StudentMark mark = new StudentMark();
                     mark.setStudent(student);
                     mark.setScore(score);
-                    mark.setAssessment(assessment);
+                    mark.setLos(los);
+                    mark.setBatch(batch); // Store batch with each mark
                     markRepository.save(mark);
                     count++;
                 }
@@ -86,13 +87,18 @@ public class ExcelImportService {
         }
     }
 
-    // Alias for standard import if needed, or different logic
-    public String importStudentMarksFromExcel(String assignmentId, MultipartFile file) {
-        return importMarksOBEFormat(assignmentId, file);
+    // Backward compatibility - defaults to null batch
+    public String importMarksOBEFormat(String losId, MultipartFile file) {
+        return importMarksOBEFormat(losId, file, null);
     }
-    
+
+    // Alias for standard import if needed, or different logic
+    public String importStudentMarksFromExcel(String losId, MultipartFile file) {
+        return importMarksOBEFormat(losId, file, null);
+    }
+
     // Backward compatibility
-    public void importMarks(MultipartFile file, String assessmentId) throws Exception {
-        importMarksOBEFormat(assessmentId, file);
+    public void importMarks(MultipartFile file, String losId) throws Exception {
+        importMarksOBEFormat(losId, file, null);
     }
 }

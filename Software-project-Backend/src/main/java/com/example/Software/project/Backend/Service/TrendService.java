@@ -33,14 +33,53 @@ public class TrendService {
             String loName = toSafeString(row[1]);
             String key = loId + " - " + loName;
 
-            groupedData.computeIfAbsent(key, k -> new ArrayList<>()).add(new Object[]{row[2], row[3]}); // year, avg
+            // Include batch with the data: {batch, avg}
+            groupedData.computeIfAbsent(key, k -> new ArrayList<>()).add(new Object[]{row[2], row[3]}); // batch, avg
         }
 
         // Process trend for each LO
         for (Map.Entry<String, List<Object[]>> entry : groupedData.entrySet()) {
-            result.put(entry.getKey(), processTrendData(entry.getValue(), false));
+            result.put(entry.getKey(), processLoTrendData(entry.getValue()));
         }
 
+        return result;
+    }
+
+    // Process LO trend data (batches instead of years)
+    private List<Map<String, Object>> processLoTrendData(List<Object[]> rawData) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Double previousAvg = null;
+
+        for (Object[] row : rawData) {
+            if (row == null || row.length < 2) {
+                continue;
+            }
+
+            String batch = toSafeString(row[0]); // batch number (e.g., "20", "21", "22")
+            Double currentAvg = toSafeDouble(row[1]); // average score
+
+            if (currentAvg == null) {
+                continue;
+            }
+
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("year", batch + "nd Batch"); // Display as "20nd Batch", "21nd Batch", etc.
+            entry.put("batch", batch); // Also include raw batch for reference
+            entry.put("average", currentAvg);
+
+            if (previousAvg != null && previousAvg != 0) {
+                double delta = ((currentAvg - previousAvg) / previousAvg) * 100;
+                entry.put("delta", delta);
+                if (delta > 5) entry.put("status", "IMPROVED");
+                else if (delta < -5) entry.put("status", "DECLINED");
+                else entry.put("status", "STABLE");
+            } else {
+                entry.put("status", "BASELINE");
+            }
+
+            result.add(entry);
+            previousAvg = currentAvg;
+        }
         return result;
     }
 

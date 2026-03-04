@@ -36,7 +36,7 @@ export const setupAxiosInterceptors = (navigate) => {
         }
 
         // Show message to user
-        window.dispatchEvent(
+        globalThis.dispatchEvent(
           new CustomEvent('authExpired', {
             detail: { message: 'Your session has expired. Please login again.' }
           })

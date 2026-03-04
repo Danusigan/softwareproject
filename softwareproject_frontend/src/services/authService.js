@@ -11,7 +11,7 @@ export const authService = {
 
     // Check if token is expired (simple check - compare stored expiration)
     const tokenExpiry = localStorage.getItem('tokenExpiry');
-    if (tokenExpiry && new Date().getTime() > parseInt(tokenExpiry)) {
+    if (tokenExpiry && Date.now() > Number.parseInt(tokenExpiry, 10)) {
       this.logout();
       return false;
     }
@@ -48,7 +48,7 @@ export const authService = {
     localStorage.setItem('isLoggedIn', 'true');
 
     // Calculate and store token expiry (2 hours from now)
-    const expiryTime = new Date().getTime() + 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+    const expiryTime = Date.now() + 2 * 60 * 60 * 1000; // 2 hours in milliseconds
     localStorage.setItem('tokenExpiry', expiryTime.toString());
 
     // Handle remember me
@@ -75,7 +75,7 @@ export const authService = {
     if (!tokenExpiry) {
       return 0;
     }
-    const remaining = parseInt(tokenExpiry) - new Date().getTime();
+    const remaining = Number.parseInt(tokenExpiry, 10) - Date.now();
     return Math.max(0, Math.floor(remaining / 1000));
   }
 };
