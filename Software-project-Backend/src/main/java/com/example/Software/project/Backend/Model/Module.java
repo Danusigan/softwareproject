@@ -26,9 +26,9 @@ public class Module {
     public String getModuleId() { return moduleId; }
 
     public void setModuleId(String moduleId) {
-        // Validate: only capital letters and digits allowed
-        if (moduleId != null && !moduleId.matches("^[A-Z0-9]+$")) {
-            throw new IllegalArgumentException("Module ID must contain only capital letters and digits (A-Z, 0-9)");
+        // Validate: only capital letters, numbers, and spaces allowed
+        if (moduleId != null && !moduleId.matches("^[A-Z0-9\\s]+$")) {
+            throw new IllegalArgumentException("Module ID must contain only capital letters, numbers, and spaces (A-Z, 0-9, spaces)");
         }
         this.moduleId = moduleId;
     }

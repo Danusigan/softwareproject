@@ -32,10 +32,10 @@ export default function AdminDashboard() {
     useEffect(() => {
         const userType = localStorage.getItem('userType');
         console.log('Admin Dashboard - User Type:', userType);
-        
+
         const normalizedType = userType?.toLowerCase?.() || '';
         const isAdmin = normalizedType === 'admin' || normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin';
-        
+
         if (!isAdmin) {
             console.log('Unauthorized! Redirecting to home. Normalized type:', normalizedType);
             navigate('/');
@@ -53,9 +53,11 @@ export default function AdminDashboard() {
             const res = await axios.get('http://localhost:8080/api/modules/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setModules(res.data);
+            // Backend returns {message, data, status} format
+            setModules(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch modules:', err);
+            setModules([]);
         }
     };
 
@@ -87,9 +89,9 @@ export default function AdminDashboard() {
                 setTimeout(() => setSidePanelOpen(null), 2000);
             }
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data?.message || 'Failed to add teacher' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to add teacher'
             });
         } finally {
             setLoading(false);
@@ -125,9 +127,9 @@ export default function AdminDashboard() {
             fetchModules();
             setTimeout(() => setSidePanelOpen(null), 2000);
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to create module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to create module'
             });
         } finally {
             setLoading(false);
@@ -165,9 +167,9 @@ export default function AdminDashboard() {
             setModuleData({ moduleId: '', moduleName: '' });
             fetchModules();
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to update module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to update module'
             });
         } finally {
             setLoading(false);
@@ -186,9 +188,9 @@ export default function AdminDashboard() {
             setMessage({ type: 'success', text: 'Module deleted successfully!' });
             fetchModules();
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to delete module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to delete module'
             });
         }
     };

@@ -1,16 +1,36 @@
-"use client"
-
 import Header from '../components/header'
 import Footer from '../components/footer'
 import { useNavigate } from 'react-router-dom'
+import authService from '../services/authService'
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
+  // ✅ Removed auto-redirect - Users now see landing page first
+  // They can click "Access Dashboard" button to navigate to their dashboard
+
+  const handleAccessDashboard = () => {
+    // If already logged in, navigate to dashboard; otherwise go to login
+    if (authService.isLoggedIn()) {
+      const userInfo = authService.getUserInfo();
+      const userRole = userInfo?.userType?.toLowerCase()?.trim();
+
+      if (userRole === 'superadmin' || userRole === 'super admin') {
+        navigate('/super-admin-dashboard');
+      } else if (userRole === 'admin') {
+        navigate('/admin-dashboard');
+      } else if (userRole === 'lecture') {
+        navigate('/lecturer-dashboard');
+      }
+    } else {
+      navigate('/loginpage');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="bg-gray-50 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,8 +44,8 @@ export default function LandingPage() {
                 The dedicated web-based system for the DEIE, University of Ruhuna, to streamline LO-PO mapping,
                 calculate attainment levels, and drive Continuous Quality Improvement (CQI).
               </p>
-              <button 
-                onClick={() => navigate('/loginpage')}
+              <button
+                onClick={handleAccessDashboard}
                 className="bg-blue-700 text-white px-6 py-3 rounded-full font-semibold hover:bg-blue-800 transition flex items-center gap-2"
                 aria-label="Access your dashboard"
               >
