@@ -1,6 +1,6 @@
 // Protected Route - Ensures user is logged in before accessing a page
-import React from 'react';
 import { Navigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import authService from '../services/authService';
 
 export const ProtectedRoute = ({ children, requiredRole = null }) => {
@@ -21,6 +21,11 @@ export const ProtectedRoute = ({ children, requiredRole = null }) => {
   }
 
   return children;
+};
+
+ProtectedRoute.propTypes = {
+  children: PropTypes.node.isRequired,
+  requiredRole: PropTypes.string,
 };
 
 export default ProtectedRoute;

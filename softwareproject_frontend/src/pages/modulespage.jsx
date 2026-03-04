@@ -27,9 +27,11 @@ export default function ModulesPage() {
     const fetchModules = async () => {
         try {
             const res = await axios.get('http://localhost:8080/api/modules/all');
-            setModules(res.data);
+            // Backend returns {message, data, status} format
+            setModules(res.data.data || []);
         } catch (err) {
             console.error('Error fetching modules:', err);
+            setModules([]);
         } finally {
             setLoading(false);
         }

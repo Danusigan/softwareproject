@@ -1,29 +1,13 @@
-"use client"
-
 import Header from '../components/header'
 import Footer from '../components/footer'
 import { useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
 import authService from '../services/authService'
 
 export default function LandingPage() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // ✅ If user is logged in, redirect to their dashboard
-    if (authService.isLoggedIn()) {
-      const userInfo = authService.getUserInfo();
-      const userRole = userInfo?.userType?.toLowerCase()?.trim();
-
-      if (userRole === 'superadmin' || userRole === 'super admin') {
-        navigate('/super-admin-dashboard', { replace: true });
-      } else if (userRole === 'admin') {
-        navigate('/admin-dashboard', { replace: true });
-      } else if (userRole === 'lecture') {
-        navigate('/lecturer-dashboard', { replace: true });
-      }
-    }
-  }, [navigate]);
+  // ✅ Removed auto-redirect - Users now see landing page first
+  // They can click "Access Dashboard" button to navigate to their dashboard
 
   const handleAccessDashboard = () => {
     // If already logged in, navigate to dashboard; otherwise go to login

@@ -1,9 +1,11 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Module;
+import com.example.Software.project.Backend.Repository.LosRepository;
 import com.example.Software.project.Backend.Repository.ModuleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +15,12 @@ public class ModuleService {
 
     @Autowired
     private ModuleRepository moduleRepository;
+
+    @Autowired
+    private LosRepository losRepository;
+
+    @Autowired
+    private LosService losService;
 
     // Create (Admin)
     public Module createModule(Module module) throws Exception {
@@ -36,9 +44,9 @@ public class ModuleService {
     public Module updateModule(String id, Module moduleDetails) throws Exception {
         Module module = moduleRepository.findById(id)
                 .orElseThrow(() -> new Exception("Module not found"));
-        
+
         String newModuleId = moduleDetails.getModuleId();
-        
+
         // If moduleId is being changed, check if new ID already exists
         if (newModuleId != null && !newModuleId.equals(id)) {
             if (moduleRepository.existsById(newModuleId)) {
@@ -48,16 +56,23 @@ public class ModuleService {
             moduleRepository.deleteById(id);
             module.setModuleId(newModuleId);
         }
-        
+
         module.setModuleName(moduleDetails.getModuleName());
         return moduleRepository.save(module);
     }
 
     // Delete (Admin)
+    @Transactional
     public void deleteModule(String id) throws Exception {
         if (!moduleRepository.existsById(id)) {
             throw new Exception("Module not found");
         }
+
+        List<String> losIds = losRepository.findIdsByModuleId(id);
+        for (String losId : losIds) {
+            losService.deleteLos(losId);
+        }
+
         moduleRepository.deleteById(id);
     }
 }

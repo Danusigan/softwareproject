@@ -1,4 +1,3 @@
-"use client"
 import Header from '../components/header'
 import Footer from '../components/footer'
 import React, { useState } from 'react';
@@ -37,7 +36,7 @@ export default function LoginPage() {
             console.log('=== LOGIN RESPONSE ===');
             console.log('Full Response:', res.data);
 
-            if (res.data && res.data.status === "SUCCESS") {
+            if (res.data?.status === 'SUCCESS') {
                 const loggedInUsername = res.data.userId;
                 const userType = res.data.userType || userRole;
                 const token = res.data.token;
@@ -114,8 +113,9 @@ export default function LoginPage() {
                         <form onSubmit={handleLogin} className="space-y-6">
                             {/* User Role */}
                             <div className="space-y-2">
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Identity Profile</label>
+                                <label htmlFor="userRole" className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Identity Profile</label>
                                 <select
+                                    id="userRole"
                                     className="input-field appearance-none bg-white/50"
                                     value={userRole}
                                     onChange={(e) => setUserRole(e.target.value)}
@@ -130,8 +130,9 @@ export default function LoginPage() {
 
                             {/* Username */}
                             <div className="space-y-2">
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
+                                <label htmlFor="username" className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
                                 <input
+                                    id="username"
                                     type="text"
                                     className="input-field"
                                     placeholder="yourId@domain.com"
@@ -143,8 +144,9 @@ export default function LoginPage() {
 
                             {/* Password */}
                             <div className="space-y-2">
-                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Access Token</label>
+                                <label htmlFor="password" className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Access Token</label>
                                 <input
+                                    id="password"
                                     type="password"
                                     className="input-field"
                                     placeholder="••••••••"

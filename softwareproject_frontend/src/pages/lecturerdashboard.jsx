@@ -38,9 +38,11 @@ export default function LecturerDashboard() {
             const res = await axios.get('http://localhost:8080/api/modules/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setModules(res.data);
+            // Backend returns {message, data, status} format
+            setModules(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch modules:', err);
+            setModules([]);
         }
     };
 
@@ -50,7 +52,8 @@ export default function LecturerDashboard() {
             const res = await axios.get(`http://localhost:8080/api/lospos/module/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setLos(res.data);
+            // Backend returns {message, data, count, status} format
+            setLos(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch LOs:', err);
             setLos([]);
@@ -69,7 +72,7 @@ export default function LecturerDashboard() {
                 {
                     id: loData.loNumber,
                     name: `LO ${loData.loNumber}`,
-                    loDescription: loData.description
+                    description: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -104,7 +107,7 @@ export default function LecturerDashboard() {
                 {
                     id: loData.loNumber,
                     name: `LO ${loData.loNumber}`,
-                    loDescription: loData.description
+                    description: loData.description
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -147,7 +150,7 @@ export default function LecturerDashboard() {
 
     const openEditDialog = (lo) => {
         setEditingLo(lo);
-        setLoData({ loNumber: lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id, description: lo.loDescription || lo.name });
+        setLoData({ loNumber: lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id, description: lo.description || lo.name });
         setShowEditLoDialog(true);
     };
 
@@ -322,7 +325,7 @@ export default function LecturerDashboard() {
                                                         <div className="h-px w-8 bg-white/5"></div>
                                                     </div>
                                                     <p className="text-lg font-bold text-white/90 leading-snug group-hover:text-white transition-colors">
-                                                        {lo.loDescription || lo.name}
+                                                        {lo.description || lo.name}
                                                     </p>
                                                 </div>
 
