@@ -16,7 +16,7 @@ export default function AddResultsPage() {
     const loNumber = sessionStorage.getItem('currentLoNumber') || '';
     const fileInputRef = useRef(null);
 
-    const batches = ['20', '21', '22', '23', '24', '25'];
+    const batches = ['20', '21', '22', '23', '24', '25', '26', '27']; // Example batch numbers
 
     // Check if we're in edit mode and pre-populate data
     useEffect(() => {
