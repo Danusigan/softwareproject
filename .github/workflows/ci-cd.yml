@@ -37,7 +37,7 @@ jobs:
   backend:
     runs-on: ubuntu-latest
     name: Backend - Spring Boot
-    
+
     services:
       mysql:
         image: mysql:8.0
@@ -96,7 +96,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     name: Frontend - React/Vite
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -130,14 +130,14 @@ jobs:
     name: CI Status
     needs: [backend, frontend, quality-gate]
     if: always()
-    
+
     steps:
       - name: Check Pipeline Status
         run: |
           echo "✅ Backend Tests: ${{ needs.backend.result }}"
           echo "✅ Frontend Tests: ${{ needs.frontend.result }}"
           echo "✅ Code Quality: ${{ needs.quality-gate.result }}"
-          
+
           if [ "${{ needs.backend.result }}" = "failure" ] || [ "${{ needs.frontend.result }}" = "failure" ]; then
             echo "❌ Pipeline Failed"
             exit 1
