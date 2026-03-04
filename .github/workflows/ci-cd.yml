@@ -44,8 +44,6 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: ${{ secrets.DB_PASSWORD }}
           MYSQL_DATABASE: ${{ secrets.DB_NAME }}
-          MYSQL_USER: ${{ secrets.DB_USERNAME }}
-          MYSQL_PASSWORD: ${{ secrets.DB_PASSWORD }}
         options: >-
           --health-cmd="mysqladmin ping -h localhost"
           --health-interval=10s
