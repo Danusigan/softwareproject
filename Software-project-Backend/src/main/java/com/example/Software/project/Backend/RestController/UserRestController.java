@@ -92,9 +92,96 @@ public class UserRestController {
         }
     }
 
-    @PostMapping("/add-user")
-    public ResponseEntity<?> addUser(@RequestBody User newUser) {
+    @PostMapping("/add-admin")
+    public ResponseEntity<?> addAdmin(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
+            // Only superadmin can add admins
+            if (!isSuperAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Superadmin can add admins", "status", "ERROR"));
+            }
+
+            // Ensure new user is being created as admin
+            if (newUser.getUsertype() == null || !newUser.getUsertype().toLowerCase().equals("admin")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: New user must be of type 'admin'", "status", "ERROR"));
+            }
+
+            // Get the currently authenticated superadmin user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String creatorUsername = authentication.getName();
+
+            User createdUser = userService.addUser(newUser, creatorUsername);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Admin user added successfully");
+            response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", "admin");
+            response.put("status", "SUCCESS");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add admin: " + e.getMessage());
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/add-lecture")
+    public ResponseEntity<?> addLecture(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+        try {
+            // Only admin/superadmin can add lectures
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Admin can add lecturers", "status", "ERROR"));
+            }
+
+            // Ensure new user is being created as lecture
+            if (newUser.getUsertype() == null || !newUser.getUsertype().toLowerCase().equals("lecture")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: New user must be of type 'lecture'", "status", "ERROR"));
+            }
+
+            // Get the currently authenticated admin user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String creatorUsername = authentication.getName();
+
+            User createdUser = userService.addUser(newUser, creatorUsername);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Lecturer user added successfully");
+            response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", "lecture");
+            response.put("status", "SUCCESS");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add lecturer: " + e.getMessage());
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/add-user")
+    public ResponseEntity<?> addUser(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+        try {
+            String requestedType = newUser.getUsertype() == null ? "" : newUser.getUsertype().toLowerCase().trim();
+
+            if ("admin".equals(requestedType) && !isSuperAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Superadmin can add admins", "status", "ERROR"));
+            }
+
+            if ("lecture".equals(requestedType) && !isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Admin can add lecturers", "status", "ERROR"));
+            }
+
+            if (!"admin".equals(requestedType) && !"lecture".equals(requestedType)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: userType must be 'admin' or 'lecture'", "status", "ERROR"));
+            }
+
             // Get the currently authenticated user from the SecurityContext
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String creatorUsername = authentication.getName(); // This is the username from the JWT
@@ -103,6 +190,8 @@ public class UserRestController {
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User added successfully");
             response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", createdUser.getUsertype());
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -151,6 +240,34 @@ public class UserRestController {
             errorResponse.put("message", "Failed to create test user: " + e.getMessage());
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    private boolean isSuperAdmin(String token) {
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && role.equals("superadmin");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isAdmin(String token) {
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && ("admin".equals(role) || "superadmin".equals(role));
+        } catch (Exception e) {
+            return false;
         }
     }
 }

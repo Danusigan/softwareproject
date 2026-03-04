@@ -26,11 +26,92 @@ public class OBEController {
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
 
-    // --- ADMIN ONLY: Create PO ---
+    // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
     public ResponseEntity<?> createPO(@RequestBody ProgramOutcome po, @RequestHeader("Authorization") String token) {
-        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admin only");
-        return ResponseEntity.ok(poRepo.save(po));
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            }
+            ProgramOutcome createdPo = poRepo.save(po);
+            return ResponseEntity.ok(Map.of("message", "Program Outcome created successfully", "data", createdPo, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Error creating PO: " + e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN ONLY: Read All POs ---
+    @GetMapping("/po/all")
+    public ResponseEntity<?> getAllPOs(@RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            }
+            return ResponseEntity.ok(Map.of("message", "All Program Outcomes", "data", poRepo.findAll(), "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Error fetching POs: " + e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN ONLY: Read One PO by ID ---
+    @GetMapping("/po/{poId}")
+    public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            }
+            return poRepo.findById(poId)
+                .map(po -> ResponseEntity.ok(Map.of("message", "PO found", "data", po, "status", "SUCCESS")))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "PO not found", "status", "ERROR")));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Error fetching PO: " + e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN ONLY: Update PO ---
+    @PutMapping("/po/{poId}")
+    public ResponseEntity<?> updatePO(@PathVariable String poId, @RequestBody ProgramOutcome poDetails, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            }
+            return poRepo.findById(poId)
+                .map(po -> {
+                    if (poDetails.getCode() != null) po.setCode(poDetails.getCode());
+                    if (poDetails.getDescription() != null) po.setDescription(poDetails.getDescription());
+                    ProgramOutcome updatedPo = poRepo.save(po);
+                    return ResponseEntity.ok(Map.of("message", "PO updated successfully", "data", updatedPo, "status", "SUCCESS"));
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "PO not found", "status", "ERROR")));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Error updating PO: " + e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN ONLY: Delete PO ---
+    @DeleteMapping("/po/{poId}")
+    public ResponseEntity<?> deletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            }
+            if (poRepo.existsById(poId)) {
+                poRepo.deleteById(poId);
+                return ResponseEntity.ok(Map.of("message", "PO deleted successfully", "status", "SUCCESS"));
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "PO not found", "status", "ERROR"));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Error deleting PO: " + e.getMessage(), "status", "ERROR"));
+        }
     }
 
     // --- LECTURE: Bulk Save Mappings (Pending) ---
@@ -78,11 +159,11 @@ public class OBEController {
     }
 
     // --- LECTURE: Upload Marks ---
-    @PostMapping("/marks/upload/{assignmentId}")
-    public ResponseEntity<?> uploadMarks(@PathVariable String assignmentId, @RequestParam("file") MultipartFile file, @RequestHeader("Authorization") String token) {
+    @PostMapping("/marks/upload/{losId}")
+    public ResponseEntity<?> uploadMarks(@PathVariable String losId, @RequestParam("file") MultipartFile file, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
-            excelService.importMarks(file, assignmentId);
+            excelService.importMarks(file, losId);
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
