@@ -21,9 +21,9 @@ public class AttainmentService {
     // 1. Calculate LO Attainment Level (1, 2, or 3)
     public int calculateLOLevel(String loId) {
         Los los = losRepository.findById(loId).orElse(null);
-        if (los == null || los.getAssignment() == null) return 0;
+        if (los == null) return 0;
 
-        List<StudentMark> marks = markRepository.findByAssessment_AssignmentId(los.getAssignment().getAssignmentId());
+        List<StudentMark> marks = markRepository.findByLos_Id(loId);
         if (marks.isEmpty()) return 0;
 
         long totalStudents = marks.size();

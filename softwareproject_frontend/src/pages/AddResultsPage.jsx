@@ -1,37 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 export default function AddResultsPage() {
     const { loId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [batch, setBatch] = useState('');
-    const [academicYear, setAcademicYear] = useState('');
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [lo, setLo] = useState(null);
     const [dragActive, setDragActive] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [existingFileName, setExistingFileName] = useState('');
     const loNumber = sessionStorage.getItem('currentLoNumber') || '';
     const fileInputRef = useRef(null);
 
     const batches = ['20', '21', '22', '23', '24', '25'];
 
+    // Check if we're in edit mode and pre-populate data
     useEffect(() => {
-        fetchLODetails();
-    }, [loId]);
-
-    const fetchLODetails = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setLo(res.data);
-        } catch (err) {
-            console.error('Error fetching LO details:', err);
+        if (location.state?.editMode) {
+            setIsEditMode(true);
+            setBatch(location.state.batch || '');
+            setExistingFileName(location.state.fileName || '');
         }
-    };
+    }, [location.state]);
 
     const handleDrag = (e) => {
         e.preventDefault();
@@ -47,7 +41,7 @@ export default function AddResultsPage() {
         e.preventDefault();
         e.stopPropagation();
         setDragActive(false);
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        if (e.dataTransfer.files?.[0]) {
             const droppedFile = e.dataTransfer.files[0];
             if (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls') || droppedFile.name.endsWith('.csv')) {
                 setFile(droppedFile);
@@ -58,7 +52,7 @@ export default function AddResultsPage() {
     };
 
     const handleChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
+        if (e.target.files?.[0]) {
             setFile(e.target.files[0]);
         }
     };
@@ -81,60 +75,58 @@ export default function AddResultsPage() {
             alert('Please select a batch');
             return;
         }
-        if (!academicYear) {
-            alert('Please select an academic year');
-            return;
-        }
-        if (!file) {
-            alert('Please select a file');
-            return;
-        }
 
         setLoading(true);
         setMessage({ type: '', text: '' });
 
         try {
             const token = localStorage.getItem('token');
-            let currentAssignmentId;
 
-            // Find if an assignment for the specific batch and academic year already exists
-            const existingAssignment = lo?.assignments?.find(a => a.academicYear === academicYear && a.batch === batch);
-
-            if (existingAssignment) {
-                currentAssignmentId = existingAssignment.assignmentId;
-            } else {
-                // Create a unique assignment ID for this batch + year
-                currentAssignmentId = `${loId}-${batch}-${academicYear.replace('/', '-')}`;
-
-                const formDataAssign = new FormData();
-                formDataAssign.append('assignmentId', currentAssignmentId);
-                formDataAssign.append('assignmentName', `LO ${loNumber} - ${academicYear} (Batch ${batch})`);
-                formDataAssign.append('academicYear', academicYear);
-                formDataAssign.append('batch', batch);
-
-                // Create the assignment link
-                const assignRes = await axios.post(
-                    `http://localhost:8080/api/assignments/${loId}/add`,
-                    formDataAssign,
-                    { headers: { 'Authorization': `Bearer ${token}` } }
+            // If in edit mode and no new file selected, update batch only
+            if (isEditMode && !file) {
+                // Update batch for existing records
+                await axios.put(
+                    `http://localhost:8080/api/lospos/${loId}/batch/update`,
+                    { oldBatch: location.state.batch, newBatch: batch },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
                 );
 
-                // Update local lo state to include this new assignment
-                setLo(prev => ({
-                    ...prev,
-                    assignments: [...(prev.assignments || []), assignRes.data]
-                }));
+                setMessage({ type: 'success', text: 'Batch updated successfully!' });
+                setTimeout(() => navigate(-1), 1500);
+                return;
+            }
+
+            // File upload flow (new or replacement)
+            if (!file) {
+                alert('Please select a file');
+                return;
             }
 
             const formData = new FormData();
             formData.append('excelFile', file);
             formData.append('batch', batch);
             formData.append('loNumber', loNumber);
-            formData.append('academicYear', academicYear);
 
-            // Import marks using the linked assignment ID
-            const res = await axios.post(
-                `http://localhost:8080/api/assignments/${currentAssignmentId}/import-marks-obe`,
+            // If editing with new file, first delete old batch
+            if (isEditMode && location.state.batch) {
+                await axios.delete(
+                    `http://localhost:8080/api/lospos/${loId}/batch/${location.state.batch}`,
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }
+                );
+            }
+
+            // Import marks directly for the selected LO
+            await axios.post(
+                `http://localhost:8080/api/lospos/${loId}/marks/import-obe`,
                 formData,
                 {
                     headers: {
@@ -144,7 +136,7 @@ export default function AddResultsPage() {
                 }
             );
 
-            setMessage({ type: 'success', text: 'Results uploaded successfully!' });
+            setMessage({ type: 'success', text: 'Results ' + (isEditMode ? 'updated' : 'uploaded') + ' successfully!' });
             setTimeout(() => navigate(-1), 1500);
         } catch (err) {
             console.error('Upload flow failed:', err);
@@ -178,11 +170,11 @@ export default function AddResultsPage() {
                 {/* Header Title */}
                 <div className="text-center mb-12">
                     <span className="px-4 py-1.5 bg-indigo-50 text-indigo-600 rounded-full text-sm font-bold tracking-wider uppercase mb-4 inline-block">
-                        Results Portal
+                        {isEditMode ? 'Edit Results' : 'Results Portal'}
                     </span>
                     <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
-                        Upload Activity Results
-                        {loNumber && <span className="text-indigo-600 ml-2">LO {loNumber}</span>}
+                        {isEditMode ? `Update Batch ${batch} Results` : 'Upload Activity Results'}
+                        {!isEditMode && loNumber && <span className="text-indigo-600 ml-2">LO {loNumber}</span>}
                     </h1>
                     <p className="mt-4 text-slate-500 max-w-md mx-auto">
                         Seamlessly import student marks and track performance outcomes across different batches.
@@ -192,49 +184,32 @@ export default function AddResultsPage() {
                 {/* Form Section */}
                 <div className="w-full max-w-2xl space-y-8">
 
-                    {/* Batch & Year Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700 ml-1">
-                                Selection Batch
-                            </label>
-                            <select
-                                value={batch}
-                                onChange={(e) => setBatch(e.target.value)}
-                                className="input-field appearance-none"
-                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
-                            >
-                                <option value="" disabled>Select Batch Number</option>
-                                {batches.map(v => (
-                                    <option key={v} value={v}>Batch {v}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-700 ml-1">
-                                Academic Year
-                            </label>
-                            <select
-                                value={academicYear}
-                                onChange={(e) => setAcademicYear(e.target.value)}
-                                className="input-field appearance-none"
-                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
-                            >
-                                <option value="" disabled>Select Year</option>
-                                {['2022/23', '2023/24', '2024/25', '2025/26'].map(y => (
-                                    <option key={y} value={y}>{y}</option>
-                                ))}
-                            </select>
-                        </div>
+                    {/* Batch Selection */}
+                    <div className="space-y-2">
+                        <label htmlFor="batch" className="text-sm font-bold text-slate-700 ml-1">
+                            Selection Batch
+                        </label>
+                        <select
+                            id="batch"
+                            value={batch}
+                            onChange={(e) => setBatch(e.target.value)}
+                            className="input-field appearance-none w-full"
+                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
+                        >
+                            <option value="" disabled>Select Batch Number</option>
+                            {batches.map(v => (
+                                <option key={v} value={v}>Batch {v}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Upload Box */}
                     <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-700 ml-1">
+                        <label htmlFor="resultFile" className="text-sm font-bold text-slate-700 ml-1">
                             Document Upload
                         </label>
-                        <div
+                        <button
+                            type="button"
                             className={`w-full group p-10 border-2 border-dashed rounded-[2rem] transition-all duration-300 flex flex-col items-center justify-center cursor-pointer
                                 ${dragActive ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400 bg-white/30'}`}
                             onDragEnter={handleDrag}
@@ -245,6 +220,7 @@ export default function AddResultsPage() {
                         >
                             <input
                                 ref={fileInputRef}
+                                id="resultFile"
                                 type="file"
                                 className="hidden"
                                 onChange={handleChange}
@@ -265,22 +241,23 @@ export default function AddResultsPage() {
 
                             <div className="text-center">
                                 <h3 className="text-xl font-bold text-slate-800 mb-2">
-                                    {file ? file.name : 'Drop your file here'}
+                                    {file ? file.name : (isEditMode && existingFileName ? existingFileName : 'Drop your file here')}
                                 </h3>
                                 <p className="text-slate-500 text-sm">
-                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : 'Click to browse or drag & drop (Excel, CSV)'}
+                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : (isEditMode && existingFileName ? 'Current file - Upload new to replace' : 'Click to browse or drag & drop (Excel, CSV)')}
                                 </p>
                             </div>
 
-                            {file && (
-                                <button
-                                    onClick={clearFile}
-                                    className="mt-6 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
-                                >
-                                    Select Different File
-                                </button>
-                            )}
-                        </div>
+                        </button>
+                        {file && (
+                            <button
+                                type="button"
+                                onClick={clearFile}
+                                className="mt-6 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
+                            >
+                                Select Different File
+                            </button>
+                        )}
                     </div>
 
                     {/* Notification Message */}
@@ -298,9 +275,9 @@ export default function AddResultsPage() {
                     <div className="pt-4">
                         <button
                             onClick={handleUpload}
-                            disabled={loading || !file || !batch || !academicYear}
+                            disabled={loading || !batch || (!file && !(isEditMode && existingFileName))}
                             className={`w-full py-4 px-8 rounded-2xl text-white font-bold text-lg shadow-xl shadow-indigo-100 transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3
-                                ${loading || !file || !batch || !academicYear
+                                ${loading || (!file && !(isEditMode && existingFileName)) || !batch
                                     ? 'bg-slate-300 cursor-not-allowed shadow-none'
                                     : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200'}`}
                         >
@@ -310,7 +287,7 @@ export default function AddResultsPage() {
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
                             )}
-                            {loading ? 'Processing Data...' : 'Confirm and Upload'}
+                            {loading ? 'Processing Data...' : (isEditMode ? 'Update Results' : 'Confirm and Upload')}
                         </button>
                     </div>
                 </div>

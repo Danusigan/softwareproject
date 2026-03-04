@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/header';
 import Footer from '../components/footer';
@@ -9,10 +9,15 @@ export default function LODetailPage() {
     const [lo, setLo] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [batches, setBatches] = useState([]);
+    const [batchesLoading, setBatchesLoading] = useState(false);
+    const [markMessage, setMarkMessage] = useState({ type: '', text: '' });
+
     const navigate = useNavigate();
 
     useEffect(() => {
         fetchLODetails();
+        fetchBatches();
     }, [loId]);
 
     const fetchLODetails = async () => {
@@ -22,13 +27,67 @@ export default function LODetailPage() {
             const res = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setLo(res.data);
+
+            // Backend returns {message, data, losId, name, description, status}
+            // Extract the Los object from data field if it exists, otherwise use the whole response
+            const loData = res.data.data || res.data;
+            setLo(loData);
+
+            // Log for debugging
+            console.log('LO Details Response:', res.data);
+            console.log('Extracted LO Data:', loData);
         } catch (err) {
             console.error('Error fetching LO details:', err);
+            console.error('Error response:', err.response?.data);
             setError('Failed to load learning outcome details');
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchBatches = async () => {
+        try {
+            setBatchesLoading(true);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setBatches(res.data?.data || []);
+        } catch (err) {
+            console.error('Error fetching batches:', err);
+            setBatches([]);
+        } finally {
+            setBatchesLoading(false);
+        }
+    };
+
+    const deleteBatch = async (batch) => {
+        if (!window.confirm(`Delete all results for ${batch}nd Batch?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches/${batch}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setMarkMessage({ type: 'success', text: `${batch}nd Batch deleted successfully.` });
+            fetchBatches();
+        } catch (err) {
+            setMarkMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to delete batch'
+            });
+        }
+    };
+
+    // Navigate to edit page
+    const openEditPage = (batchInfo) => {
+        navigate(`/lo-detail/${loId}/add-results`, {
+            state: {
+                editMode: true,
+                batch: batchInfo.batch,
+                fileName: lo?.fileName || 'existing_file.xlsx'
+            }
+        });
     };
 
     return (
@@ -77,7 +136,7 @@ export default function LODetailPage() {
                                 </span>
                             </div>
                             <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 leading-[1.1] pb-2">
-                                {lo?.loDescription || lo?.name}
+                                {lo?.description || lo?.name}
                             </h1>
                             <p className="text-slate-500 text-lg font-medium max-w-2xl mx-auto leading-relaxed">
                                 Manage performance metrics and execute comparisons for this learning outcome.
@@ -166,6 +225,58 @@ export default function LODetailPage() {
                                     </svg>
                                 </div>
                             </button>
+                        </div>
+
+                        <div className="glass-card rounded-[2rem] p-8 text-left animate-in slide-in-from-bottom-6 duration-700">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-black text-slate-800">Uploaded Results</h3>
+                                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                    {batches.length} {batches.length === 1 ? 'Batch' : 'Batches'}
+                                </span>
+                            </div>
+
+                            {markMessage.text && (
+                                <div className={`mb-4 p-3 rounded-xl text-sm font-semibold ${markMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                    {markMessage.text}
+                                </div>
+                            )}
+
+                            {batchesLoading ? (
+                                <p className="text-slate-500 font-semibold">Loading results...</p>
+                            ) : batches.length === 0 ? (
+                                <p className="text-slate-500 font-semibold">No uploaded results found for this LO.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-slate-600 mb-3">Results available</p>
+                                    {batches.map((batchInfo) => (
+                                        <div key={batchInfo.batch} className="flex items-center justify-between py-3 px-4 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <span className="text-base font-semibold text-slate-800">
+                                                {batchInfo.batch}nd Batch
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => openEditPage(batchInfo)}
+                                                    className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                                                    title="Edit batch"
+                                                >
+                                                    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteBatch(batchInfo.batch)}
+                                                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete batch"
+                                                >
+                                                    <svg className="w-5 h-5 text-slate-600 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

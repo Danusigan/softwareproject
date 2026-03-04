@@ -1,26 +1,34 @@
-"use client"
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import authService from '../services/authService';
 
 export default function Header() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const username = localStorage.getItem('username');
-    const userType = localStorage.getItem('userType');
-    if (username && userType) {
-      setUser({ username, userType });
-    }
-  }, []);
+    // ✅ Check login status
+    setUser(authService.getUserInfo());
+
+    // ✅ Auto-logout when token expires
+    const interval = setInterval(() => {
+      if (authService.isLoggedIn()) {
+        const remaining = authService.getTimeRemaining();
+        if (remaining <= 0) {
+          handleLogout();
+          return;
+        }
+      }
+      setUser(authService.getUserInfo());
+    }, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem('username');
-    localStorage.removeItem('userType');
-    localStorage.removeItem('token');
-    localStorage.removeItem('rememberMe');
+    authService.logout();
     setUser(null);
-    navigate('/');
+    navigate('/loginpage', { replace: true });
   };
 
   return (
@@ -28,7 +36,12 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-6 sm:px-10">
         <div className="flex justify-between items-center h-24">
           {/* Logo and Branding */}
-          <div className="flex items-center gap-5 cursor-pointer group" onClick={() => navigate('/')}>
+          <button
+            type="button"
+            className="flex items-center gap-5 cursor-pointer group"
+            onClick={() => navigate('/')}
+            aria-label="Go to home"
+          >
             <div className="bg-white p-2.5 rounded-xl shadow-md group-hover:scale-105 transition-transform duration-300">
               <div className="w-11 h-11 bg-[#1e3a8a] rounded-lg flex items-center justify-center">
                 <span className="text-white font-black text-xl tracking-tighter">LO</span>
@@ -41,12 +54,12 @@ export default function Header() {
                 <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-blue-200/80">University of Ruhuna</span>
               </div>
             </div>
-          </div>
+          </button>
 
           {/* Navigation Links */}
           <div className="flex items-center gap-10">
             <Link to="/" className="text-sm font-bold hover:text-blue-200 transition-colors uppercase tracking-widest relative group/link">
-              Home
+              <span>Home</span>
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-300 group-hover/link:w-full transition-all duration-300"></span>
             </Link>
 
