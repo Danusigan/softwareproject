@@ -18,16 +18,23 @@ public class OutcomeMapping {
     @JsonIgnore // Ignore getter to prevent recursion
     private Los learningOutcome;
 
+    // Legacy schema compatibility: some DBs still require non-null `lospos_id`.
+    @JsonIgnore
+    @Column(name = "lospos_id", nullable = false)
+    private String legacyLosPosId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "program_outcome_id", nullable = false)
     @JsonIgnore // Ignore getter to prevent recursion
     private ProgramOutcome programOutcome;
 
     @Column(name = "weight", nullable = false)
+    @JsonProperty("correlationWeight")
     private Integer weight; // 0 = No correlation, 1 = Low, 2 = Medium, 3 = High
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @JsonProperty("approvalStatus")
     private ApprovalStatus status = ApprovalStatus.PENDING;
 
     @Column(name = "lecturer_remarks", columnDefinition = "TEXT")
@@ -61,6 +68,9 @@ public class OutcomeMapping {
     protected void onCreate() {
         mappedAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (learningOutcome != null) {
+            legacyLosPosId = learningOutcome.getId();
+        }
         if (status == null) {
             status = ApprovalStatus.PENDING;
         }
@@ -73,6 +83,9 @@ public class OutcomeMapping {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        if (learningOutcome != null) {
+            legacyLosPosId = learningOutcome.getId();
+        }
         // Validate weight range
         if (weight != null && (weight < 0 || weight > 3)) {
             weight = Math.max(0, Math.min(3, weight));
