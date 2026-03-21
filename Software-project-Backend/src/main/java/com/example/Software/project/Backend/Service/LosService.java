@@ -28,15 +28,54 @@ public class LosService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private String normalizeLoId(String id) {
+        return id == null ? null : id.trim().toUpperCase();
+    }
+
+    private String buildModuleScopedLosId(String moduleId, String loId) {
+        String normalizedModuleId = normalizeLoId(moduleId);
+        String normalizedLoId = normalizeLoId(loId);
+        return normalizedModuleId + " " + normalizedLoId;
+    }
+
+    private String resolveStoredLosId(String id) throws Exception {
+        String normalized = normalizeLoId(id);
+        if (normalized == null || normalized.isEmpty()) {
+            throw new Exception("Los ID is required");
+        }
+
+        if (losRepository.existsById(normalized)) {
+            return normalized;
+        }
+
+        List<Los> suffixMatches = losRepository.findByIdEndingWith(" " + normalized);
+        if (suffixMatches.size() == 1) {
+            return suffixMatches.get(0).getId();
+        }
+        if (suffixMatches.size() > 1) {
+            throw new Exception("Multiple modules contain Los ID '" + normalized + "'. Use module-specific Los ID.");
+        }
+
+        throw new Exception("Los not found");
+    }
+
     // Create (Lecture) - Add to Module
     public Los addLosToModule(String moduleId, Los los) throws Exception {
         Optional<Module> moduleOptional = moduleRepository.findById(moduleId);
         if (moduleOptional.isEmpty()) {
             throw new Exception("Module not found");
         }
-        if (losRepository.existsById(los.getId())) {
-            throw new Exception("Los ID already exists");
+        String requestedLoId = normalizeLoId(los.getId());
+        if (requestedLoId == null || requestedLoId.isEmpty()) {
+            throw new Exception("Los ID is required");
         }
+
+        String storedLosId = buildModuleScopedLosId(moduleId, requestedLoId);
+        if (losRepository.existsById(storedLosId)) {
+            throw new Exception("Los ID already exists for this module");
+        }
+
+        los.setId(storedLosId);
         los.setModule(moduleOptional.get());
         return losRepository.save(los);
     }
@@ -48,13 +87,18 @@ public class LosService {
 
     // Read One Los
     public Optional<Los> getLosById(String id) {
-        return losRepository.findById(id);
+        try {
+            return losRepository.findById(resolveStoredLosId(id));
+        } catch (Exception e) {
+            return Optional.empty();
+        }
     }
 
     // Update Los (Lecture)
     public Los updateLos(String id, Los losDetails) throws Exception {
-        Los los = losRepository.findById(id)
-                .orElseThrow(() -> new Exception("Los not found"));
+        String storedLosId = resolveStoredLosId(id);
+        Los los = losRepository.findById(storedLosId)
+            .orElseThrow(() -> new Exception("Los not found"));
 
         los.setName(losDetails.getName());
         if (losDetails.getDescription() != null) {
@@ -75,19 +119,17 @@ public class LosService {
     // Delete Los (Lecture)
     @Transactional
     public void deleteLos(String id) throws Exception {
-        if (!losRepository.existsById(id)) {
-            throw new Exception("Los not found");
-        }
+        String storedLosId = resolveStoredLosId(id);
 
-        studentMarkRepository.deleteByLos_Id(id);
+        studentMarkRepository.deleteByLos_Id(storedLosId);
 
-        jdbcTemplate.update("DELETE FROM lo_po_mappings WHERE los_id = ?", id);
+        jdbcTemplate.update("DELETE FROM lo_po_mappings WHERE los_id = ? OR lospos_id = ?", storedLosId, storedLosId);
 
         try {
-            jdbcTemplate.update("DELETE FROM assignments WHERE los_pos_id = ?", id);
+            jdbcTemplate.update("DELETE FROM assignments WHERE los_pos_id = ?", storedLosId);
         } catch (Exception ignored) {
         }
 
-        losRepository.deleteById(id);
+        losRepository.deleteById(storedLosId);
     }
 }
