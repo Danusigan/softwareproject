@@ -17,6 +17,7 @@ public class LegacySchemaFixService {
     public void applyLegacyFixes() {
         makeAssessmentIdNullableForLegacyStudentMark();
         reconcileLoPoProgramOutcomeForeignKey();
+        reconcileLoPoLegacyLosPosForeignKey();
     }
 
     private void makeAssessmentIdNullableForLegacyStudentMark() {
@@ -57,6 +58,28 @@ public class LegacySchemaFixService {
             }
 
             jdbcTemplate.execute("ALTER TABLE lo_po_mappings MODIFY COLUMN program_outcome_id VARCHAR(255) NOT NULL");
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void reconcileLoPoLegacyLosPosForeignKey() {
+        try {
+            List<String> fkNames = jdbcTemplate.queryForList(
+                    "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE " +
+                            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'lo_po_mappings' " +
+                            "AND COLUMN_NAME = 'lospos_id' AND REFERENCED_TABLE_NAME IS NOT NULL",
+                    String.class
+            );
+
+            for (String fkName : fkNames) {
+                try {
+                    jdbcTemplate.execute("ALTER TABLE lo_po_mappings DROP FOREIGN KEY " + fkName);
+                } catch (Exception ignored) {
+                }
+            }
+
+            // Keep legacy column for compatibility, but do not enforce obsolete FK to `los_pos`.
+            jdbcTemplate.execute("ALTER TABLE lo_po_mappings MODIFY COLUMN lospos_id VARCHAR(255) NULL");
         } catch (Exception ignored) {
         }
     }
