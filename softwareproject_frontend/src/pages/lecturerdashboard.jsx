@@ -20,6 +20,13 @@ export default function LecturerDashboard() {
         description: ''
     });
 
+    const extractDisplayLoNumber = (loId) => {
+        if (!loId) return '';
+        const normalized = String(loId).trim();
+        const parts = normalized.split(' ');
+        return parts.length > 1 ? parts[parts.length - 1] : normalized;
+    };
+
     // Fetch modules on mount
     useEffect(() => {
         fetchModules();
@@ -150,7 +157,7 @@ export default function LecturerDashboard() {
 
     const openEditDialog = (lo) => {
         setEditingLo(lo);
-        setLoData({ loNumber: lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id, description: lo.description || lo.name });
+        setLoData({ loNumber: extractDisplayLoNumber(lo.id), description: lo.description || lo.name });
         setShowEditLoDialog(true);
     };
 
@@ -274,15 +281,37 @@ export default function LecturerDashboard() {
 
                             {/* Panel Actions */}
                             <div className="pt-2">
-                                <button
-                                    onClick={() => setShowAddLoDialog(true)}
-                                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/10 transform active:scale-[0.98]"
-                                >
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Add Learning Outcome
-                                </button>
+                                <div className="space-y-3">
+                                    <button
+                                        onClick={() => setShowAddLoDialog(true)}
+                                        className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/10 transform active:scale-[0.98]"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
+                                        </svg>
+                                        Add LO Only
+                                    </button>
+
+                                    <button
+                                        onClick={() => navigate(`/create-lo-mapping/${selectedModule.moduleId}`)}
+                                        className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m-6-8h6m3 10H6a2 2 0 01-2-2V8a2 2 0 012-2h3.172a2 2 0 001.414-.586l.828-.828A2 2 0 0112.828 4H18a2 2 0 012 2v10a2 2 0 01-2 2z" />
+                                        </svg>
+                                        Create LO + PO Mapping
+                                    </button>
+
+                                    <button
+                                        onClick={() => navigate('/lo-po-mappings')}
+                                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-white/10"
+                                    >
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                        Review Mapping Status
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -311,7 +340,7 @@ export default function LecturerDashboard() {
                                             key={lo.id}
                                             className="group relative bg-white/5 border border-white/5 rounded-3xl p-6 transition-all duration-300 hover:bg-white/10 hover:border-white/10 cursor-pointer"
                                             onClick={() => {
-                                                const loNum = lo.id?.includes('_') ? lo.id.split('_').pop() : lo.id;
+                                                const loNum = extractDisplayLoNumber(lo.id);
                                                 sessionStorage.setItem('currentLoNumber', loNum);
                                                 navigate(`/lo-detail/${lo.id}`);
                                             }}
@@ -320,7 +349,7 @@ export default function LecturerDashboard() {
                                                 <div className="space-y-4 flex-1">
                                                     <div className="flex items-center gap-3">
                                                         <span className="px-4 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                                                            {lo.id?.includes('_') ? `LO ${lo.id.split('_').pop()}` : lo.id}
+                                                            {`LO ${extractDisplayLoNumber(lo.id)}`}
                                                         </span>
                                                         <div className="h-px w-8 bg-white/5"></div>
                                                     </div>
