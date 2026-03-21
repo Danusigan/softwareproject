@@ -15,4 +15,6 @@ public interface LosRepository extends JpaRepository<Los, String> {
 
     @Query("SELECT l.id FROM Los l WHERE l.module.moduleId = :moduleId")
     List<String> findIdsByModuleId(String moduleId);
+
+    List<Los> findByIdEndingWith(String suffix);
 }
