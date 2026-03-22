@@ -27,6 +27,23 @@ export default function LecturerDashboard() {
         return parts.length > 1 ? parts[parts.length - 1] : normalized;
     };
 
+    const getStatusForLo = (loId) => {
+        const relevantMappings = los.find(lo => lo.id === loId)?.mappings;
+        if (!relevantMappings || relevantMappings.length === 0) {
+            return { status: 'UNMAPPED', badge: 'bg-gray-100 text-gray-800 border-gray-200' };
+        }
+        if (relevantMappings.some(m => m.status === 'PENDING')) {
+            return { status: 'PENDING', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+        }
+        if (relevantMappings.every(m => m.status === 'APPROVED')) {
+            return { status: 'APPROVED', badge: 'bg-green-100 text-green-800 border-green-200' };
+        }
+        if (relevantMappings.some(m => m.status === 'REJECTED')) {
+            return { status: 'REJECTED', badge: 'bg-red-100 text-red-800 border-red-200' };
+        }
+        return { status: 'MIXED', badge: 'bg-blue-100 text-blue-800 border-blue-200' };
+    };
+
     // Fetch modules on mount
     useEffect(() => {
         fetchModules();
@@ -352,6 +369,9 @@ export default function LecturerDashboard() {
                                                             {`LO ${extractDisplayLoNumber(lo.id)}`}
                                                         </span>
                                                         <div className="h-px w-8 bg-white/5"></div>
+                                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${getStatusForLo(lo.id).badge}`}>
+                                                            {getStatusForLo(lo.id).status}
+                                                        </span>
                                                     </div>
                                                     <p className="text-lg font-bold text-white/90 leading-snug group-hover:text-white transition-colors">
                                                         {lo.description || lo.name}
