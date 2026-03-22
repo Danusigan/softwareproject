@@ -38,6 +38,12 @@ export default function LOPOMappingManagementPage() {
         status: '',
         remarks: ''
     });
+    const [selectedEditableMapping, setSelectedEditableMapping] = useState(null);
+    const [showEditMappingModal, setShowEditMappingModal] = useState(false);
+    const [editMappingForm, setEditMappingForm] = useState({
+        weight: 1,
+        lecturerRemarks: ''
+    });
 
     // User role
     const [userRole, setUserRole] = useState('');
@@ -102,7 +108,9 @@ export default function LOPOMappingManagementPage() {
 
             const allFailed = [mappingsRes, modulesRes, statsRes].every(res => res.status === 'rejected');
             if (allFailed) {
-                setError('Failed to load LO-PO mappings');
+                const firstFailure = [mappingsRes, modulesRes, statsRes].find(res => res.status === 'rejected');
+                const failureMessage = firstFailure?.reason?.response?.data?.message || firstFailure?.reason?.message;
+                setError(failureMessage || 'Failed to load LO-PO mappings');
             }
 
         } catch (err) {
@@ -157,10 +165,15 @@ export default function LOPOMappingManagementPage() {
     };
 
     const submitApproval = async () => {
+        const normalizedAction = normalizeRole(approvalForm.status);
+        if (normalizedAction === 'REJECTED' && !approvalForm.remarks.trim()) {
+            setError('Rejection remarks are required so lecturers can fix the mapping.');
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
 
-            const normalizedAction = normalizeRole(approvalForm.status);
             const actionEndpoint = normalizedAction === 'APPROVED' ? 'approve' : 'reject';
             const mappingIdentifier = selectedMapping.mappingId || selectedMapping.id;
 
@@ -181,6 +194,62 @@ export default function LOPOMappingManagementPage() {
         } catch (err) {
             console.error('Error updating mapping approval:', err);
             setError(err.response?.data?.message || 'Failed to update mapping approval');
+        }
+    };
+
+    const handleEditRejectedMapping = (mapping) => {
+        setSelectedEditableMapping(mapping);
+        setEditMappingForm({
+            weight: mapping.correlationWeight || 1,
+            lecturerRemarks: mapping.lecturerRemarks || ''
+        });
+        setShowEditMappingModal(true);
+    };
+
+    const submitRejectedMappingEdit = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const mappingIdentifier = selectedEditableMapping.mappingId || selectedEditableMapping.id;
+
+            await axios.put(
+                `http://localhost:8080/api/lo-po-mapping/${mappingIdentifier}`,
+                {
+                    weight: Number(editMappingForm.weight),
+                    lecturerRemarks: editMappingForm.lecturerRemarks
+                },
+                {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                }
+            );
+
+            setSuccess('Rejected mapping updated successfully');
+            setShowEditMappingModal(false);
+            setSelectedEditableMapping(null);
+            setEditMappingForm({ weight: 1, lecturerRemarks: '' });
+            fetchMappings();
+            fetchData();
+        } catch (err) {
+            console.error('Error updating rejected mapping:', err);
+            setError(err.response?.data?.message || 'Failed to update rejected mapping');
+        }
+    };
+
+    const handleDeleteRejectedMapping = async (mapping) => {
+        const mappingIdentifier = mapping.mappingId || mapping.id;
+        if (!window.confirm('Delete this rejected LO-PO mapping?')) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:8080/api/lo-po-mapping/${mappingIdentifier}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            setSuccess('Rejected mapping deleted successfully');
+            fetchMappings();
+            fetchData();
+        } catch (err) {
+            console.error('Error deleting rejected mapping:', err);
+            setError(err.response?.data?.message || 'Failed to delete rejected mapping');
         }
     };
 
@@ -225,6 +294,16 @@ export default function LOPOMappingManagementPage() {
         }));
     };
 
+    const getAdminFeedback = (mapping) => {
+        return mapping?.adminRemarks || mapping?.remarks || mapping?.reviewComment || '';
+    };
+
+    const formatCoverage = (value) => {
+        const numeric = Number(value || 0);
+        if (Number.isNaN(numeric)) return '0';
+        return numeric.toFixed(1).replace(/\.0$/, '');
+    };
+
     // Group mappings by LO for matrix view
     const groupedMappings = mappings.reduce((acc, mapping) => {
         const loId = mapping.learningOutcome?.id || mapping.learningOutcomeId || 'UNKNOWN-LO';
@@ -243,6 +322,9 @@ export default function LOPOMappingManagementPage() {
         acc[key].mappings.push(mapping);
         return acc;
     }, {});
+
+    const isAdminUser = userRole === 'ADMIN' || userRole === 'SUPERADMIN';
+    const canEditRejected = !isAdminUser;
 
     if (loading) {
         return (
@@ -364,7 +446,7 @@ export default function LOPOMappingManagementPage() {
                             <div>
                                 <p className="text-sm font-medium text-slate-600">Coverage</p>
                                 <p className="text-2xl font-bold text-indigo-600 mt-1">
-                                    {stats.coveragePercentage || 0}%
+                                    {formatCoverage(stats.coveragePercentage)}%
                                 </p>
                             </div>
                             <div className="p-3 bg-indigo-100 rounded-xl">
@@ -463,7 +545,7 @@ export default function LOPOMappingManagementPage() {
                                         <th className="text-left py-4 px-6 font-semibold text-slate-700">Weight</th>
                                         <th className="text-left py-4 px-6 font-semibold text-slate-700">Status</th>
                                         <th className="text-left py-4 px-6 font-semibold text-slate-700">Created</th>
-                                        {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && (
+                                        {(isAdminUser || canEditRejected) && (
                                             <th className="text-left py-4 px-6 font-semibold text-slate-700">Actions</th>
                                         )}
                                     </tr>
@@ -505,11 +587,16 @@ export default function LOPOMappingManagementPage() {
                                                 <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadge(mapping.approvalStatus)}`}>
                                                     {mapping.approvalStatus}
                                                 </span>
+                                                {mapping.approvalStatus === 'REJECTED' && getAdminFeedback(mapping) && (
+                                                    <p className="mt-2 text-xs text-red-700 max-w-xs leading-relaxed">
+                                                        Admin feedback: {getAdminFeedback(mapping)}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="py-4 px-6 text-sm text-slate-600">
                                                         {new Date(mapping.mappedAt || mapping.createdDate || mapping.updatedAt || Date.now()).toLocaleDateString()}
                                             </td>
-                                            {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && mapping.approvalStatus === 'PENDING' && (
+                                            {isAdminUser && mapping.approvalStatus === 'PENDING' && (
                                                 <td className="py-4 px-6">
                                                     <div className="flex gap-2">
                                                         <button
@@ -523,6 +610,24 @@ export default function LOPOMappingManagementPage() {
                                                             className="text-red-600 hover:text-red-700 font-medium text-sm"
                                                         >
                                                             Reject
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            )}
+                                            {!isAdminUser && mapping.approvalStatus === 'REJECTED' && (
+                                                <td className="py-4 px-6">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleEditRejectedMapping(mapping)}
+                                                            className="text-indigo-600 hover:text-indigo-700 font-medium text-sm"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteRejectedMapping(mapping)}
+                                                            className="text-red-600 hover:text-red-700 font-medium text-sm"
+                                                        >
+                                                            Delete
                                                         </button>
                                                     </div>
                                                 </td>
@@ -571,9 +676,16 @@ export default function LOPOMappingManagementPage() {
                                         <span className="text-sm text-slate-600">Created:</span>
                                         <span className="text-sm">{new Date(mapping.mappedAt || mapping.createdDate || mapping.updatedAt || Date.now()).toLocaleDateString()}</span>
                                     </div>
+
+                                    {mapping.approvalStatus === 'REJECTED' && getAdminFeedback(mapping) && (
+                                        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                                            <p className="text-xs font-semibold text-red-700 mb-1">Admin feedback</p>
+                                            <p className="text-xs text-red-700 leading-relaxed">{getAdminFeedback(mapping)}</p>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && mapping.approvalStatus === 'PENDING' && (
+                                {isAdminUser && mapping.approvalStatus === 'PENDING' && (
                                     <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
                                         <button
                                             onClick={() => handleApproveMapping(mapping.mappingId, 'APPROVED')}
@@ -586,6 +698,23 @@ export default function LOPOMappingManagementPage() {
                                             className="btn-secondary text-red-600 hover:text-red-700 text-sm flex-1"
                                         >
                                             Reject
+                                        </button>
+                                    </div>
+                                )}
+
+                                {!isAdminUser && mapping.approvalStatus === 'REJECTED' && (
+                                    <div className="flex gap-2 mt-4 pt-4 border-t border-slate-200">
+                                        <button
+                                            onClick={() => handleEditRejectedMapping(mapping)}
+                                            className="btn-secondary text-indigo-600 hover:text-indigo-700 text-sm flex-1"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteRejectedMapping(mapping)}
+                                            className="btn-secondary text-red-600 hover:text-red-700 text-sm flex-1"
+                                        >
+                                            Delete
                                         </button>
                                     </div>
                                 )}
@@ -628,7 +757,7 @@ export default function LOPOMappingManagementPage() {
                                                     {mapping.approvalStatus}
                                                 </span>
                                                 
-                                                {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && mapping.approvalStatus === 'PENDING' && (
+                                                {isAdminUser && mapping.approvalStatus === 'PENDING' && (
                                                     <div className="flex gap-1">
                                                         <button
                                                             onClick={() => handleApproveMapping(mapping.mappingId, 'APPROVED')}
@@ -646,7 +775,33 @@ export default function LOPOMappingManagementPage() {
                                                         </button>
                                                     </div>
                                                 )}
+
+                                                {!isAdminUser && mapping.approvalStatus === 'REJECTED' && (
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleEditRejectedMapping(mapping)}
+                                                            className="text-indigo-600 hover:text-indigo-700 text-xs"
+                                                            title="Edit rejected mapping"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteRejectedMapping(mapping)}
+                                                            className="text-red-600 hover:text-red-700 text-xs"
+                                                            title="Delete rejected mapping"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
+
+                                            {mapping.approvalStatus === 'REJECTED' && getAdminFeedback(mapping) && (
+                                                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                                                    <p className="text-[11px] font-semibold text-red-700 mb-1">Admin feedback</p>
+                                                    <p className="text-[11px] text-red-700 leading-relaxed">{getAdminFeedback(mapping)}</p>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -719,6 +874,74 @@ export default function LOPOMappingManagementPage() {
                                     setShowApprovalModal(false);
                                     setSelectedMapping(null);
                                     setApprovalForm({ status: '', remarks: '' });
+                                }}
+                                className="btn-secondary flex-1"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showEditMappingModal && selectedEditableMapping && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="glass-card rounded-2xl p-8 w-full max-w-md">
+                        <h3 className="text-xl font-bold text-slate-900 mb-6">Edit Rejected Mapping</h3>
+
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <span className="text-sm text-slate-600">Learning Outcome:</span>
+                                <p className="font-medium">{selectedEditableMapping.learningOutcome?.id || selectedEditableMapping.learningOutcomeId || 'N/A'} - {selectedEditableMapping.learningOutcome?.name || 'Unknown Learning Outcome'}</p>
+                            </div>
+                            <div>
+                                <span className="text-sm text-slate-600">Program Outcome:</span>
+                                <p className="font-medium">{selectedEditableMapping.programOutcome?.code || selectedEditableMapping.programOutcomeCode || 'N/A'} - {selectedEditableMapping.programOutcome?.title || 'Unknown Program Outcome'}</p>
+                            </div>
+                            {getAdminFeedback(selectedEditableMapping) && (
+                                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                                    <p className="text-xs font-semibold text-red-700 mb-1">Admin feedback</p>
+                                    <p className="text-xs text-red-700">{getAdminFeedback(selectedEditableMapping)}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mb-4">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Correlation Weight</label>
+                            <select
+                                className="input-field"
+                                value={editMappingForm.weight}
+                                onChange={(e) => setEditMappingForm(prev => ({ ...prev, weight: e.target.value }))}
+                            >
+                                <option value={1}>1 - Low</option>
+                                <option value={2}>2 - Medium</option>
+                                <option value={3}>3 - High</option>
+                            </select>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Lecturer remarks (optional)</label>
+                            <textarea
+                                className="input-field"
+                                rows="3"
+                                value={editMappingForm.lecturerRemarks}
+                                onChange={(e) => setEditMappingForm(prev => ({ ...prev, lecturerRemarks: e.target.value }))}
+                                placeholder="Add notes for admin review"
+                            />
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={submitRejectedMappingEdit}
+                                className="btn-primary flex-1"
+                            >
+                                Save Changes
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowEditMappingModal(false);
+                                    setSelectedEditableMapping(null);
+                                    setEditMappingForm({ weight: 1, lecturerRemarks: '' });
                                 }}
                                 className="btn-secondary flex-1"
                             >
