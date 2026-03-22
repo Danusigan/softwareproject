@@ -33,7 +33,9 @@ public class LOPOMappingRestController {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
             String userRole = jwtUtil.extractRole(jwt);
-            return "lecture".equalsIgnoreCase(userRole) || isAdmin(token);
+            return "lecture".equalsIgnoreCase(userRole)
+                || "lecturer".equalsIgnoreCase(userRole)
+                || isAdmin(token);
         } catch (Exception e) {
             return false;
         }
@@ -318,7 +320,11 @@ public class LOPOMappingRestController {
             }
 
             String username = extractUsername(token);
-            String adminRemarks = request.getOrDefault("adminRemarks", "No reason provided");
+            String adminRemarks = request.getOrDefault("adminRemarks", "").trim();
+            if (adminRemarks.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(createErrorResponse("Rejection remarks are required."));
+            }
 
             OutcomeMapping rejectedMapping = mappingService.rejectMapping(mappingId, username, adminRemarks);
             return ResponseEntity.ok(createSuccessResponse("Mapping rejected", rejectedMapping));

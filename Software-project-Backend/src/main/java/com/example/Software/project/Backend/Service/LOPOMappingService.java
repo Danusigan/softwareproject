@@ -345,6 +345,15 @@ public class LOPOMappingService {
         
         mapping.setWeight(newWeight);
         mapping.setLecturerRemarks(lecturerRemarks);
+
+        // Re-submit rejected mappings for admin review after lecturer updates.
+        if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.REJECTED) {
+            mapping.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
+            mapping.setReviewedBy(null);
+            mapping.setReviewedAt(null);
+            mapping.setAdminRemarks(null);
+        }
+
         mapping.setUpdatedAt(LocalDateTime.now());
         
         return mappingRepository.save(mapping);
