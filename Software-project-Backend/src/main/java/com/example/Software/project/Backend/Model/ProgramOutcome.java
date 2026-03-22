@@ -1,11 +1,13 @@
 package com.example.Software.project.Backend.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "program_outcomes")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ProgramOutcome {
     @Id
     @Column(name = "po_id", unique = true, nullable = false)
