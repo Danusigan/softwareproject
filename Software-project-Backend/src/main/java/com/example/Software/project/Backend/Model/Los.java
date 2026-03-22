@@ -1,6 +1,7 @@
 package com.example.Software.project.Backend.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
@@ -48,7 +49,7 @@ public class Los {
 
     // Relationship to OutcomeMapping
     @OneToMany(mappedBy = "learningOutcome", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnore // Prevent recursion
+    @JsonManagedReference
     private List<OutcomeMapping> mappings;
 
     // Relationship to Student Marks

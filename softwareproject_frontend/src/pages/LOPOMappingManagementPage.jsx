@@ -6,6 +6,11 @@ import axios from 'axios';
 
 export default function LOPOMappingManagementPage() {
     const navigate = useNavigate();
+
+    const normalizeRole = (role) => {
+        if (!role) return '';
+        return String(role).toUpperCase().replace(/[-\s]/g, '');
+    };
     
     // State management
     const [mappings, setMappings] = useState([]);
@@ -38,14 +43,21 @@ export default function LOPOMappingManagementPage() {
     const [userRole, setUserRole] = useState('');
 
     useEffect(() => {
-        // Get user role from token or localStorage
-        const token = localStorage.getItem('token');
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
-                setUserRole(payload.role || 'LECTURER');
-            } catch (err) {
-                console.warn('Could not parse token:', err);
+        // Get user role from persisted login first, then token payload fallback.
+        const storedRole = localStorage.getItem('userType');
+        if (storedRole) {
+            setUserRole(normalizeRole(storedRole));
+        } else {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const tokenRole = payload.role || payload.userType || payload.usertype || 'LECTURER';
+                    setUserRole(normalizeRole(tokenRole));
+                } catch (err) {
+                    console.warn('Could not parse token:', err);
+                    setUserRole('LECTURER');
+                }
             }
         }
         
@@ -62,13 +74,13 @@ export default function LOPOMappingManagementPage() {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            
-            // Fetch mappings and modules in parallel
-            const [mappingsRes, modulesRes, statsRes] = await Promise.all([
+
+            // Keep partial successes if one endpoint fails.
+            const [mappingsRes, modulesRes, statsRes] = await Promise.allSettled([
                 axios.get('http://localhost:8080/api/lo-po-mapping/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:8080/api/modules', {
+                axios.get('http://localhost:8080/api/modules/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
                 axios.get('http://localhost:8080/api/lo-po-mapping/statistics', {
@@ -76,16 +88,21 @@ export default function LOPOMappingManagementPage() {
                 })
             ]);
 
-            if (mappingsRes.data.status === 'SUCCESS') {
-                setMappings(mappingsRes.data.data || []);
+            if (mappingsRes.status === 'fulfilled' && mappingsRes.value.data.status === 'SUCCESS') {
+                setMappings(normalizeMappings(mappingsRes.value.data.data));
             }
-            
-            if (modulesRes.data.status === 'SUCCESS') {
-                setModules(modulesRes.data.data || []);
+
+            if (modulesRes.status === 'fulfilled' && modulesRes.value.data.status === 'SUCCESS') {
+                setModules(modulesRes.value.data.data || []);
             }
-            
-            if (statsRes.data.status === 'SUCCESS') {
-                setStats(statsRes.data.data || {});
+
+            if (statsRes.status === 'fulfilled' && statsRes.value.data.status === 'SUCCESS') {
+                setStats(statsRes.value.data.data || {});
+            }
+
+            const allFailed = [mappingsRes, modulesRes, statsRes].every(res => res.status === 'rejected');
+            if (allFailed) {
+                setError('Failed to load LO-PO mappings');
             }
 
         } catch (err) {
@@ -117,7 +134,7 @@ export default function LOPOMappingManagementPage() {
             });
 
             if (response.data.status === 'SUCCESS') {
-                setMappings(response.data.data || []);
+                setMappings(normalizeMappings(response.data.data));
             }
         } catch (err) {
             console.error('Error fetching mappings:', err);
@@ -130,7 +147,7 @@ export default function LOPOMappingManagementPage() {
             return;
         }
 
-        const currentMapping = mappings.find(m => m.mappingId === mappingId);
+        const currentMapping = mappings.find(m => m.id === mappingId);
         setSelectedMapping(currentMapping);
         setApprovalForm({
             status: action,
@@ -142,10 +159,14 @@ export default function LOPOMappingManagementPage() {
     const submitApproval = async () => {
         try {
             const token = localStorage.getItem('token');
-            
+
+            const normalizedAction = normalizeRole(approvalForm.status);
+            const actionEndpoint = normalizedAction === 'APPROVED' ? 'approve' : 'reject';
+            const mappingIdentifier = selectedMapping.mappingId || selectedMapping.id;
+
             await axios.put(
-                `http://localhost:8080/api/lo-po-mapping/${selectedMapping.mappingId}/approve`,
-                approvalForm,
+                `http://localhost:8080/api/lo-po-mapping/admin/${mappingIdentifier}/${actionEndpoint}`,
+                { adminRemarks: approvalForm.remarks },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }
@@ -193,12 +214,29 @@ export default function LOPOMappingManagementPage() {
         return labels[weight] || 'None';
     };
 
+    const normalizeMappings = (rawMappings) => {
+        return (rawMappings || []).map((mapping) => ({
+            ...mapping,
+            mappingId: mapping?.mappingId ?? mapping?.id,
+            learningOutcome: mapping?.learningOutcome || {},
+            programOutcome: mapping?.programOutcome || {},
+            approvalStatus: mapping?.approvalStatus || mapping?.status || 'PENDING',
+            correlationWeight: mapping?.correlationWeight ?? mapping?.weight ?? 0
+        }));
+    };
+
     // Group mappings by LO for matrix view
     const groupedMappings = mappings.reduce((acc, mapping) => {
-        const key = `${mapping.learningOutcome.id}-${mapping.learningOutcome.name}`;
+        const loId = mapping.learningOutcome?.id || mapping.learningOutcomeId || 'UNKNOWN-LO';
+        const loName = mapping.learningOutcome?.name || 'Unknown Learning Outcome';
+        const key = `${loId}-${loName}`;
         if (!acc[key]) {
             acc[key] = {
-                lo: mapping.learningOutcome,
+                lo: {
+                    id: loId,
+                    name: loName,
+                    description: mapping.learningOutcome?.description || ''
+                },
                 mappings: []
             };
         }
@@ -436,10 +474,10 @@ export default function LOPOMappingManagementPage() {
                                             <td className="py-4 px-6">
                                                 <div>
                                                     <p className="font-semibold text-slate-900">
-                                                        {mapping.learningOutcome.id}
+                                                        {mapping.learningOutcome?.id || mapping.learningOutcomeId || 'N/A'}
                                                     </p>
                                                     <p className="text-sm text-slate-600">
-                                                        {mapping.learningOutcome.name}
+                                                        {mapping.learningOutcome?.name || 'Unknown Learning Outcome'}
                                                     </p>
                                                 </div>
                                             </td>
@@ -451,10 +489,10 @@ export default function LOPOMappingManagementPage() {
                                             <td className="py-4 px-6">
                                                 <div>
                                                     <p className="font-medium text-slate-900">
-                                                        {mapping.programOutcome.code}
+                                                        {mapping.programOutcome?.code || mapping.programOutcomeCode || 'N/A'}
                                                     </p>
                                                     <p className="text-sm text-slate-600">
-                                                        {mapping.programOutcome.title}
+                                                        {mapping.programOutcome?.title || 'Unknown Program Outcome'}
                                                     </p>
                                                 </div>
                                             </td>
@@ -469,7 +507,7 @@ export default function LOPOMappingManagementPage() {
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6 text-sm text-slate-600">
-                                                {new Date(mapping.createdDate).toLocaleDateString()}
+                                                        {new Date(mapping.mappedAt || mapping.createdDate || mapping.updatedAt || Date.now()).toLocaleDateString()}
                                             </td>
                                             {(userRole === 'ADMIN' || userRole === 'SUPERADMIN') && mapping.approvalStatus === 'PENDING' && (
                                                 <td className="py-4 px-6">
@@ -503,8 +541,8 @@ export default function LOPOMappingManagementPage() {
                             <div key={mapping.mappingId} className="glass-card rounded-2xl p-6">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex-1">
-                                        <h3 className="font-bold text-slate-900">{mapping.learningOutcome.id}</h3>
-                                        <p className="text-sm text-slate-600 mt-1">{mapping.learningOutcome.name}</p>
+                                        <h3 className="font-bold text-slate-900">{mapping.learningOutcome?.id || mapping.learningOutcomeId || 'N/A'}</h3>
+                                        <p className="text-sm text-slate-600 mt-1">{mapping.learningOutcome?.name || 'Unknown Learning Outcome'}</p>
                                     </div>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadge(mapping.approvalStatus)}`}>
                                         {mapping.approvalStatus}
@@ -514,12 +552,12 @@ export default function LOPOMappingManagementPage() {
                                 <div className="space-y-3">
                                     <div className="flex justify-between">
                                         <span className="text-sm text-slate-600">Module:</span>
-                                        <span className="text-sm font-medium">{mapping.module?.moduleName}</span>
+                                        <span className="text-sm font-medium">{modules.find(m => m.moduleId === mapping.learningOutcome?.moduleId)?.moduleName || 'N/A'}</span>
                                     </div>
 
                                     <div className="flex justify-between">
                                         <span className="text-sm text-slate-600">PO:</span>
-                                        <span className="text-sm font-medium">{mapping.programOutcome.code}</span>
+                                        <span className="text-sm font-medium">{mapping.programOutcome?.code || mapping.programOutcomeCode || 'N/A'}</span>
                                     </div>
 
                                     <div className="flex justify-between">
@@ -531,7 +569,7 @@ export default function LOPOMappingManagementPage() {
 
                                     <div className="flex justify-between">
                                         <span className="text-sm text-slate-600">Created:</span>
-                                        <span className="text-sm">{new Date(mapping.createdDate).toLocaleDateString()}</span>
+                                        <span className="text-sm">{new Date(mapping.mappedAt || mapping.createdDate || mapping.updatedAt || Date.now()).toLocaleDateString()}</span>
                                     </div>
                                 </div>
 
@@ -578,12 +616,12 @@ export default function LOPOMappingManagementPage() {
                                             className="border border-slate-200 rounded-xl p-4 hover:border-indigo-200 transition-colors"
                                         >
                                             <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-semibold text-slate-900">{mapping.programOutcome.code}</h4>
+                                                <h4 className="font-semibold text-slate-900">{mapping.programOutcome?.code || mapping.programOutcomeCode || 'N/A'}</h4>
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getWeightBadge(mapping.correlationWeight)}`}>
                                                     {mapping.correlationWeight}
                                                 </span>
                                             </div>
-                                            <p className="text-sm text-slate-600 mb-3 line-clamp-2">{mapping.programOutcome.title}</p>
+                                            <p className="text-sm text-slate-600 mb-3 line-clamp-2">{mapping.programOutcome?.title || 'Unknown Program Outcome'}</p>
                                             
                                             <div className="flex justify-between items-center">
                                                 <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusBadge(mapping.approvalStatus)}`}>
@@ -642,11 +680,11 @@ export default function LOPOMappingManagementPage() {
                         <div className="space-y-4 mb-6">
                             <div>
                                 <span className="text-sm text-slate-600">Learning Outcome:</span>
-                                <p className="font-medium">{selectedMapping.learningOutcome.id} - {selectedMapping.learningOutcome.name}</p>
+                                <p className="font-medium">{selectedMapping.learningOutcome?.id || selectedMapping.learningOutcomeId || 'N/A'} - {selectedMapping.learningOutcome?.name || 'Unknown Learning Outcome'}</p>
                             </div>
                             <div>
                                 <span className="text-sm text-slate-600">Program Outcome:</span>
-                                <p className="font-medium">{selectedMapping.programOutcome.code} - {selectedMapping.programOutcome.title}</p>
+                                <p className="font-medium">{selectedMapping.programOutcome?.code || selectedMapping.programOutcomeCode || 'N/A'} - {selectedMapping.programOutcome?.title || 'Unknown Program Outcome'}</p>
                             </div>
                             <div>
                                 <span className="text-sm text-slate-600">Mapping Weight:</span>
