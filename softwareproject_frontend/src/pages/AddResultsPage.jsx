@@ -43,10 +43,10 @@ export default function AddResultsPage() {
         setDragActive(false);
         if (e.dataTransfer.files?.[0]) {
             const droppedFile = e.dataTransfer.files[0];
-            if (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls') || droppedFile.name.endsWith('.csv')) {
+            if (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls')) {
                 setFile(droppedFile);
             } else {
-                setMessage({ type: 'error', text: 'Please upload an Excel or CSV file.' });
+                setMessage({ type: 'error', text: 'Please upload an Excel file (.xlsx or .xls).' });
             }
         }
     };
@@ -224,7 +224,7 @@ export default function AddResultsPage() {
                                 type="file"
                                 className="hidden"
                                 onChange={handleChange}
-                                accept=".xlsx,.xls,.csv"
+                                accept=".xlsx,.xls"
                             />
 
                             <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 text-indigo-600 transition-transform group-hover:scale-110 duration-300">
@@ -244,7 +244,7 @@ export default function AddResultsPage() {
                                     {file ? file.name : (isEditMode && existingFileName ? existingFileName : 'Drop your file here')}
                                 </h3>
                                 <p className="text-slate-500 text-sm">
-                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : (isEditMode && existingFileName ? 'Current file - Upload new to replace' : 'Click to browse or drag & drop (Excel, CSV)')}
+                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : (isEditMode && existingFileName ? 'Current file - Upload new to replace' : 'Click to browse or drag & drop (Excel .xlsx/.xls)')}
                                 </p>
                             </div>
 

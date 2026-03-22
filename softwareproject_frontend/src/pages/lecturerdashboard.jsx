@@ -8,6 +8,7 @@ export default function LecturerDashboard() {
     const navigate = useNavigate();
     const [modules, setModules] = useState([]);
     const [selectedModule, setSelectedModule] = useState(null);
+    const [modulePanelMode, setModulePanelMode] = useState('default');
     const [activeModuleMenuId, setActiveModuleMenuId] = useState(null);
     const [los, setLos] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -137,6 +138,13 @@ export default function LecturerDashboard() {
         navigate('/lo-po-mappings');
     };
 
+    const handleAddMarksClick = (module) => {
+        setActiveModuleMenuId(null);
+        setSelectedModule(module);
+        setModulePanelMode('analysis');
+        setMessage({ type: 'success', text: 'Select a Learning Outcome below to upload student marks.' });
+    };
+
     const handleEditLo = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -198,6 +206,7 @@ export default function LecturerDashboard() {
 
     const closeModulePanel = () => {
         setSelectedModule(null);
+        setModulePanelMode('default');
         setLos([]);
         setShowEditLoDialog(false);
         setMessage({ type: '', text: '' });
@@ -319,6 +328,20 @@ export default function LecturerDashboard() {
                                                     <p className="text-[11px] text-slate-500">Open approval and mapping status page</p>
                                                 </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handleAddMarksClick(module)}
+                                                className="w-full text-left px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-3"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm font-semibold">Add Marks (Result Analysis)</p>
+                                                    <p className="text-[11px] text-emerald-700/80">Select an LO, then drag & drop Excel marks</p>
+                                                </div>
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -356,25 +379,39 @@ export default function LecturerDashboard() {
                             {/* Panel Actions */}
                             <div className="pt-2">
                                 <div className="space-y-3">
-                                    <button
-                                        onClick={() => openLoCreationInNewWindow(selectedModule.moduleId)}
-                                        className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
-                                    >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m-6-8h6m3 10H6a2 2 0 01-2-2V8a2 2 0 012-2h3.172a2 2 0 001.414-.586l.828-.828A2 2 0 0112.828 4H18a2 2 0 012 2v10a2 2 0 01-2 2z" />
-                                        </svg>
-                                        Create LO + PO Mapping
-                                    </button>
+                                    {modulePanelMode === 'analysis' ? (
+                                        <button
+                                            onClick={() => setMessage({ type: 'success', text: 'Click an LO card below to open Add Results and upload Excel marks.' })}
+                                            className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-emerald-400/20"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                            Result Analysis: Add Marks
+                                        </button>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => openLoCreationInNewWindow(selectedModule.moduleId)}
+                                                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
+                                            >
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m-6-8h6m3 10H6a2 2 0 01-2-2V8a2 2 0 012-2h3.172a2 2 0 001.414-.586l.828-.828A2 2 0 0112.828 4H18a2 2 0 012 2v10a2 2 0 01-2 2z" />
+                                                </svg>
+                                                Create LO + PO Mapping
+                                            </button>
 
-                                    <button
-                                        onClick={() => navigate('/lo-po-mappings')}
-                                        className="w-full flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-white/10"
-                                    >
-                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                        </svg>
-                                        Review Mapping Status
-                                    </button>
+                                            <button
+                                                onClick={() => navigate('/lo-po-mappings')}
+                                                className="w-full flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-white/10"
+                                            >
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                                </svg>
+                                                Review Mapping Status
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -406,7 +443,11 @@ export default function LecturerDashboard() {
                                             onClick={() => {
                                                 const loNum = extractDisplayLoNumber(lo.id);
                                                 sessionStorage.setItem('currentLoNumber', loNum);
-                                                navigate(`/lo-detail/${lo.id}`);
+                                                if (modulePanelMode === 'analysis') {
+                                                    navigate(`/lo-detail/${lo.id}/add-results`);
+                                                } else {
+                                                    navigate(`/lo-detail/${lo.id}`);
+                                                }
                                             }}
                                         >
                                             <div className="flex justify-between items-start gap-4">
@@ -441,26 +482,42 @@ export default function LecturerDashboard() {
 
                                                 <div className="flex gap-2">
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); openEditDialog(lo); }}
-                                                        className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-indigo-500 hover:text-white rounded-xl transition-all duration-300"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            navigate(`/lo-detail/${lo.id}/add-results`);
+                                                        }}
+                                                        className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300"
+                                                        title="Add marks"
                                                     >
                                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                                         </svg>
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteLo(lo.id); }}
-                                                        className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                                        </svg>
-                                                    </button>
+                                                    {modulePanelMode !== 'analysis' && (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); openEditDialog(lo); }}
+                                                                className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-indigo-500 hover:text-white rounded-xl transition-all duration-300"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                </svg>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteLo(lo.id); }}
+                                                                className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300"
+                                                            >
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                                </svg>
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="mt-6 flex items-center gap-3 text-white/20 text-[10px] font-black uppercase tracking-widest">
-                                                <span>View detailed metrics</span>
+                                                <span>{modulePanelMode === 'analysis' ? 'Open add marks upload' : 'View detailed metrics'}</span>
                                                 <div className="h-px flex-1 bg-white/5"></div>
                                                 <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" />

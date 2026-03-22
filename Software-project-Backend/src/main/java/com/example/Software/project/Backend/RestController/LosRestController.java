@@ -183,6 +183,16 @@ public class LosRestController {
                         ));
             }
 
+            String originalName = excelFile.getOriginalFilename();
+            String normalizedName = originalName == null ? "" : originalName.toLowerCase();
+            if (!(normalizedName.endsWith(".xlsx") || normalizedName.endsWith(".xls"))) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of(
+                                "message", "Only Excel files (.xlsx, .xls) are supported for LO marks upload",
+                                "status", "ERROR"
+                        ));
+            }
+
             // Only batch is required now (no academicYear)
             // Verify Los exists
             Los los = losService.getLosById(loId)
@@ -579,7 +589,7 @@ public class LosRestController {
             }
             String role = jwtUtil.extractRole(bearerToken);
             role = role == null ? null : role.trim().toLowerCase();
-            return role != null && ("lecture".equals(role) || "admin".equals(role) || "superadmin".equals(role));
+            return role != null && ("lecture".equals(role) || "lecturer".equals(role) || "admin".equals(role) || "superadmin".equals(role));
         } catch (Exception e) {
             return false;
         }
