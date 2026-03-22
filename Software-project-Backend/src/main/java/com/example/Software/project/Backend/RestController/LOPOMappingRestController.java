@@ -27,14 +27,19 @@ public class LOPOMappingRestController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    private String normalizeRole(String role) {
+        if (role == null) return "";
+        return role.trim().toLowerCase().replace("-", "").replace(" ", "");
+    }
+
     // Helper methods for authentication
     private boolean isLecturer(String token) {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
-            return "lecture".equalsIgnoreCase(userRole)
-                || "lecturer".equalsIgnoreCase(userRole)
+            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            return "lecture".equals(userRole)
+                || "lecturer".equals(userRole)
                 || isAdmin(token);
         } catch (Exception e) {
             return false;
@@ -45,8 +50,8 @@ public class LOPOMappingRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
-            return "admin".equalsIgnoreCase(userRole) || "superadmin".equalsIgnoreCase(userRole);
+            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            return "admin".equals(userRole) || "superadmin".equals(userRole);
         } catch (Exception e) {
             return false;
         }
