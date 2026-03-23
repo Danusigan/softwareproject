@@ -67,7 +67,7 @@ It features **Role-Based Access Control (RBAC)**, ensuring secure access for Sup
 ### 3. Assignments & Marks
 | Method | Endpoint | Description | Auth |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/assignments/{losPosId}/add` | Create Assignment (Form-Data) | Lecture |
+| `POST` | `/api/assignments/{losId}/add` | Create Assignment (Form-Data) | Lecture |
 | `POST` | `/api/obe/marks/upload/{assignmentId}` | Upload Marks (Excel) | Lecture |
 
 ### 4. OBE & Analytics

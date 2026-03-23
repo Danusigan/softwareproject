@@ -25,9 +25,10 @@ export default function ComparisonPage() {
             const loRes = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const lo = loRes.data;
-            setLoName(lo.loDescription || lo.name);
-            const moduleId = lo.moduleId; // Exposed via @JsonProperty in Model
+            // Backend returns {message, data, losId, name, description, status}
+            const lo = loRes.data.data || loRes.data;
+            setLoName(lo.description || lo.name);
+            const moduleId = lo.moduleId || loRes.data.moduleId; // Exposed via @JsonProperty in Model
 
             // 2. Fetch LO Trend data for the module
             const trendRes = await axios.get(`http://localhost:8080/api/obe/analysis/trend/lo/${moduleId}`, {
@@ -161,7 +162,7 @@ export default function ComparisonPage() {
                                 {trendData.map((data, idx) => (
                                     <div key={data.year} className="flex flex-col items-center group relative w-full h-full justify-end max-w-[140px]">
                                         {/* Status Tooltip */}
-                                        <div className={`absolute bottom-full mb-6 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-xl border z-20 
+                                        <div className={`absolute bottom-full mb-6 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-xl border z-20
                                             ${data.status === 'IMPROVED' ? 'bg-white text-emerald-600 border-emerald-100' :
                                                 data.status === 'DECLINED' ? 'bg-white text-red-600 border-red-100' :
                                                     'bg-white text-indigo-600 border-indigo-100'}`}>

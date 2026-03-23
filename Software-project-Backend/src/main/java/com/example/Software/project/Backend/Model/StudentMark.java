@@ -18,22 +18,28 @@ public class StudentMark {
     private Double score; // Clamped 0.0 - 100.0
 
     @ManyToOne
-    @JoinColumn(name = "assessment_id", nullable = false)
-    private Assignment assessment;
+    @JoinColumn(name = "los_id", nullable = false)
+    private Los los;
+
+    @Column(name = "batch")
+    private String batch; // e.g., "22", "23" - batch identifier for grouping
 
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    
+
     public Student getStudent() { return student; }
     public void setStudent(Student student) { this.student = student; }
-    
+
     public Double getScore() { return score; }
     public void setScore(Double score) { this.score = score; }
-    
-    public Assignment getAssessment() { return assessment; }
-    public void setAssessment(Assignment assessment) { this.assessment = assessment; }
-    
+
+    public Los getLos() { return los; }
+    public void setLos(Los los) { this.los = los; }
+
+    public String getBatch() { return batch; }
+    public void setBatch(String batch) { this.batch = batch; }
+
     // Helper to get student index for backward compatibility/display
     public String getStudentIndex() {
         return student != null ? student.getStudentId() : null;
