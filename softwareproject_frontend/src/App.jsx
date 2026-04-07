@@ -10,6 +10,9 @@ import ModulesPage from './pages/modulespage'
 import LODetailPage from './pages/LODetailPage'
 import AddResultsPage from './pages/AddResultsPage'
 import ComparisonPage from './pages/ComparisonPage'
+import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
+import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
+import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { setupAxiosInterceptors } from './services/axiosSetup'
 
@@ -82,6 +85,30 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ComparisonPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/program-outcomes"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <ProgramOutcomesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/create-lo-mapping/:moduleId"
+        element={
+          <ProtectedRoute>
+            <CreateLOWithMappingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/lo-po-mappings"
+        element={
+          <ProtectedRoute>
+            <LOPOMappingManagementPage />
           </ProtectedRoute>
         }
       />

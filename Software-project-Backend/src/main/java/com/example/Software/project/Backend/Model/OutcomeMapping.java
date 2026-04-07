@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -15,19 +16,25 @@ public class OutcomeMapping {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "los_id", nullable = false) // Renamed column
-    @JsonIgnore // Ignore getter to prevent recursion
+    @JsonBackReference
     private Los learningOutcome;
+
+    // Legacy schema compatibility: some DBs still require non-null `lospos_id`.
+    @JsonIgnore
+    @Column(name = "lospos_id", nullable = false)
+    private String legacyLosPosId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "program_outcome_id", nullable = false)
-    @JsonIgnore // Ignore getter to prevent recursion
     private ProgramOutcome programOutcome;
 
     @Column(name = "weight", nullable = false)
+    @JsonProperty("correlationWeight")
     private Integer weight; // 0 = No correlation, 1 = Low, 2 = Medium, 3 = High
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @JsonProperty("approvalStatus")
     private ApprovalStatus status = ApprovalStatus.PENDING;
 
     @Column(name = "lecturer_remarks", columnDefinition = "TEXT")
@@ -61,6 +68,9 @@ public class OutcomeMapping {
     protected void onCreate() {
         mappedAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (learningOutcome != null) {
+            legacyLosPosId = learningOutcome.getId();
+        }
         if (status == null) {
             status = ApprovalStatus.PENDING;
         }
@@ -73,6 +83,9 @@ public class OutcomeMapping {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        if (learningOutcome != null) {
+            legacyLosPosId = learningOutcome.getId();
+        }
         // Validate weight range
         if (weight != null && (weight < 0 || weight > 3)) {
             weight = Math.max(0, Math.min(3, weight));
@@ -96,26 +109,29 @@ public class OutcomeMapping {
         return id;
     }
 
+    @JsonProperty("mappingId")
+    public Long getMappingId() {
+        return id;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
 
-    @JsonIgnore // Hide full object from output
+    @JsonProperty("learningOutcome") // Expose full object in output
     public Los getLearningOutcome() {
         return learningOutcome;
     }
 
-    @JsonProperty("learningOutcome") // Allow setting full object from input
     public void setLearningOutcome(Los learningOutcome) {
         this.learningOutcome = learningOutcome;
     }
 
-    @JsonIgnore // Hide full object from output
+    @JsonProperty("programOutcome") // Expose full object in output
     public ProgramOutcome getProgramOutcome() {
         return programOutcome;
     }
 
-    @JsonProperty("programOutcome") // Allow setting full object from input
     public void setProgramOutcome(ProgramOutcome programOutcome) {
         this.programOutcome = programOutcome;
     }
@@ -255,7 +271,6 @@ public class OutcomeMapping {
                 ", programOutcome=" + (programOutcome != null ? programOutcome.getCode() : "null") +
                 ", weight=" + weight +
                 ", status=" + status +
-                ", mappedBy='" + mappedBy + '\'' +
                 '}';
     }
 }

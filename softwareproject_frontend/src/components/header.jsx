@@ -47,8 +47,8 @@ export default function Header() {
                 <span className="text-white font-black text-xl tracking-tighter">LO</span>
               </div>
             </div>
-            <div className="border-l border-white/20 pl-5">
-              <h1 className="text-xl font-black tracking-tight leading-none mb-1">LO-PO ANALYTICS</h1>
+            <div className="border-l border-white/20 pl-5 text-left">
+              <h1 className="text-xl font-black tracking-tight leading-none mb-1 text-white">LO-PO ANALYTICS</h1>
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-100">Faculty of Engineering</span>
                 <span className="text-[10px] font-medium uppercase tracking-[0.1em] text-blue-200/80">University of Ruhuna</span>

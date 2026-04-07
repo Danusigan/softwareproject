@@ -33,6 +33,10 @@ public class OBEController {
             if (!isAdmin(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
             }
+            if (po.getPoId() != null) {
+                po.setPoId(po.getPoId());
+                po.setCode(po.getPoId());
+            }
             ProgramOutcome createdPo = poRepo.save(po);
             return ResponseEntity.ok(Map.of("message", "Program Outcome created successfully", "data", createdPo, "status", "SUCCESS"));
         } catch (Exception e) {
@@ -81,8 +85,8 @@ public class OBEController {
             }
             return poRepo.findById(poId)
                 .map(po -> {
-                    if (poDetails.getCode() != null) po.setCode(poDetails.getCode());
                     if (poDetails.getDescription() != null) po.setDescription(poDetails.getDescription());
+                    po.setCode(po.getPoId());
                     ProgramOutcome updatedPo = poRepo.save(po);
                     return ResponseEntity.ok(Map.of("message", "PO updated successfully", "data", updatedPo, "status", "SUCCESS"));
                 })
