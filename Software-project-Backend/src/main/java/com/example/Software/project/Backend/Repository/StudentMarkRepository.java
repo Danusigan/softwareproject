@@ -1,6 +1,8 @@
 package com.example.Software.project.Backend.Repository;
 
 import com.example.Software.project.Backend.Model.StudentMark;
+import com.example.Software.project.Backend.Model.MarkType;
+import com.example.Software.project.Backend.Model.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -11,7 +13,19 @@ import java.util.List;
 @Repository
 public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> {
     List<StudentMark> findByLos_Id(String losId);
-       List<StudentMark> findByLos_IdOrderByIdDesc(String losId);
+    List<StudentMark> findByLos_IdOrderByIdDesc(String losId);
+
+    // Query by mark type and batch
+    @Query("SELECT sm FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
+    List<StudentMark> findByLosIdsAndMarkTypeAndBatch(List<String> losIds, MarkType markType, String batch);
+
+    // Get all unique students for given LOs
+    @Query("SELECT DISTINCT sm.student FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
+    List<Student> findDistinctStudentsByLosIdsAndMarkTypeAndBatch(List<String> losIds, MarkType markType, String batch);
+
+    // Get all batches for given LOs and mark type
+    @Query("SELECT DISTINCT sm.batch FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch IS NOT NULL ORDER BY sm.batch")
+    List<String> findDistinctBatchesByLosIdsAndMarkType(List<String> losIds, MarkType markType);
 
     @Modifying
     @Transactional

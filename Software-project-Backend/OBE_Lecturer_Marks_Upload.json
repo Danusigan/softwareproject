@@ -1,0 +1,295 @@
+{
+	"info": {
+		"_postman_id": "obe-lecturer-marks-upload",
+		"name": "OBE - Lecturer Marks Upload (EC6306)",
+		"description": "Simplified collection for Lecturer to upload marks for module EC6306.\n\nPre-loaded User:\n- danu1 (Lecturer) - password: 1234\n\nModule: EC6306\n\nWorkflow:\n1. Login as Lecturer (token auto-saved)\n2. View Module EC6306 Details\n3. Get Learning Outcomes for EC6306\n   - If empty, create LOs using requests 3a, 3b, 3c first!\n4. Download Excel Template\n5. Upload All Marks (Bulk Upload)\n6. Verify Uploaded Marks\n\n⚠️ IMPORTANT:\n- Make sure to login first! The JWT token is automatically saved to environment variable\n- Authorization header uses: Bearer {{jwt_token}}\n- Server must be running at http://localhost:8080\n- If you get \"Learning Outcome not found\" error, you need to create LOs first (requests 3a, 3b, 3c)\n- Use the EXACT LO IDs returned from request #3 in your template and upload requests\n\nBase URL: http://localhost:8080",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Login as Lecturer",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var jsonData = pm.response.json();",
+							"    if (jsonData.token) {",
+							"        pm.environment.set(\"jwt_token\", jsonData.token);",
+							"        pm.environment.set(\"userID\", jsonData.userID);",
+							"        console.log(\"✓ Login successful! Token saved.\");",
+							"    }",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"userID\": \"danu1\",\n    \"password\": \"1234\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/auth/login",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Login as Lecturer (danu1). Token will be automatically saved to environment variable.\n\n✅ After successful login:\n- JWT token is saved as {{jwt_token}}\n- User ID is saved as {{userID}}\n- All subsequent requests will use this token automatically\n\n⚠️ If you get authorization errors:\n1. Make sure this login request succeeded (200 OK)\n2. Check that you see the token in the response\n3. The token is valid for the session\n\nPre-loaded lecturer accounts:\n- danu1 (password: 1234)\n- danu (password: 1234)\n- danu2 (password: 1234)"
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get Module EC6306 Details",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/modules/EC6306",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "modules", "EC6306"]
+				},
+				"description": "Get details of module EC6306"
+			},
+			"response": []
+		},
+		{
+			"name": "3. Get Learning Outcomes for EC6306",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/module/EC6306",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "module", "EC6306"]
+				},
+				"description": "Get all Learning Outcomes (LOs) for module EC6306.\n\n✅ IMPORTANT: Use the LO IDs from this response for template generation and mark upload.\n\nIf this returns empty [], you need to create Learning Outcomes first using request 3a, 3b, 3c."
+			},
+			"response": []
+		},
+		{
+			"name": "3a. Create LO1 for EC6306 (if needed)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"LO1\",\n    \"name\": \"Learning Outcome 1\",\n    \"description\": \"First learning outcome for EC6306\",\n    \"credits\": 3\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/EC6306/add",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "EC6306", "add"]
+				},
+				"description": "Create Learning Outcome LO1 for module EC6306.\n\n⚠️ Only run this if request #3 returned empty [].\n\nYou can customize:\n- id: The unique LO identifier (e.g., \"LO1\", \"EC6306-LO1\")\n- name: Display name\n- description: What this LO covers\n- credits: Credit weight"
+			},
+			"response": []
+		},
+		{
+			"name": "3b. Create LO2 for EC6306 (if needed)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"LO2\",\n    \"name\": \"Learning Outcome 2\",\n    \"description\": \"Second learning outcome for EC6306\",\n    \"credits\": 3\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/EC6306/add",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "EC6306", "add"]
+				},
+				"description": "Create Learning Outcome LO2 for module EC6306.\n\n⚠️ Only run this if request #3 returned empty []."
+			},
+			"response": []
+		},
+		{
+			"name": "3c. Create LO3 for EC6306 (if needed)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"id\": \"LO3\",\n    \"name\": \"Learning Outcome 3\",\n    \"description\": \"Third learning outcome for EC6306\",\n    \"credits\": 3\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/EC6306/add",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "EC6306", "add"]
+				},
+				"description": "Create Learning Outcome LO3 for module EC6306.\n\n⚠️ Only run this if request #3 returned empty []."
+			},
+			"response": []
+		},
+		{
+			"name": "4. Download Excel Template (EC6306)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"losIds\": [\"EC6306 LO1\", \"EC6306 LO2\", \"EC6306 LO3\"],\n    \"markType\": \"FINAL_EXAM\",\n    \"batch\": \"22\"\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/obe/template/marks",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "obe", "template", "marks"]
+				},
+				"description": "Download Excel template for marks entry.\n\n⚠️ IMPORTANT: To download the Excel file:\n1. Click the dropdown arrow next to 'Send' button\n2. Select 'Send and Download'\n3. File will save to your Downloads folder\n\nIf you just click 'Send', you'll see gibberish text - that's normal! It's the Excel binary data. Use 'Send and Download' instead.\n\nAdjust the request body:\n- losIds: Array of LO IDs from step 3 (e.g., [\"LO1\", \"LO2\", \"LO3\"])\n- markType: \"FINAL_EXAM\" or \"ASSIGNMENT\"\n- batch: Batch year (e.g., \"22\", \"23\", \"24\")\n\nThe template will download as: mark_template_{batch}_{markType}.xlsx"
+			},
+			"response": []
+		},
+		{
+			"name": "5. Upload All Marks (Bulk Upload) - After creating LOs",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "excelFile",
+							"description": "Select the filled Excel template file",
+							"type": "file",
+							"src": []
+						},
+						{
+							"key": "losIds",
+							"value": "EC6306 LO1,EC6306 LO2,EC6306 LO3",
+							"description": "Comma-separated LO IDs matching Excel columns - USE EXACT IDs from request #3!",
+							"type": "text"
+						},
+						{
+							"key": "batch",
+							"value": "22",
+							"description": "Batch year (must match template)",
+							"type": "text"
+						},
+						{
+							"key": "markType",
+							"value": "FINAL_EXAM",
+							"description": "FINAL_EXAM or ASSIGNMENT",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/obe/marks/upload-bulk",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "obe", "marks", "upload-bulk"]
+				},
+				"description": "✅ BULK UPLOAD: Upload marks for ALL LOs in ONE request!\n\nThis uploads the entire Excel file at once - no need to upload separately for each LO.\n\nSteps:\n1. Click 'Body' tab\n2. Click 'Select Files' for excelFile\n3. Choose your filled Excel template\n4. Update losIds with your actual LO IDs (comma-separated, matching column order)\n5. Update batch if needed\n6. Update markType if needed\n7. Click Send\n\nExample:\nIf your Excel has columns: Student Index | LO1 | LO2 | LO3\nThen losIds should be: LO1,LO2,LO3\n\nThe order matters! LO IDs must match the column order in Excel.\n\n⚠️ TROUBLESHOOTING:\n\nIf you get \"Access to the resource is prohibited\":\n1. ✓ Make sure you logged in first (request #1)\n2. ✓ Check that Authorization header shows: Bearer {{jwt_token}}\n3. ✓ Verify your user role is 'lecture', 'admin', or 'superadmin'\n4. ✓ Token must be valid (try logging in again)\n\nIf you get \"Learning Outcome not found\":\n1. ✓ Run request #3 to get actual LO IDs from database\n2. ✓ Use exact LO IDs (case-sensitive)\n3. ✓ Make sure LOs exist for module EC6306\n\nIf you get \"Error importing marks\":\n1. ✓ Check Excel file format matches template\n2. ✓ Verify Student Index column has valid student IDs\n3. ✓ Make sure mark columns match losIds parameter order"
+			},
+			"response": []
+		},
+		{
+			"name": "6. Verify Uploaded Marks (LO1)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/EC6306 LO1/marks",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "EC6306 LO1", "marks"]
+				},
+				"description": "Verify that marks were uploaded successfully for EC6306 LO1"
+			},
+			"response": []
+		},
+		{
+			"name": "7. Get Marks by Batch (LO1)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:8080/api/lospos/EC6306 LO1/batches/22/marks",
+					"protocol": "http",
+					"host": ["localhost"],
+					"port": "8080",
+					"path": ["api", "lospos", "EC6306 LO1", "batches", "22", "marks"]
+				},
+				"description": "Get marks for EC6306 LO1 filtered by batch 22"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		}
+	]
+}

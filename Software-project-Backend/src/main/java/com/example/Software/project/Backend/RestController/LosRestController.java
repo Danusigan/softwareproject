@@ -7,11 +7,21 @@ import com.example.Software.project.Backend.Repository.StudentMarkRepository;
 import com.example.Software.project.Backend.Service.ExcelImportService;
 import com.example.Software.project.Backend.Service.LosService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -579,6 +589,107 @@ public class LosRestController {
                     "status", "ERROR"
             ));
         }
+    }
+
+    /**
+     * Export an Excel sheet containing student marks per LO and pass/fail info.
+     * Request JSON shape explained in ExcelExportRequest class below.
+     */
+    @PostMapping(value = "/export-excel", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<byte[]> exportExcel(@RequestBody ExcelExportRequest request) throws Exception {
+        // validate
+        if (request.getLos() == null || request.getLos().isEmpty()) {
+            throw new IllegalArgumentException("'los' (list of LO titles) must be provided and not empty");
+        }
+        int loCount = request.getLos().size();
+        if (request.getStudents() == null) request.setStudents(new ArrayList<>());
+
+        double threshold = request.getPassThreshold() != null ? request.getPassThreshold() : 50.0;
+
+        Workbook wb = new XSSFWorkbook();
+        Sheet sheet = wb.createSheet("LO Results");
+
+        int rowIdx = 0;
+        Row header = sheet.createRow(rowIdx++);
+        int col = 0;
+        header.createCell(col++).setCellValue("Index No");
+        // LO columns
+        for (String lo : request.getLos()) {
+            header.createCell(col++).setCellValue(lo);
+        }
+        // pass/fail columns for each LO
+        for (String lo : request.getLos()) {
+            header.createCell(col++).setCellValue(lo + " Pass");
+        }
+        header.createCell(col++).setCellValue("Passed LO Count");
+        header.createCell(col++).setCellValue("All Passed");
+
+        for (ExcelStudent s : request.getStudents()) {
+            Row r = sheet.createRow(rowIdx++);
+            int c = 0;
+            r.createCell(c++).setCellValue(s.getIndexNo() == null ? "" : s.getIndexNo());
+            List<Double> marks = s.getMarks() != null ? s.getMarks() : new ArrayList<>();
+            // marks per LO
+            for (int i = 0; i < loCount; i++) {
+                double m = i < marks.size() && marks.get(i) != null ? marks.get(i) : 0d;
+                r.createCell(c++).setCellValue(m);
+            }
+            // pass/fail per LO
+            int passedCount = 0;
+            for (int i = 0; i < loCount; i++) {
+                double m = i < marks.size() && marks.get(i) != null ? marks.get(i) : 0d;
+                boolean pass = m >= threshold;
+                if (pass) passedCount++;
+                r.createCell(c++).setCellValue(pass ? "Pass" : "Fail");
+            }
+            r.createCell(c++).setCellValue(passedCount);
+            r.createCell(c++).setCellValue(passedCount == loCount ? "Yes" : "No");
+        }
+
+        // autosize
+        for (int i = 0; i < col; i++) sheet.autoSizeColumn(i);
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        wb.write(out);
+        wb.close();
+
+        byte[] bytes = out.toByteArray();
+        String fileName = "lo-results.xlsx";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDispositionFormData("attachment", fileName);
+        headers.setContentLength(bytes.length);
+
+        return ResponseEntity.ok().headers(headers).body(bytes);
+    }
+
+    // DTOs for export endpoint
+    public static class ExcelExportRequest {
+        private String markType; // e.g. "final" or "assignment"
+        private List<String> los;
+        private List<ExcelStudent> students;
+        private Double passThreshold; // default 50
+
+        public ExcelExportRequest() {}
+        public String getMarkType() { return markType; }
+        public void setMarkType(String markType) { this.markType = markType; }
+        public List<String> getLos() { return los; }
+        public void setLos(List<String> los) { this.los = los; }
+        public List<ExcelStudent> getStudents() { return students; }
+        public void setStudents(List<ExcelStudent> students) { this.students = students; }
+        public Double getPassThreshold() { return passThreshold; }
+        public void setPassThreshold(Double passThreshold) { this.passThreshold = passThreshold; }
+    }
+
+    public static class ExcelStudent {
+        private String indexNo;
+        private List<Double> marks;
+        public ExcelStudent() {}
+        public String getIndexNo() { return indexNo; }
+        public void setIndexNo(String indexNo) { this.indexNo = indexNo; }
+        public List<Double> getMarks() { return marks; }
+        public void setMarks(List<Double> marks) { this.marks = marks; }
     }
 
     private boolean isLecture(String token) {
