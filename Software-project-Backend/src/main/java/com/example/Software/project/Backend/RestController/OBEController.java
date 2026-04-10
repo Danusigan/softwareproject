@@ -22,6 +22,7 @@ public class OBEController {
     @Autowired private OutcomeMappingRepository mapRepo;
     @Autowired private LosRepository losRepo;
     @Autowired private ExcelImportService excelService;
+    @Autowired private ExcelExportService excelExportService;
     @Autowired private AttainmentService attainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
@@ -196,6 +197,179 @@ public class OBEController {
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
     }
 
+    // --- EXPORT: Generate Excel with selected LOs and mark type ---
+    @PostMapping("/export/marks")
+    public ResponseEntity<?> exportMarks(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can export marks", "status", "ERROR"));
+        }
+
+        try {
+            // Extract parameters from request body
+            @SuppressWarnings("unchecked")
+            List<String> losIds = (List<String>) request.get("losIds");
+            String markType = (String) request.get("markType");
+            String batch = (String) request.get("batch");
+            Integer threshold = request.get("threshold") != null ?
+                Integer.parseInt(request.get("threshold").toString()) : 50;
+
+            if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            if (markType == null || markType.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: markType is required (FINAL_EXAM or ASSIGNMENT)", "status", "ERROR"));
+            }
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            // Validate mark type
+            try {
+                MarkType.valueOf(markType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
+            }
+
+            // Generate Excel
+            byte[] excelBytes = excelExportService.generateMarksExcel(losIds, markType, batch, threshold);
+
+            // Return as file download
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"marks_report_" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .body(excelBytes);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to generate marks report",
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
+    // --- TEMPLATE: Generate empty Excel template for mark entry ---
+    @PostMapping("/template/marks")
+    public ResponseEntity<?> generateMarkTemplate(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can generate templates", "status", "ERROR"));
+        }
+
+        try {
+            // Extract parameters
+            @SuppressWarnings("unchecked")
+            List<String> losIds = (List<String>) request.get("losIds");
+            String markType = (String) request.get("markType");
+            String batch = (String) request.get("batch");
+
+            if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            if (markType == null || markType.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: markType is required", "status", "ERROR"));
+            }
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            // Validate mark type
+            try {
+                MarkType.valueOf(markType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
+            }
+
+            // Generate template
+            byte[] templateBytes = excelExportService.generateMarkTemplate(losIds);
+
+            // Return as file download
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"mark_template_" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .body(templateBytes);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to generate template",
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
+    // --- BULK UPLOAD: Upload marks for multiple LOs in one Excel file ---
+    @PostMapping("/marks/upload-bulk")
+    public ResponseEntity<?> uploadMarksBulk(
+            @RequestParam("excelFile") MultipartFile file,
+            @RequestParam("losIds") String losIdsParam,
+            @RequestParam("batch") String batch,
+            @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
+            @RequestHeader("Authorization") String token) {
+
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can upload marks", "status", "ERROR"));
+        }
+
+        try {
+            // Parse losIds from comma-separated string
+            String[] losIds = losIdsParam.split(",");
+
+            if (losIds.length == 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                        "message", "Error: losIds cannot be empty",
+                        "status", "ERROR"
+                    ));
+            }
+
+            if (batch == null || batch.trim().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of(
+                        "message", "Error: batch is required",
+                        "status", "ERROR"
+                    ));
+            }
+
+            // Import marks using bulk method
+            String result = excelService.importMarksBulk(file, losIds, batch, markType);
+
+            return ResponseEntity.ok(Map.of(
+                "message", result,
+                "status", "SUCCESS",
+                "data", Map.of(
+                    "losCount", losIds.length,
+                    "batch", batch,
+                    "markType", markType
+                )
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to import marks: " + e.getMessage(),
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
     // Helper RBAC
     private boolean isAdmin(String token) {
         try {
@@ -204,8 +378,8 @@ public class OBEController {
                 bearerToken = token.substring(7);
             }
             String role = jwtUtil.extractRole(bearerToken);
-            role = role == null ? null : role.trim();
-            return role != null && ("Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role));
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && (role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {
             return false;
         }
@@ -217,8 +391,8 @@ public class OBEController {
                 bearerToken = token.substring(7);
             }
             String role = jwtUtil.extractRole(bearerToken);
-            role = role == null ? null : role.trim();
-            return role != null && ("Lecture".equalsIgnoreCase(role) || "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role));
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && (role.equals("lecture") || role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {
             return false;
         }
