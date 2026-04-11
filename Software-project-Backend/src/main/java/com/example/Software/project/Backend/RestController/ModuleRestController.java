@@ -1,6 +1,5 @@
 package com.example.Software.project.Backend.RestController;
 
-import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.ModuleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -24,42 +24,90 @@ public class ModuleRestController {
 
     // Create (Admin Only)
     @PostMapping("/create")
-    public ResponseEntity<?> createModule(@RequestBody Module module, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> createModule(@RequestBody com.example.Software.project.Backend.Model.Module module, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Admin can create modules");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Admin can create modules",
+                    "status", "ERROR"
+                ));
             }
-            Module createdModule = moduleService.createModule(module);
-            return ResponseEntity.ok(createdModule);
+            com.example.Software.project.Backend.Model.Module createdModule = moduleService.createModule(module);
+            return ResponseEntity.ok(Map.of(
+                "message", "Module created successfully",
+                "data", createdModule,
+                "moduleId", createdModule.getModuleId(),
+                "status", "SUCCESS"
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
         }
     }
 
     // Read All (Public/Auth)
     @GetMapping("/all")
-    public List<Module> getAllModules() {
-        return moduleService.getAllModules();
+    public ResponseEntity<?> getAllModules(@RequestHeader("Authorization") String token) {
+        try {
+            return ResponseEntity.ok(Map.of(
+                "message", "All modules retrieved successfully",
+                "data", moduleService.getAllModules(),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
     }
 
     // Read One
     @GetMapping("/{id}")
-    public ResponseEntity<?> getModuleById(@PathVariable String id) {
-        Optional<Module> module = moduleService.getModuleById(id);
-        return module.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<?> getModuleById(@PathVariable String id, @RequestHeader("Authorization") String token) {
+        try {
+            java.util.Optional<com.example.Software.project.Backend.Model.Module> module = moduleService.getModuleById(id);
+            return module.map(m -> ResponseEntity.ok(Map.of(
+                "message", "Module found",
+                "data", m,
+                "moduleId", m.getModuleId(),
+                "status", "SUCCESS"
+            ))).orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                "message", "Module not found",
+                "status", "ERROR"
+            )));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
     }
 
     // Update (Admin Only)
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateModule(@PathVariable String id, @RequestBody Module moduleDetails, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> updateModule(@PathVariable String id, @RequestBody com.example.Software.project.Backend.Model.Module moduleDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Admin can update modules");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Admin can update modules",
+                    "status", "ERROR"
+                ));
             }
-            Module updatedModule = moduleService.updateModule(id, moduleDetails);
-            return ResponseEntity.ok(updatedModule);
+            com.example.Software.project.Backend.Model.Module updatedModule = moduleService.updateModule(id, moduleDetails);
+            return ResponseEntity.ok(Map.of(
+                "message", "Module updated successfully",
+                "data", updatedModule,
+                "moduleId", updatedModule.getModuleId(),
+                "status", "SUCCESS"
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
         }
     }
 
@@ -68,17 +116,36 @@ public class ModuleRestController {
     public ResponseEntity<?> deleteModule(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access Denied: Only Admin can delete modules");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Admin can delete modules",
+                    "status", "ERROR"
+                ));
             }
             moduleService.deleteModule(id);
-            return ResponseEntity.ok("Module deleted successfully");
+            return ResponseEntity.ok(Map.of(
+                "message", "Module deleted successfully",
+                "moduleId", id,
+                "status", "SUCCESS"
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
         }
     }
 
     private boolean isAdmin(String token) {
-        String role = jwtUtil.extractRole(token.substring(7));
-        return "Admin".equalsIgnoreCase(role) || "Superadmin".equalsIgnoreCase(role);
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && ("admin".equals(role) || "superadmin".equals(role));
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

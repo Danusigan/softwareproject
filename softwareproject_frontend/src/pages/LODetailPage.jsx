@@ -1,0 +1,441 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import Header from '../components/header';
+import Footer from '../components/footer';
+import axios from 'axios';
+
+export default function LODetailPage() {
+    const { loId } = useParams();
+    const [lo, setLo] = useState(null);
+    const [loForm, setLoForm] = useState({ loNumber: '', description: '' });
+    const [savingLo, setSavingLo] = useState(false);
+    const [loActionMessage, setLoActionMessage] = useState({ type: '', text: '' });
+    const [mappings, setMappings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [batches, setBatches] = useState([]);
+    const [batchesLoading, setBatchesLoading] = useState(false);
+    const [markMessage, setMarkMessage] = useState({ type: '', text: '' });
+
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        fetchLODetails();
+        fetchBatches();
+        fetchMappingsForLo();
+    }, [loId]);
+
+    const fetchLODetails = async () => {
+        try {
+            setLoading(true);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            // Backend returns {message, data, losId, name, description, status}
+            // Extract the Los object from data field if it exists, otherwise use the whole response
+            const loData = res.data.data || res.data;
+            setLo(loData);
+            setLoForm({
+                loNumber: loData?.id || loId,
+                description: loData?.description || loData?.name || ''
+            });
+
+            // Log for debugging
+            console.log('LO Details Response:', res.data);
+            console.log('Extracted LO Data:', loData);
+        } catch (err) {
+            console.error('Error fetching LO details:', err);
+            console.error('Error response:', err.response?.data);
+            setError('Failed to load learning outcome details');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchBatches = async () => {
+        try {
+            setBatchesLoading(true);
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setBatches(res.data?.data || []);
+        } catch (err) {
+            console.error('Error fetching batches:', err);
+            setBatches([]);
+        } finally {
+            setBatchesLoading(false);
+        }
+    };
+
+    const fetchMappingsForLo = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:8080/api/lo-po-mapping/lo/${encodeURIComponent(loId)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setMappings(res.data?.data || []);
+        } catch (err) {
+            console.error('Error fetching LO mappings:', err);
+            setMappings([]);
+        }
+    };
+
+    const rejectedMappings = mappings.filter(m => m.approvalStatus === 'REJECTED' || m.status === 'REJECTED');
+
+    const handleUpdateLo = async () => {
+        if (!loForm.loNumber.trim() || !loForm.description.trim()) {
+            setLoActionMessage({ type: 'error', text: 'LO number and description are required.' });
+            return;
+        }
+
+        try {
+            setSavingLo(true);
+            setLoActionMessage({ type: '', text: '' });
+            const token = localStorage.getItem('token');
+
+            await axios.put(
+                `http://localhost:8080/api/lospos/${encodeURIComponent(loId)}`,
+                {
+                    id: loForm.loNumber,
+                    name: loForm.description,
+                    description: loForm.description
+                },
+                { headers: { 'Authorization': `Bearer ${token}` } }
+            );
+
+            setLoActionMessage({ type: 'success', text: 'Learning Outcome updated successfully. You can now resubmit mappings if needed.' });
+            fetchLODetails();
+            fetchMappingsForLo();
+        } catch (err) {
+            setLoActionMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to update Learning Outcome'
+            });
+        } finally {
+            setSavingLo(false);
+        }
+    };
+
+    const handleDeleteLo = async () => {
+        if (!window.confirm('Delete this Learning Outcome and all related mappings?')) return;
+
+        try {
+            setSavingLo(true);
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            navigate('/lecturer-dashboard');
+        } catch (err) {
+            setLoActionMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to delete Learning Outcome'
+            });
+        } finally {
+            setSavingLo(false);
+        }
+    };
+
+    const deleteBatch = async (batch) => {
+        if (!window.confirm(`Delete all results for ${batch}nd Batch?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.delete(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches/${batch}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setMarkMessage({ type: 'success', text: `${batch}nd Batch deleted successfully.` });
+            fetchBatches();
+        } catch (err) {
+            setMarkMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to delete batch'
+            });
+        }
+    };
+
+    // Navigate to edit page
+    const openEditPage = (batchInfo) => {
+        navigate(`/lo-detail/${loId}/add-results`, {
+            state: {
+                editMode: true,
+                batch: batchInfo.batch,
+                fileName: lo?.fileName || 'existing_file.xlsx'
+            }
+        });
+    };
+
+    return (
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col relative overflow-hidden">
+            <Header />
+
+            {/* Background Decorations */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+
+            <main className="flex-1 flex flex-col items-center justify-center max-w-7xl mx-auto px-6 py-12 w-full relative z-10 animate-in fade-in duration-700">
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20 grayscale opacity-50">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-indigo-100 rounded-full"></div>
+                            <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
+                        </div>
+                        <p className="text-slate-500 font-bold mt-8 tracking-wide">Syncing data...</p>
+                    </div>
+                ) : error ? (
+                    <div className="text-center animate-in zoom-in-95 duration-300">
+                        <div className="glass-card p-12 rounded-[2.5rem] border-red-50 max-w-md mx-auto">
+                            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
+                                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h2 className="heading-lg text-slate-900 mb-2">Sync Error</h2>
+                            <p className="text-slate-500 mb-8">{error}</p>
+                            <button
+                                onClick={() => navigate(-1)}
+                                className="w-full btn-secondary py-4 font-black uppercase text-xs tracking-widest text-slate-500"
+                            >
+                                Revert to Safety
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="w-full max-w-5xl text-center space-y-16">
+                        {/* Hero Section */}
+                        <div className="space-y-6 animate-in slide-in-from-bottom-8 duration-700">
+                            <div className="inline-flex items-center gap-3 px-4 py-2 bg-white/50 backdrop-blur-md rounded-full border border-white/50 shadow-sm animate-bounce-subtle">
+                                <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+                                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                                    {lo?.id?.includes('_') ? `Objective ${lo.id.split('_').pop()}` : lo?.id} Hub
+                                </span>
+                            </div>
+                            <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 leading-[1.1] pb-2">
+                                {lo?.description || lo?.name}
+                            </h1>
+                            <p className="text-slate-500 text-lg font-medium max-w-2xl mx-auto leading-relaxed">
+                                Manage performance metrics and execute comparisons for this learning outcome.
+                            </p>
+
+                            <div className="flex flex-wrap items-center justify-center gap-3">
+                                <button
+                                    onClick={handleUpdateLo}
+                                    disabled={savingLo}
+                                    className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                                >
+                                    {savingLo ? 'Saving...' : 'Update LO'}
+                                </button>
+                                <button
+                                    onClick={handleDeleteLo}
+                                    disabled={savingLo}
+                                    className="px-5 py-2.5 rounded-xl bg-red-50 text-red-700 border border-red-200 text-sm font-semibold hover:bg-red-100 transition-colors disabled:opacity-60"
+                                >
+                                    Delete LO
+                                </button>
+                            </div>
+
+                            <div className="max-w-3xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                                <div>
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">LO Number</label>
+                                    <input
+                                        type="text"
+                                        value={loForm.loNumber}
+                                        onChange={(e) => setLoForm(prev => ({ ...prev, loNumber: e.target.value }))}
+                                        className="input-field"
+                                    />
+                                </div>
+                                <div className="md:col-span-1">
+                                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Description</label>
+                                    <textarea
+                                        value={loForm.description}
+                                        onChange={(e) => setLoForm(prev => ({ ...prev, description: e.target.value }))}
+                                        className="input-field min-h-[96px] resize-none"
+                                    />
+                                </div>
+                            </div>
+
+                            {loActionMessage.text && (
+                                <div className={`max-w-3xl mx-auto w-full rounded-xl px-4 py-3 text-sm font-semibold ${
+                                    loActionMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                    {loActionMessage.text}
+                                </div>
+                            )}
+                        </div>
+
+                        {rejectedMappings.length > 0 && (
+                            <div className="glass-card rounded-[2rem] p-8 text-left animate-in slide-in-from-bottom-6 duration-700 border-red-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-2xl font-black text-slate-800">Admin Review Feedback</h3>
+                                    <span className="text-xs font-bold uppercase tracking-widest text-red-600 bg-red-50 px-3 py-1 rounded-lg border border-red-200">
+                                        {rejectedMappings.length} Rejected Mapping{rejectedMappings.length > 1 ? 's' : ''}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {rejectedMappings.map((mapping) => (
+                                        <div key={mapping.mappingId || mapping.id} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                <p className="text-sm font-bold text-red-700">
+                                                    {mapping.programOutcome?.code || mapping.programOutcomeCode || 'PO'}
+                                                </p>
+                                                <span className="text-xs font-semibold text-red-600">
+                                                    {(mapping.reviewedAt || mapping.updatedAt) ? new Date(mapping.reviewedAt || mapping.updatedAt).toLocaleDateString() : 'Needs changes'}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-red-800 leading-relaxed">
+                                                {mapping.adminRemarks || 'Admin requested revisions for this mapping.'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Action Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-12 duration-1000 delay-200">
+                            {/* Add Results Card */}
+                            <button
+                                onClick={() => navigate(`/lo-detail/${loId}/add-results`)}
+                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 4V20M20 12H4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                                <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-600 transition-colors">Data Ingestion</h3>
+                                <p className="text-slate-500 font-medium leading-relaxed mb-8">
+                                    Upload batch assessment data and process student attainment levels.
+                                </p>
+                                <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest">
+                                    Initialize Upload
+                                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7-7 7M3 12h18" />
+                                    </svg>
+                                </div>
+                            </button>
+
+                            {/* Comparison Card */}
+                            <button
+                                onClick={() => navigate(`/lo-detail/${loId}/comparisons`)}
+                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M7 12L17 12M17 12L13 8M17 12L13 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-sm">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-600 transition-colors">Trend Synthesis</h3>
+                                <p className="text-slate-500 font-medium leading-relaxed mb-8">
+                                    Project comparative analytics and visualize cross-batch performance trends.
+                                </p>
+                                <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest">
+                                    Launch Analysis
+                                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7-7 7M3 12h18" />
+                                    </svg>
+                                </div>
+                            </button>
+
+                            {/* Lecturer Dashboard Card */}
+                            <button
+                                onClick={() => navigate('/lecturer-dashboard')}
+                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M3 12L21 12M21 12L15 6M21 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                                <div className="w-16 h-16 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-slate-900 group-hover:text-white transition-all duration-500 shadow-sm">
+                                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                    </svg>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 mb-3 group-hover:text-indigo-600 transition-colors">Instructor Hub</h3>
+                                <p className="text-slate-500 font-medium leading-relaxed mb-8">
+                                    Return to your primary workspace and manage all course assignments.
+                                </p>
+                                <div className="flex items-center gap-2 text-indigo-600 font-black text-xs uppercase tracking-widest">
+                                    Workspace Home
+                                    <svg className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7-7 7M3 12h18" />
+                                    </svg>
+                                </div>
+                            </button>
+                        </div>
+
+                        <div className="glass-card rounded-[2rem] p-8 text-left animate-in slide-in-from-bottom-6 duration-700">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-black text-slate-800">Uploaded Results</h3>
+                                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">
+                                    {batches.length} {batches.length === 1 ? 'Batch' : 'Batches'}
+                                </span>
+                            </div>
+
+                            {markMessage.text && (
+                                <div className={`mb-4 p-3 rounded-xl text-sm font-semibold ${markMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                                    {markMessage.text}
+                                </div>
+                            )}
+
+                            {batchesLoading ? (
+                                <p className="text-slate-500 font-semibold">Loading results...</p>
+                            ) : batches.length === 0 ? (
+                                <p className="text-slate-500 font-semibold">No uploaded results found for this LO.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-slate-600 mb-3">Results available</p>
+                                    {batches.map((batchInfo) => (
+                                        <div key={batchInfo.batch} className="flex items-center justify-between py-3 px-4 hover:bg-slate-50 rounded-lg transition-colors">
+                                            <span className="text-base font-semibold text-slate-800">
+                                                {batchInfo.batch}nd Batch
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => openEditPage(batchInfo)}
+                                                    className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                                                    title="Edit batch"
+                                                >
+                                                    <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteBatch(batchInfo.batch)}
+                                                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Delete batch"
+                                                >
+                                                    <svg className="w-5 h-5 text-slate-600 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </main>
+
+            <Footer />
+        </div>
+    );
+}

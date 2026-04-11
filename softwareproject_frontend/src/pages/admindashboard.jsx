@@ -32,10 +32,10 @@ export default function AdminDashboard() {
     useEffect(() => {
         const userType = localStorage.getItem('userType');
         console.log('Admin Dashboard - User Type:', userType);
-        
+
         const normalizedType = userType?.toLowerCase?.() || '';
         const isAdmin = normalizedType === 'admin' || normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin';
-        
+
         if (!isAdmin) {
             console.log('Unauthorized! Redirecting to home. Normalized type:', normalizedType);
             navigate('/');
@@ -53,9 +53,11 @@ export default function AdminDashboard() {
             const res = await axios.get('http://localhost:8080/api/modules/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setModules(res.data);
+            // Backend returns {message, data, status} format
+            setModules(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch modules:', err);
+            setModules([]);
         }
     };
 
@@ -87,9 +89,9 @@ export default function AdminDashboard() {
                 setTimeout(() => setSidePanelOpen(null), 2000);
             }
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data?.message || 'Failed to add teacher' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to add teacher'
             });
         } finally {
             setLoading(false);
@@ -100,6 +102,13 @@ export default function AdminDashboard() {
         e.preventDefault();
         setLoading(true);
         setMessage({ type: '', text: '' });
+
+        // Validate moduleId: only capital letters and digits
+        if (moduleData.moduleId && !moduleData.moduleId.match(/^[A-Z0-9]+$/)) {
+            setMessage({ type: 'error', text: 'Module ID must contain only capital letters (A-Z) and digits (0-9)' });
+            setLoading(false);
+            return;
+        }
 
         try {
             const token = localStorage.getItem('token');
@@ -118,9 +127,9 @@ export default function AdminDashboard() {
             fetchModules();
             setTimeout(() => setSidePanelOpen(null), 2000);
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to create module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to create module'
             });
         } finally {
             setLoading(false);
@@ -132,10 +141,17 @@ export default function AdminDashboard() {
         setLoading(true);
         setMessage({ type: '', text: '' });
 
+        // Validate moduleId: only capital letters and digits
+        if (moduleData.moduleId && !moduleData.moduleId.match(/^[A-Z0-9]+$/)) {
+            setMessage({ type: 'error', text: 'Module ID must contain only capital letters (A-Z) and digits (0-9)' });
+            setLoading(false);
+            return;
+        }
+
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/modules/update/${editingModule.moduleId}`,
+                `http://localhost:8080/api/modules/${editingModule.moduleId}`,
                 {
                     moduleId: moduleData.moduleId,
                     moduleName: moduleData.moduleName
@@ -151,9 +167,9 @@ export default function AdminDashboard() {
             setModuleData({ moduleId: '', moduleName: '' });
             fetchModules();
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to update module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to update module'
             });
         } finally {
             setLoading(false);
@@ -165,16 +181,16 @@ export default function AdminDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/modules/delete/${moduleId}`, {
+            await axios.delete(`http://localhost:8080/api/modules/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
             setMessage({ type: 'success', text: 'Module deleted successfully!' });
             fetchModules();
         } catch (err) {
-            setMessage({ 
-                type: 'error', 
-                text: err.response?.data || 'Failed to delete module' 
+            setMessage({
+                type: 'error',
+                text: err.response?.data || 'Failed to delete module'
             });
         }
     };
@@ -265,7 +281,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Modern Cards with Hover Effects */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12">
                     {/* Add Teacher Card */}
                     <div
                         onClick={() => setSidePanelOpen('teacher')}
@@ -296,6 +312,38 @@ export default function AdminDashboard() {
                         </div>
                         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Create the Module</h2>
                         <p className="text-center text-gray-600">Click to create a new course module</p>
+                    </div>
+
+                    {/* Program Outcomes Management Card */}
+                    <div
+                        onClick={() => navigate('/program-outcomes')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-purple-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Program Outcomes</h2>
+                        <p className="text-center text-gray-600">Manage Washington Accord POs & custom outcomes</p>
+                    </div>
+
+                    {/* LO-PO Mappings Management Card */}
+                    <div
+                        onClick={() => navigate('/lo-po-mappings')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-orange-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LO-PO Mappings</h2>
+                        <p className="text-center text-gray-600">Manage & approve Learning Outcome mappings</p>
                     </div>
                 </div>
             </div>
@@ -379,7 +427,7 @@ export default function AdminDashboard() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400"
+                            className="px-8 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
                         >
                             {loading ? 'Adding...' : 'Add Teacher'}
                         </button>
@@ -432,19 +480,20 @@ export default function AdminDashboard() {
                             <input
                                 type="text"
                                 value={moduleData.moduleId}
-                                onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value })}
+                                onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value.toUpperCase() })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="Enter the Module ID"
+                                placeholder="Enter the Module ID (e.g., SE101, CS201)"
                                 required
                             />
+                            <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                            className="px-8 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
                         >
-                            {loading ? 'Creating...' : 'Submit'}
+                            {loading ? 'Creating...' : 'Create Module'}
                         </button>
                     </form>
                 </div>
@@ -496,11 +545,12 @@ export default function AdminDashboard() {
                                 <input
                                     type="text"
                                     value={moduleData.moduleId}
-                                    onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value })}
+                                    onChange={(e) => setModuleData({ ...moduleData, moduleId: e.target.value.toUpperCase() })}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="Enter the Module ID"
+                                    placeholder="Enter the Module ID (e.g., SE101, CS201)"
                                     required
                                 />
+                                <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
                             </div>
 
                             <button

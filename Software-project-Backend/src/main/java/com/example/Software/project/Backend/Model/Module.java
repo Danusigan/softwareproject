@@ -15,31 +15,40 @@ public class Module {
     @Column(name = "module_name")
     private String moduleName;
 
-    // Relationship: One Module has many LosPos
-    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<LosPos> losPosList;
+    // Removed academicYear as requested
+
+    // Relationship: One Module has many Los
+    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<Los> losList; // Renamed from losPosList
 
     // --- Getters and Setters ---
 
     public String getModuleId() { return moduleId; }
-    public void setModuleId(String moduleId) { this.moduleId = moduleId; }
+
+    public void setModuleId(String moduleId) {
+        // Validate: only capital letters, numbers, and spaces allowed
+        if (moduleId != null && !moduleId.matches("^[A-Z0-9\\s]+$")) {
+            throw new IllegalArgumentException("Module ID must contain only capital letters, numbers, and spaces (A-Z, 0-9, spaces)");
+        }
+        this.moduleId = moduleId;
+    }
 
     public String getModuleName() { return moduleName; }
     public void setModuleName(String moduleName) { this.moduleName = moduleName; }
 
-    public List<LosPos> getLosPosList() { return losPosList; }
-    public void setLosPosList(List<LosPos> losPosList) { this.losPosList = losPosList; }
+    public List<Los> getLosList() { return losList; }
+    public void setLosList(List<Los> losList) { this.losList = losList; }
 
     /**
      * Derived Attribute:
-     * Returns a list of names derived from the connected LosPos objects.
+     * Returns a list of names derived from the connected Los objects.
      * This acts "like an attribute" but is calculated from the relationship.
      */
     @Transient // This annotation tells JPA not to store this column in the DB, it's calculated on the fly
-    public List<String> getLosPosNames() {
-        if (losPosList == null) return null;
-        return losPosList.stream()
-                .map(LosPos::getName)
+    public List<String> getLosNames() {
+        if (losList == null) return null;
+        return losList.stream()
+                .map(Los::getName)
                 .collect(Collectors.toList());
     }
 }

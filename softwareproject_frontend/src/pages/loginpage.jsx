@@ -1,9 +1,9 @@
-"use client"
 import Header from '../components/header'
 import Footer from '../components/footer'
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios'; 
+import axios from 'axios';
+import authService from '../services/authService';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -19,197 +19,186 @@ export default function LoginPage() {
         setIsLoading(true);
         setError('');
 
+        // ✅ FIX 1: Validate role is selected
+        if (!userRole) {
+            setError('Please select a user role.');
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const res = await axios.post('http://localhost:8080/api/auth/login', {
                 userID: username,
-                password
+                password,
+                userType: userRole  // ✅ FIX 2: Send userRole to backend
             });
 
             console.log('=== LOGIN RESPONSE ===');
             console.log('Full Response:', res.data);
-            console.log('Response Status:', res.data.status);
-            console.log('Response Keys:', Object.keys(res.data));
 
-            // Handle successful response
-            if (res.data && res.data.status === "SUCCESS") {
+            if (res.data?.status === 'SUCCESS') {
                 const loggedInUsername = res.data.userId;
-                const userType = res.data.userType;
+                const userType = res.data.userType || userRole;
                 const token = res.data.token;
-                
-                console.log('=== EXTRACTED VALUES ===');
-                console.log('Username:', loggedInUsername);
-                console.log('UserType:', userType);
-                console.log('UserType Type:', typeof userType);
-                console.log('Token:', token ? 'Received' : 'Missing');
-                
-                // Store user data and token
-                localStorage.setItem('username', loggedInUsername);
-                localStorage.setItem('userType', userType);
-                localStorage.setItem('token', token);
 
-                if (rememberMe) {
-                    localStorage.setItem('rememberMe', 'true');
-                } else {
-                    localStorage.removeItem('rememberMe');
-                }
+                // ✅ Use authService to store login with 2-hour expiration
+                authService.storeLogin(token, loggedInUsername, userType, rememberMe);
 
-                // Debug: log the userType to console
-                const storedUserType = localStorage.getItem('userType');
-                console.log('=== STORED IN LOCALSTORAGE ===');
-                console.log('Stored UserType:', storedUserType);
-                console.log('Stored UserType Type:', typeof storedUserType);
+                // ✅ Normalize userType for comparison
+                const normalizedType = userType?.toLowerCase?.().trim() || '';
 
-                // Navigate based on user role
-                console.log('=== NAVIGATION LOGIC ===');
-                console.log('Checking if userType === "superadmin":', userType === 'superadmin');
-                console.log('Checking if userType === "admin":', userType === 'admin');
-                console.log('Checking if userType === "lecture":', userType === 'lecture');
-                
-                // Normalize for comparison - handle various capitalizations
-                const normalizedType = userType?.toLowerCase?.() || '';
-                
+                console.log('Navigating for userType:', normalizedType);
+
                 if (normalizedType === 'superadmin' || normalizedType === 'super admin' || normalizedType === 'super-admin') {
-                    console.log('✓ Navigating to superadmin dashboard');
-                    navigate('/super-admin-dashboard');
+                    navigate('/super-admin-dashboard', { replace: true });
                 } else if (normalizedType === 'admin') {
-                    console.log('✓ Navigating to admin dashboard');
-                    navigate('/admin-dashboard');
-                } else if (normalizedType === 'lecture') {
-                    console.log('✓ Navigating to lecturer dashboard');
-                    navigate('/lecturer-dashboard');
+                    navigate('/admin-dashboard', { replace: true });
+                } else if (normalizedType === 'lecture' || normalizedType === 'lecturer') {
+                    navigate('/lecturer-dashboard', { replace: true });
                 } else {
-                    console.log('✗ Unknown user type:', userType, 'normalized:', normalizedType, '- Navigating to home');
-                    navigate('/');
+                    console.warn('Unknown userType:', userType);
+                    navigate('/', { replace: true });
                 }
+
             } else {
                 setError(res.data.message || 'Login failed. Invalid response from server.');
             }
         } catch (err) {
             console.error('=== LOGIN ERROR ===');
-            console.error('Error Response:', err.response?.data);
-            console.error('Error Message:', err.message);
-            console.error('Full Error:', err);
-            setError('Login failed. Please check your username and password.');
+            console.error('Error:', err.response?.data || err.message);
+
+            const backendMessage = err.response?.data?.message;
+            if (backendMessage) {
+                setError(backendMessage);
+            } else if (err.response?.status === 401) {
+                setError('Login failed. Incorrect username, password, or user role.');
+            } else if (err.response?.status === 403) {
+                setError('Access denied. Your role does not match the selected profile.');
+            } else {
+                setError('Login failed. Please check your credentials.');
+            }
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 py-8">
-            {/* Header */}
+        <div className="min-h-screen bg-slate-50 flex flex-col relative overflow-hidden">
+            {/* Background Decorative Elements */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-sky-500/10 rounded-full blur-[120px] pointer-events-none" />
+
             <Header />
 
-            {/* Navigation */}
-            <div className="max-w-4xl mx-auto px-4 mb-8">
-                <div className="flex justify-center space-x-8">
-                    <Link to="/" className="text-gray-700 hover:text-blue-600">Home</Link>
-                    <a href="#" className="text-blue-600 font-semibold border-b-2 border-blue-600">Login</a>
-                </div>
-            </div>
+            <main className="flex-1 flex items-center justify-center p-6 relative z-10 animate-in fade-in zoom-in-95 duration-700">
+                <div className="w-full max-w-md bg-white/95 backdrop-blur rounded-3xl border border-slate-200/80 overflow-hidden shadow-xl shadow-slate-900/5">
 
-            {/* Main Content */}
-            <div className="max-w-6xl mx-auto px-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                    {/* Login Form */}
-                    <div className="bg-white p-8 rounded-lg shadow-md">
-                        <h2 className="text-2xl font-bold text-center mb-6">Login</h2>
+                    {/* Login Form Section */}
+                    <div className="p-8 md:p-10 flex flex-col justify-center">
+                        <div className="mb-8 text-center">
+                            <h2 className="text-4xl font-semibold tracking-tight text-slate-900 mb-3">Welcome Back</h2>
+                            <p className="text-slate-600 text-base">Sign in to continue to the LO-PO analytics dashboard.</p>
+                        </div>
 
                         {/* Error Message */}
                         {error && (
-                            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                                {error}
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-3 animate-shake">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span className="text-sm font-medium">{error}</span>
                             </div>
                         )}
 
-                        <div className="space-y-4">
-                            <form onSubmit={handleLogin}>
-                                {/* User Role Dropdown - ABOVE username and password */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Select User Role</label>
-                                    </div>
-                                    <select
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                        value={userRole}
-                                        onChange={(e) => setUserRole(e.target.value)}
-                                        required
-                                    >
-                                        <option value="">-- Select User Role --</option>
-                                        <option value="Superadmin">Superadmin</option>
-                                        <option value="Admin">Admin</option>
-                                        <option value="Lecture">Lecture</option>
-                                    </select>
-                                </div>
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            {/* User Role */}
+                            <div className="space-y-2">
+                                <label htmlFor="userRole" className="text-sm font-medium text-slate-700 ml-1">Role</label>
+                                <select
+                                    id="userRole"
+                                    className="input-field appearance-none bg-white"
+                                    value={userRole}
+                                    onChange={(e) => setUserRole(e.target.value)}
+                                    required
+                                >
+                                    <option value="">Select User Role</option>
+                                    <option value="superadmin">Superadmin</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="lecture">Lecturer</option>
+                                </select>
+                            </div>
 
-                                {/* Username Field */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Enter Your Username</label>
-                                    </div>
-                                    <input
-                                        type="text"
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Username"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                            {/* Username */}
+                            <div className="space-y-2">
+                                <label htmlFor="username" className="text-sm font-medium text-slate-700 ml-1">Username</label>
+                                <input
+                                    id="username"
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Enter your username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                                {/* Password Field */}
-                                <div className="mb-4">
-                                    <div className="flex items-center mb-2">
-                                        <label className="font-medium">Enter Your Password</label>
-                                    </div>
-                                    <input
-                                        type="password"
-                                        className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        required
-                                    />
-                                </div>
+                            {/* Password */}
+                            <div className="space-y-2">
+                                <label htmlFor="password" className="text-sm font-medium text-slate-700 ml-1">Password</label>
+                                <input
+                                    id="password"
+                                    type="password"
+                                    className="input-field"
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    required
+                                />
+                            </div>
 
-                                <div className="flex justify-between items-center mb-4">
-                                    <label className="flex items-center">
+                            <div className="flex justify-between items-center py-2">
+                                <label className="flex items-center gap-3 cursor-pointer group">
+                                    <div className="relative flex items-center">
                                         <input
                                             type="checkbox"
-                                            className="mr-2"
+                                            className="peer sr-only"
                                             checked={rememberMe}
                                             onChange={(e) => setRememberMe(e.target.checked)}
                                         />
-                                        <span>Remember me?</span>
-                                    </label>
-                                    <Link to="/forgottenpassword" className="text-blue-600 text-sm hover:underline">Forget Password</Link>
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    className="w-full bg-blue-700 text-white p-3 rounded font-semibold hover:bg-blue-800 transition-colors disabled:bg-gray-400"
-                                    disabled={isLoading}
-                                >
-                                    {isLoading ? 'Logging in...' : 'Login'}
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-
-                    {/* Right Side Image */}
-                    <div className="hidden lg:flex items-center justify-center">
-                        <div className="bg-gradient-to-br from-blue-100 to-gray-100 rounded-lg p-8 w-full h-96 flex items-center justify-center border border-gray-300">
-                            <div className="text-center">
-                                <div className="text-6xl mb-4">🔐</div>
-                                <p className="text-blue-600 font-semibold">Secure Login Portal</p>
-                                <p className="text-gray-600 mt-2">Access your dashboard</p>
+                                        <div className="w-5 h-5 border-2 border-slate-200 rounded-lg peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-all duration-300 shadow-sm" />
+                                        <svg className="absolute w-3 h-3 text-white left-1 opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">Remember me</span>
+                                </label>
+                                <Link to="/forgottenpassword" title="Forgot Password?" className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors">Forgot password?</Link>
                             </div>
-                        </div>
+
+                            <button
+                                type="submit"
+                                className={`w-full py-3.5 px-8 rounded-xl text-white font-medium text-base shadow-lg transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3
+                                    ${isLoading
+                                        ? 'bg-slate-300 cursor-not-allowed shadow-none'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200/80'}`}
+                                disabled={isLoading}
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Signing in...
+                                    </>
+                                ) : 'Login'}
+                            </button>
+                        </form>
                     </div>
                 </div>
-            </div>
+            </main>
+
             <Footer />
         </div>
-    )
+    );
 }
