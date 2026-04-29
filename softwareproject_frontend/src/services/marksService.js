@@ -1,0 +1,44 @@
+import axios from 'axios'
+
+const BASE_URL = 'http://localhost:8080'
+
+export const marksService = {
+  async getModule(moduleId, config = {}) {
+    return axios.get(`${BASE_URL}/api/modules/${moduleId}`, config)
+  },
+
+  async getModuleLos(moduleId, config = {}) {
+    return axios.get(`${BASE_URL}/api/lospos/module/${moduleId}`, config)
+  },
+
+  async downloadTemplate({ losIds, markType, batch }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/template/marks`,
+      { losIds, markType, batch },
+      { ...config, responseType: 'blob' }
+    )
+  },
+
+  async exportMarks({ losIds, markType, batch, threshold }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/export/marks`,
+      { losIds, markType, batch, threshold },
+      { ...config, responseType: 'blob' }
+    )
+  },
+
+  async uploadBulk({ excelFile, losIds, batch, markType }, config = {}) {
+    const formData = new FormData()
+    formData.append('excelFile', excelFile)
+    formData.append('losIds', Array.isArray(losIds) ? losIds.join(',') : losIds)
+    formData.append('batch', batch)
+    formData.append('markType', markType)
+
+    return axios.post(`${BASE_URL}/api/obe/marks/upload-bulk`, formData, {
+      ...config,
+      headers: config.headers || {},
+    })
+  },
+}
+
+export default marksService

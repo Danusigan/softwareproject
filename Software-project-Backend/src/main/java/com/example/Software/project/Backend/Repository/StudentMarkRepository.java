@@ -6,6 +6,7 @@ import com.example.Software.project.Backend.Model.Student;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -17,15 +18,15 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
 
     // Query by mark type and batch
     @Query("SELECT sm FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
-    List<StudentMark> findByLosIdsAndMarkTypeAndBatch(List<String> losIds, MarkType markType, String batch);
+       List<StudentMark> findByLosIdsAndMarkTypeAndBatch(@Param("losIds") List<String> losIds, @Param("markType") MarkType markType, @Param("batch") String batch);
 
     // Get all unique students for given LOs
-    @Query("SELECT DISTINCT sm.student FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
-    List<Student> findDistinctStudentsByLosIdsAndMarkTypeAndBatch(List<String> losIds, MarkType markType, String batch);
+   @Query("SELECT DISTINCT s FROM StudentMark sm JOIN sm.student s WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY s.studentId ASC")
+       List<Student> findDistinctStudentsByLosIdsAndMarkTypeAndBatch(@Param("losIds") List<String> losIds, @Param("markType") MarkType markType, @Param("batch") String batch);
 
     // Get all batches for given LOs and mark type
     @Query("SELECT DISTINCT sm.batch FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch IS NOT NULL ORDER BY sm.batch")
-    List<String> findDistinctBatchesByLosIdsAndMarkType(List<String> losIds, MarkType markType);
+       List<String> findDistinctBatchesByLosIdsAndMarkType(@Param("losIds") List<String> losIds, @Param("markType") MarkType markType);
 
     @Modifying
     @Transactional
@@ -51,7 +52,7 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
            "WHERE m.moduleId = :courseId " +
            "GROUP BY lo.batch " +
            "ORDER BY lo.batch ASC")
-    List<Object[]> findYearlyAverageByCourse(String courseId);
+    List<Object[]> findYearlyAverageByCourse(@Param("courseId") String courseId);
 
     // LO-level Trend (Average per LO per Batch)
     @Query("SELECT lo.id, lo.name, lo.batch, AVG(sm.score) " +
@@ -61,5 +62,5 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
            "WHERE m.moduleId = :courseId " +
            "GROUP BY lo.id, lo.name, lo.batch " +
            "ORDER BY lo.id, lo.batch ASC")
-    List<Object[]> findLoTrendByCourse(String courseId);
+    List<Object[]> findLoTrendByCourse(@Param("courseId") String courseId);
 }

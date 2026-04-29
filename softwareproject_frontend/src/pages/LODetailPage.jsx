@@ -236,6 +236,14 @@ export default function LODetailPage() {
                                 >
                                     Delete LO
                                 </button>
+                                {lo?.moduleId && (
+                                    <button
+                                        onClick={() => navigate(`/marks-workbench/${lo.moduleId}`)}
+                                        className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
+                                    >
+                                        Bulk workflow
+                                    </button>
+                                )}
                             </div>
 
                             <div className="max-w-3xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-4 text-left">

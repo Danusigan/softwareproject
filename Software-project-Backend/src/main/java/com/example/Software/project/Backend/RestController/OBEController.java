@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/obe")
@@ -209,12 +210,40 @@ public class OBEController {
             // Extract parameters from request body
             @SuppressWarnings("unchecked")
             List<String> losIds = (List<String>) request.get("losIds");
-            String markType = (String) request.get("markType");
-            String batch = (String) request.get("batch");
-            Integer threshold = request.get("threshold") != null ?
-                Integer.parseInt(request.get("threshold").toString()) : 50;
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+
+            int threshold = 50;
+            Object thresholdObj = request.get("threshold");
+            if (thresholdObj != null) {
+                String thresholdRaw = thresholdObj.toString().trim();
+                if (!thresholdRaw.isEmpty()) {
+                    try {
+                        threshold = Integer.parseInt(thresholdRaw);
+                    } catch (NumberFormatException ex) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "Error: threshold must be an integer between 0 and 100", "status", "ERROR"));
+                    }
+                }
+            }
+
+            if (threshold < 0 || threshold > 100) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: threshold must be between 0 and 100", "status", "ERROR"));
+            }
 
             if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            losIds = losIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .toList();
+
+            if (losIds.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
             }
@@ -247,10 +276,11 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
-                    "message", "Failed to generate marks report",
-                    "error", e.getMessage(),
+                    "message", "Failed to generate marks report: " + errorDetail,
+                    "error", errorDetail,
                     "status", "ERROR"
                 ));
         }

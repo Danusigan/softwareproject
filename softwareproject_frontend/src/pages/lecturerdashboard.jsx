@@ -342,6 +342,23 @@ export default function LecturerDashboard() {
                                                     <p className="text-[11px] text-emerald-700/80">Select an LO, then drag & drop Excel marks</p>
                                                 </div>
                                             </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setActiveModuleMenuId(null);
+                                                    navigate(`/marks-workbench/${module.moduleId}`);
+                                                }}
+                                                className="w-full text-left px-4 py-3 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-3"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7h18M3 12h18M3 17h18" />
+                                                </svg>
+                                                <div>
+                                                    <p className="text-sm font-semibold">Bulk Marks Workflow</p>
+                                                    <p className="text-[11px] text-indigo-700/80">Template download, export report, and bulk upload</p>
+                                                </div>
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -380,15 +397,27 @@ export default function LecturerDashboard() {
                             <div className="pt-2">
                                 <div className="space-y-3">
                                     {modulePanelMode === 'analysis' ? (
-                                        <button
-                                            onClick={() => setMessage({ type: 'success', text: 'Click an LO card below to open Add Results and upload Excel marks.' })}
-                                            className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-emerald-400/20"
-                                        >
-                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                            </svg>
-                                            Result Analysis: Add Marks
-                                        </button>
+                                        <>
+                                            <button
+                                                onClick={() => navigate(`/marks-workbench/${selectedModule.moduleId}`)}
+                                                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
+                                            >
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 7h18M3 12h18M3 17h18" />
+                                                </svg>
+                                                Open Bulk Workflow
+                                            </button>
+
+                                            <button
+                                                onClick={() => setMessage({ type: 'success', text: 'Click an LO card below to open the single-LO upload flow.' })}
+                                                className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-emerald-400/20"
+                                            >
+                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                                </svg>
+                                                Single LO Upload
+                                            </button>
+                                        </>
                                     ) : (
                                         <>
                                             <button

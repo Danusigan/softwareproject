@@ -5,30 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="de4a3f05-a1ee-4501-84c5-6e56ddfc1690" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Software-project-Backend/src/main/resources/application-dev.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Software-project-Backend/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/Software-project-Backend/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Software-project-Backend/src/main/resources/application.properties" beforeDir="false" afterPath="$PROJECT_DIR$/Software-project-Backend/src/main/resources/application.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/_metadata.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/axios.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/axios.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/chunk-G3PMV62Z.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/chunk-G3PMV62Z.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/chunk-QRULMDK5.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/chunk-TDH2IRYZ.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/package.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-dom.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-dom.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-dom_client.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-dom_client.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-router-dom.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react-router-dom.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react_jsx-dev-runtime.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react_jsx-dev-runtime.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react_jsx-runtime.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/node_modules/.vite/deps/react_jsx-runtime.js.map" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/softwareproject_frontend/src/components/ModuleModal.jsx" beforeDir="false" afterPath="$PROJECT_DIR$/softwareproject_frontend/src/components/ModuleModal.jsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,6 +15,10 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 6
@@ -49,12 +31,23 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/sanji/Desktop/Project of Mine all UG/softwareproject&quot;
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;E:/OBQA_project/softwareproject&quot;
   }
 }</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-2fc7cc6b9a17-intellij.indexing.shared.core-IU-253.30387.90" />
+      </set>
+    </attachedChunks>
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="de4a3f05-a1ee-4501-84c5-6e56ddfc1690" name="Changes" comment="" />

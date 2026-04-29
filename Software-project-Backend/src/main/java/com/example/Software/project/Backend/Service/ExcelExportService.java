@@ -10,6 +10,7 @@ import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,6 +34,7 @@ public class ExcelExportService {
      * @param threshold Pass threshold score (default 50)
      * @return byte array of Excel file
      */
+    @Transactional(readOnly = true)
     public byte[] generateMarksExcel(List<String> losIds, String markType, String batch, Integer threshold) throws IOException {
         if (threshold == null) {
             threshold = 50;

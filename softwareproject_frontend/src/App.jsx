@@ -13,6 +13,7 @@ import ComparisonPage from './pages/ComparisonPage'
 import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
+import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { setupAxiosInterceptors } from './services/axiosSetup'
 
@@ -85,6 +86,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ComparisonPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/marks-workbench/:moduleId"
+        element={
+          <ProtectedRoute>
+            <MarksWorkbenchPage />
           </ProtectedRoute>
         }
       />
