@@ -67,6 +67,7 @@ export default function MarksWorkbenchPage() {
   const [markType, setMarkType] = useState('FINAL_EXAM')
   const [threshold, setThreshold] = useState(50)
   const [uploadFile, setUploadFile] = useState(null)
+  const [poAttainment, setPOAttainment] = useState(null)
   const [dragActive, setDragActive] = useState(false)
   const batchInputId = 'marks-workbench-batch'
   const markTypeInputId = 'marks-workbench-mark-type'
@@ -257,6 +258,79 @@ export default function MarksWorkbenchPage() {
       const filename = parseFilename(response.headers?.['content-disposition'], fallbackName)
       downloadBlob(response.data, filename)
       setMessage({ type: 'success', text: 'Excel report exported successfully.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: await readBlobError(error) })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  const handleCalculatePOAttainment = async () => {
+    if (!validateWorkflow()) return
+
+    const parsedThreshold = Number(threshold)
+    if (!Number.isFinite(parsedThreshold) || parsedThreshold < 0 || parsedThreshold > 100) {
+      setMessage({ type: 'error', text: 'Threshold must be a number between 0 and 100.' })
+      return
+    }
+
+    try {
+      setBusyAction('po-attainment')
+      setMessage({ type: '', text: '' })
+      setPOAttainment(null)
+
+      const token = authService.getToken()
+      const response = await marksService.getPOAttainment(
+        {
+          losIds: selectedLos.map((lo) => lo.id),
+          markType,
+          batch,
+          threshold: parsedThreshold,
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      )
+
+      const data = response.data?.data || response.data
+      setPOAttainment(data)
+      setMessage({ type: 'success', text: 'PO attainment calculated successfully.' })
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to calculate PO attainment.',
+      })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  const handleExportPOAttainment = async () => {
+    if (!validateWorkflow()) return
+
+    const parsedThreshold = Number(threshold)
+    if (!Number.isFinite(parsedThreshold) || parsedThreshold < 0 || parsedThreshold > 100) {
+      setMessage({ type: 'error', text: 'Threshold must be a number between 0 and 100.' })
+      return
+    }
+
+    try {
+      setBusyAction('po-export')
+      setMessage({ type: '', text: '' })
+
+      const token = authService.getToken()
+      const response = await marksService.exportPOAttainment(
+        {
+          losIds: selectedLos.map((lo) => lo.id),
+          markType,
+          batch,
+          threshold: parsedThreshold,
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      )
+
+      const fallbackName = `po_attainment_${batch}_${markType.toLowerCase()}.xlsx`
+      const filename = parseFilename(response.headers?.['content-disposition'], fallbackName)
+      downloadBlob(response.data, filename)
+      setMessage({ type: 'success', text: 'PO attainment Excel exported successfully.' })
     } catch (error) {
       setMessage({ type: 'error', text: await readBlobError(error) })
     } finally {
@@ -570,6 +644,33 @@ export default function MarksWorkbenchPage() {
                     {busyAction === 'export' && <span className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />}
                     Export report (saved marks)
                   </button>
+
+                  <div className="border-t border-slate-100 pt-5 mt-3">
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-3 block">PO Attainment</span>
+                    <p className="text-sm text-slate-500 mb-4 leading-relaxed">
+                      Calculate per-student PO credits based on LO pass/fail and LO→PO mappings. If a student passes an LO, they receive 100% of the assigned PO weight.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={handleCalculatePOAttainment}
+                      disabled={busyAction === 'po-attainment' || !selectedLosCount}
+                      className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-lg transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 mb-3 ${busyAction === 'po-attainment' || !selectedLosCount ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200'}`}
+                    >
+                      {busyAction === 'po-attainment' && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                      Calculate PO Attainment
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleExportPOAttainment}
+                      disabled={busyAction === 'po-export' || !selectedLosCount}
+                      className={`w-full py-4 px-6 rounded-2xl border font-bold shadow-sm transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 ${busyAction === 'po-export' || !selectedLosCount ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-emerald-200 hover:text-emerald-700'}`}
+                    >
+                      {busyAction === 'po-export' && <span className="w-4 h-4 border-2 border-slate-300 border-t-emerald-600 rounded-full animate-spin" />}
+                      Export PO Attainment Excel
+                    </button>
+                  </div>
                 </div>
               </section>
 
@@ -625,6 +726,106 @@ export default function MarksWorkbenchPage() {
                 </div>
               </section>
             </div>
+
+            {/* PO Attainment Results Table - Full Width Below */}
+            {poAttainment && poAttainment.poList && poAttainment.poList.length > 0 && (
+              <section className="glass-card rounded-[2.5rem] p-8 border-slate-100 col-span-1 lg:col-span-2 mt-8">
+                <div className="space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2 block">Results</span>
+                      <h2 className="heading-lg">Per-Student PO Credit Attainment</h2>
+                      <p className="text-sm text-slate-500 mt-2">
+                        Threshold: <strong>{poAttainment.threshold}%</strong> &middot; Students: <strong>{poAttainment.studentCount}</strong> &middot; POs: <strong>{poAttainment.poList.length}</strong>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPOAttainment(null)}
+                      className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors"
+                    >
+                      Clear results
+                    </button>
+                  </div>
+
+                  {/* LO→PO Mapping Info */}
+                  {poAttainment.loPoMappings && poAttainment.loPoMappings.length > 0 && (
+                    <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Active LO → PO Mappings</div>
+                      <div className="flex flex-wrap gap-2">
+                        {poAttainment.loPoMappings.map((m, i) => (
+                          <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">
+                            {m.loId} → {m.poCode} <span className="text-[10px] text-indigo-400">(weight: {m.weight})</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Max Credits Row */}
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+                    <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Maximum Possible Credits</div>
+                    <div className="flex flex-wrap gap-3">
+                      {poAttainment.poList.map(po => (
+                        <span key={po} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">
+                          {po}: {poAttainment.maxCredits?.[po] || 0}
+                        </span>
+                      ))}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">
+                        Total: {poAttainment.totalMaxCredit}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Results Table */}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-800 text-white">
+                          <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">Student Index</th>
+                          {poAttainment.poList.map(po => (
+                            <th key={po} className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">{po}</th>
+                          ))}
+                          <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest bg-slate-900">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {poAttainment.students?.map((student, idx) => (
+                          <tr key={student.studentId} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-4 py-3 font-semibold text-slate-800 border-r border-slate-100">{student.studentId}</td>
+                            {poAttainment.poList.map(po => {
+                              const credit = student.poCredits?.[po] || 0
+                              const maxCredit = poAttainment.maxCredits?.[po] || 1
+                              return (
+                                <td
+                                  key={po}
+                                  className={`px-4 py-3 text-center font-bold border-r border-slate-100 ${credit > 0
+                                    ? credit >= maxCredit
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-emerald-50 text-emerald-600'
+                                    : 'text-slate-400'
+                                    }`}
+                                >
+                                  {credit}
+                                </td>
+                              )
+                            })}
+                            <td className={`px-4 py-3 text-center font-black border-l-2 border-slate-200 ${student.totalCredit > 0
+                              ? student.totalCredit >= poAttainment.totalMaxCredit
+                                ? 'bg-emerald-200 text-emerald-800'
+                                : 'bg-emerald-50 text-emerald-700'
+                              : 'text-slate-400'
+                              }`}>
+                              {student.totalCredit}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
       </main>

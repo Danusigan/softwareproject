@@ -39,6 +39,22 @@ export const marksService = {
       headers: config.headers || {},
     })
   },
+
+  async getPOAttainment({ losIds, markType, batch, threshold }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/po-attainment`,
+      { losIds, markType, batch, threshold },
+      config
+    )
+  },
+
+  async exportPOAttainment({ losIds, markType, batch, threshold }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/export/po-attainment`,
+      { losIds, markType, batch, threshold },
+      { ...config, responseType: 'blob' }
+    )
+  },
 }
 
 export default marksService

@@ -1,0 +1,185 @@
+package com.example.Software.project.Backend.Service;
+
+import com.example.Software.project.Backend.Model.*;
+import com.example.Software.project.Backend.Repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class POAttainmentService {
+
+    @Autowired
+    private StudentMarkRepository studentMarkRepository;
+
+    @Autowired
+    private OutcomeMappingRepository outcomeMappingRepository;
+
+    @Autowired
+    private LosRepository losRepository;
+
+    /**
+     * Calculate per-student PO credits based on LO pass/fail and LO-PO mappings.
+     *
+     * Logic: For each student, for each LO:
+     *   - If student's score >= threshold → student PASSED this LO
+     *   - For each approved LO→PO mapping of that LO, add 100% of the mapping weight to student's PO credit
+     *   - If student failed → add 0
+     *
+     * @param losIds    List of LO IDs to consider
+     * @param markType  FINAL_EXAM or ASSIGNMENT
+     * @param batch     Batch year
+     * @param threshold Pass threshold (0-100)
+     * @return Map with keys: "students", "poList", "credits", "maxCredits", "loPoMappings"
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String markType, String batch, int threshold) {
+        MarkType type = MarkType.valueOf(markType.toUpperCase());
+
+        // 1. Get all distinct students for these LOs, markType, and batch
+        List<Student> students = studentMarkRepository
+                .findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // 2. Get all marks for these LOs
+        List<StudentMark> allMarks = studentMarkRepository
+                .findByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // 3. Get ALL mappings for these LOs (even if pending)
+        List<OutcomeMapping> allMappings = new ArrayList<>();
+        List<Map<String, String>> loListInfo = new ArrayList<>();
+
+        for (String losId : losIds) {
+            List<OutcomeMapping> loMappings = outcomeMappingRepository
+                    .findByLearningOutcome_Id(losId);
+            allMappings.addAll(loMappings);
+            
+            Los los = losRepository.findById(losId).orElse(null);
+            Map<String, String> info = new LinkedHashMap<>();
+            info.put("id", losId);
+            info.put("name", los != null ? los.getName() : losId);
+            loListInfo.add(info);
+        }
+
+        // 4. Build a lookup: LO ID -> List of (PO code, weight)
+        Map<String, List<OutcomeMapping>> mappingsByLo = allMappings.stream()
+                .collect(Collectors.groupingBy(m -> m.getLearningOutcome().getId()));
+
+        // 5. Collect all unique PO codes (sorted)
+        Set<String> poCodeSet = new TreeSet<>();
+        for (OutcomeMapping m : allMappings) {
+            poCodeSet.add(m.getProgramOutcome().getCode());
+        }
+        List<String> poList = new ArrayList<>(poCodeSet);
+
+        // 6. Build marks lookup: studentId -> loId -> score
+        Map<String, Map<String, Double>> marksByStudentAndLo = new HashMap<>();
+        for (StudentMark mark : allMarks) {
+            String studentId = mark.getStudent().getStudentId();
+            String losId = mark.getLos().getId();
+            marksByStudentAndLo
+                    .computeIfAbsent(studentId, k -> new HashMap<>())
+                    .put(losId, mark.getScore());
+        }
+
+        // 7. Calculate max possible credit per PO (sum of all LO weights mapped to that PO)
+        Map<String, Integer> maxCredits = new LinkedHashMap<>();
+        for (String poCode : poList) {
+            int totalWeight = 0;
+            for (OutcomeMapping m : allMappings) {
+                if (m.getProgramOutcome().getCode().equals(poCode)) {
+                    totalWeight += m.getWeight();
+                }
+            }
+            maxCredits.put(poCode, totalWeight);
+        }
+
+        // 8. Calculate per-student PO credits
+        // credits: { studentId: { poCode: creditValue } }
+        Map<String, Map<String, Integer>> credits = new LinkedHashMap<>();
+        // Also track per-student LO pass/fail detail
+        List<Map<String, Object>> studentDetails = new ArrayList<>();
+
+        for (Student student : students) {
+            String studentId = student.getStudentId();
+            Map<String, Integer> studentCredits = new LinkedHashMap<>();
+
+            // Initialize all POs to 0
+            for (String poCode : poList) {
+                studentCredits.put(poCode, 0);
+            }
+
+            Map<String, Double> studentMarks = marksByStudentAndLo.getOrDefault(studentId, new HashMap<>());
+            Map<String, String> loScoresMap = new LinkedHashMap<>();
+
+            for (String losId : losIds) {
+                Double score = studentMarks.get(losId);
+                boolean passed = score != null && score >= threshold;
+                
+                if (score != null) {
+                    loScoresMap.put(losId, (passed ? "Pass" : "Fail") + " (" + String.format("%.2f", score) + ")");
+                } else {
+                    loScoresMap.put(losId, "N/A");
+                }
+
+                if (passed) {
+                    // Add 100% of each mapping weight for this LO to the corresponding PO
+                    List<OutcomeMapping> loMappings = mappingsByLo.getOrDefault(losId, Collections.emptyList());
+                    for (OutcomeMapping mapping : loMappings) {
+                        String poCode = mapping.getProgramOutcome().getCode();
+                        studentCredits.merge(poCode, mapping.getWeight(), Integer::sum);
+                    }
+                }
+            }
+
+            credits.put(studentId, studentCredits);
+
+            // Build student detail object
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("studentId", studentId);
+            detail.put("studentName", student.getStudentName());
+            detail.put("poCredits", studentCredits);
+            detail.put("loScores", loScoresMap);
+
+            // Calculate total credit for this student
+            int totalCredit = studentCredits.values().stream().mapToInt(Integer::intValue).sum();
+            detail.put("totalCredit", totalCredit);
+
+            studentDetails.add(detail);
+        }
+
+        // 9. Calculate total max credit
+        int totalMaxCredit = maxCredits.values().stream().mapToInt(Integer::intValue).sum();
+
+        // 10. Build LO-PO mapping info for frontend display
+        List<Map<String, Object>> loPoMappingInfo = new ArrayList<>();
+        for (String losId : losIds) {
+            Los los = losRepository.findById(losId).orElse(null);
+            List<OutcomeMapping> loMappings = mappingsByLo.getOrDefault(losId, Collections.emptyList());
+            for (OutcomeMapping m : loMappings) {
+                Map<String, Object> info = new LinkedHashMap<>();
+                info.put("loId", losId);
+                info.put("loName", los != null ? los.getName() : losId);
+                info.put("poCode", m.getProgramOutcome().getCode());
+                info.put("poTitle", m.getProgramOutcome().getTitle());
+                info.put("weight", m.getWeight());
+                loPoMappingInfo.add(info);
+            }
+        }
+
+        // 11. Build result
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("poList", poList);
+        result.put("loList", loListInfo);
+        result.put("maxCredits", maxCredits);
+        result.put("totalMaxCredit", totalMaxCredit);
+        result.put("threshold", threshold);
+        result.put("studentCount", students.size());
+        result.put("students", studentDetails);
+        result.put("loPoMappings", loPoMappingInfo);
+
+        return result;
+    }
+}

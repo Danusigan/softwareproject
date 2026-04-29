@@ -311,6 +311,147 @@ public class ExcelExportService {
     }
 
     /**
+     * Generate Excel file with per-student PO attainment credits
+     * @param attainmentData Data from POAttainmentService.calculateStudentPOCredits()
+     * @return byte array of Excel file
+     */
+    @SuppressWarnings("unchecked")
+    public byte[] generatePOAttainmentExcel(Map<String, Object> attainmentData) throws IOException {
+        List<String> poList = (List<String>) attainmentData.get("poList");
+        List<Map<String, String>> loList = (List<Map<String, String>>) attainmentData.get("loList");
+        if (loList == null) loList = new ArrayList<>();
+        
+        Map<String, Integer> maxCredits = (Map<String, Integer>) attainmentData.get("maxCredits");
+        int totalMaxCredit = (int) attainmentData.get("totalMaxCredit");
+        int threshold = (int) attainmentData.get("threshold");
+        List<Map<String, Object>> students = (List<Map<String, Object>>) attainmentData.get("students");
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("PO Attainment");
+
+            // Styles
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle passStyle = createPassStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+            CellStyle failStyle = createFailStyle(workbook);
+
+            // Title row with threshold info
+            Row titleRow = sheet.createRow(0);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("PO Attainment & LO Scores Report (Threshold: " + threshold + "%)");
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            CellStyle titleStyle = workbook.createCellStyle();
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+
+            // Max credits row
+            Row maxRow = sheet.createRow(1);
+            Cell maxLabel = maxRow.createCell(0);
+            maxLabel.setCellValue("Max Credit");
+            maxLabel.setCellStyle(headerStyle);
+            
+            int colIdx = 1;
+            // Empty cells for LO columns in max credit row
+            for (int i = 0; i < loList.size(); i++) {
+                Cell cell = maxRow.createCell(colIdx);
+                cell.setCellValue("");
+                cell.setCellStyle(headerStyle);
+                colIdx++;
+            }
+            
+            // PO max credits
+            for (String poCode : poList) {
+                Cell cell = maxRow.createCell(colIdx);
+                cell.setCellValue(maxCredits.getOrDefault(poCode, 0));
+                cell.setCellStyle(headerStyle);
+                colIdx++;
+            }
+            Cell maxTotalCell = maxRow.createCell(colIdx);
+            maxTotalCell.setCellValue(totalMaxCredit);
+            maxTotalCell.setCellStyle(headerStyle);
+
+            // Header row
+            Row headerRow = sheet.createRow(2);
+            Cell indexHeader = headerRow.createCell(0);
+            indexHeader.setCellValue("Student Index");
+            indexHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            colIdx = 1;
+            // LO Headers
+            for (Map<String, String> lo : loList) {
+                Cell loHeader = headerRow.createCell(colIdx);
+                loHeader.setCellValue(lo.get("name"));
+                loHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIdx, 4000);
+                colIdx++;
+            }
+            
+            // PO Headers
+            for (String poCode : poList) {
+                Cell poHeader = headerRow.createCell(colIdx);
+                poHeader.setCellValue(poCode);
+                poHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIdx, 3500);
+                colIdx++;
+            }
+            Cell totalHeader = headerRow.createCell(colIdx);
+            totalHeader.setCellValue("Total Credit");
+            totalHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(colIdx, 4000);
+
+            // Data rows
+            int rowIndex = 3;
+            for (Map<String, Object> student : students) {
+                Row dataRow = sheet.createRow(rowIndex);
+
+                Cell studentIdCell = dataRow.createCell(0);
+                studentIdCell.setCellValue((String) student.get("studentId"));
+                studentIdCell.setCellStyle(dataStyle);
+
+                int col = 1;
+                
+                // LO Scores
+                Map<String, String> loScoresMap = (Map<String, String>) student.get("loScores");
+                for (Map<String, String> lo : loList) {
+                    Cell cell = dataRow.createCell(col);
+                    String scoreLabel = loScoresMap.getOrDefault(lo.get("id"), "N/A");
+                    cell.setCellValue(scoreLabel);
+                    
+                    if (scoreLabel.startsWith("Pass")) cell.setCellStyle(passStyle);
+                    else if (scoreLabel.startsWith("Fail")) cell.setCellStyle(failStyle);
+                    else cell.setCellStyle(dataStyle);
+                    
+                    col++;
+                }
+                
+                // PO Credits
+                Map<String, Integer> poCredits = (Map<String, Integer>) student.get("poCredits");
+                for (String poCode : poList) {
+                    Cell cell = dataRow.createCell(col);
+                    int credit = poCredits.getOrDefault(poCode, 0);
+                    cell.setCellValue(credit);
+                    cell.setCellStyle(credit > 0 ? passStyle : dataStyle);
+                    col++;
+                }
+
+                Cell totalCell = dataRow.createCell(col);
+                totalCell.setCellValue((int) student.get("totalCredit"));
+                int totalCredit = (int) student.get("totalCredit");
+                totalCell.setCellStyle(totalCredit > 0 ? passStyle : dataStyle);
+
+                rowIndex++;
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
      * Create input cell style for template (light gray background for user input area)
      */
     private CellStyle createInputStyle(Workbook workbook) {

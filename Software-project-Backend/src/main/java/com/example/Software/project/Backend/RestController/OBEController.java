@@ -25,6 +25,7 @@ public class OBEController {
     @Autowired private ExcelImportService excelService;
     @Autowired private ExcelExportService excelExportService;
     @Autowired private AttainmentService attainmentService;
+    @Autowired private POAttainmentService poAttainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
 
@@ -397,6 +398,142 @@ public class OBEController {
                     "error", e.getMessage(),
                     "status", "ERROR"
                 ));
+        }
+    }
+
+    // --- PO ATTAINMENT: Calculate per-student PO credits based on LO pass/fail ---
+    @PostMapping("/po-attainment")
+    public ResponseEntity<?> getStudentPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view PO attainment", "status", "ERROR"));
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> losIds = (List<String>) request.get("losIds");
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+
+            int threshold = 50;
+            Object thresholdObj = request.get("threshold");
+            if (thresholdObj != null) {
+                String thresholdRaw = thresholdObj.toString().trim();
+                if (!thresholdRaw.isEmpty()) {
+                    threshold = Integer.parseInt(thresholdRaw);
+                }
+            }
+
+            if (threshold < 0 || threshold > 100) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: threshold must be between 0 and 100", "status", "ERROR"));
+            }
+
+            if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            losIds = losIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .toList();
+
+            if (markType == null || markType.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: markType is required", "status", "ERROR"));
+            }
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            // Validate mark type
+            try {
+                MarkType.valueOf(markType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
+            }
+
+            Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+            return ResponseEntity.ok(Map.of("message", "PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
+
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to calculate PO attainment: " + errorDetail, "status", "ERROR"));
+        }
+    }
+
+    // --- EXPORT: Generate Excel with per-student PO attainment credits ---
+    @PostMapping("/export/po-attainment")
+    public ResponseEntity<?> exportPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can export PO attainment", "status", "ERROR"));
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> losIds = (List<String>) request.get("losIds");
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+
+            int threshold = 50;
+            Object thresholdObj = request.get("threshold");
+            if (thresholdObj != null) {
+                String thresholdRaw = thresholdObj.toString().trim();
+                if (!thresholdRaw.isEmpty()) {
+                    threshold = Integer.parseInt(thresholdRaw);
+                }
+            }
+
+            if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            losIds = losIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .toList();
+
+            if (markType == null || markType.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: markType is required", "status", "ERROR"));
+            }
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            try {
+                MarkType.valueOf(markType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
+            }
+
+            // Calculate PO credits
+            Map<String, Object> attainmentData = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+            // Generate Excel
+            byte[] excelBytes = excelExportService.generatePOAttainmentExcel(attainmentData);
+
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"po_attainment_" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .body(excelBytes);
+
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to export PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
 
