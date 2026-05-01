@@ -16,11 +16,6 @@ public class ProgramOutcome {
     @Column(name = "po_code", unique = true, nullable = false)
     private String code; // e.g., "PO1", "PO2" - unique code for reference
 
-    // Legacy schema compatibility: some DBs still require a non-null `code` column.
-    @JsonIgnore
-    @Column(name = "code", nullable = false)
-    private String legacyCode;
-
     @Column(name = "title", nullable = false)
     private String title; // Short title (e.g., "Engineering Knowledge")
 
@@ -79,7 +74,6 @@ public class ProgramOutcome {
     protected void onCreate() {
         this.poId = this.poId == null ? null : this.poId.trim().toUpperCase();
         this.code = (this.code == null || this.code.trim().isEmpty()) ? this.poId : this.code.trim().toUpperCase();
-        this.legacyCode = this.code;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         if (this.isDefault == null) this.isDefault = false;
@@ -90,7 +84,6 @@ public class ProgramOutcome {
     protected void onUpdate() {
         this.poId = this.poId == null ? null : this.poId.trim().toUpperCase();
         this.code = (this.code == null || this.code.trim().isEmpty()) ? this.poId : this.code.trim().toUpperCase();
-        this.legacyCode = this.code;
         this.updatedAt = LocalDateTime.now();
     }
 

@@ -21,6 +21,15 @@ public class POAttainmentService {
     @Autowired
     private LosRepository losRepository;
 
+    @Autowired
+    private StudentAssessmentScoreRepository studentAssessmentScoreRepository;
+
+    @Autowired
+    private AssessmentItemRepository assessmentItemRepository;
+
+    @Autowired
+    private StudentRepository studentRepository;
+
     /**
      * Calculate per-student PO credits based on LO pass/fail and LO-PO mappings.
      *
@@ -55,7 +64,7 @@ public class POAttainmentService {
             List<OutcomeMapping> loMappings = outcomeMappingRepository
                     .findByLearningOutcome_Id(losId);
             allMappings.addAll(loMappings);
-            
+
             Los los = losRepository.findById(losId).orElse(null);
             Map<String, String> info = new LinkedHashMap<>();
             info.put("id", losId);
@@ -116,10 +125,28 @@ public class POAttainmentService {
 
             for (String losId : losIds) {
                 Double score = studentMarks.get(losId);
-                boolean passed = score != null && score >= threshold;
-                
+
+                // Compute LO percentage: if assessment items exist with max marks, use (score / totalMaxMarks) * 100
+                // Otherwise, assume score is already a percentage (legacy behavior)
+                double loPercentage = 0.0;
+                boolean hasAssessmentItems = false;
+
                 if (score != null) {
-                    loScoresMap.put(losId, (passed ? "Pass" : "Fail") + " (" + String.format("%.2f", score) + ")");
+                    double totalMaxMarks = getTotalMaxMarksForLO(losId, batch, markType);
+                    if (totalMaxMarks > 0) {
+                        // Normalize: score is aggregated from question-wise imports
+                        loPercentage = (score / totalMaxMarks) * 100.0;
+                        hasAssessmentItems = true;
+                    } else {
+                        // Legacy: assume score is already a percentage (0-100)
+                        loPercentage = score;
+                    }
+                }
+
+                boolean passed = score != null && loPercentage >= threshold;
+
+                if (score != null) {
+                    loScoresMap.put(losId, (passed ? "Pass" : "Fail") + " (" + String.format("%.2f", score) + (hasAssessmentItems ? "%, " : ", ") + String.format("%.1f", loPercentage) + ")");
                 } else {
                     loScoresMap.put(losId, "N/A");
                 }
@@ -181,5 +208,137 @@ public class POAttainmentService {
         result.put("loPoMappings", loPoMappingInfo);
 
         return result;
+    }
+
+    /**
+     * Helper: Get total max marks for an LO across all assessment items in a batch/markType.
+     * @param loId Learning Outcome ID
+     * @param batch Batch identifier
+     * @param markType Mark type (FINAL_EXAM or ASSIGNMENT)
+     * @return Total max marks, or 0 if no items found
+     */
+    private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
+        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType);
+        return items.stream().mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0).sum();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> calculateOverallPOAttainment(String batch, String markType, Double poThreshold) {
+        if (poThreshold == null) poThreshold = 60.0; // Default PO attainment benchmark
+
+        // 1. Find all approved LO->PO mappings
+        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        if (approvedMappings.isEmpty()) {
+            return Map.of("message", "No approved LO-PO mappings found.", "poAttainment", Collections.emptyList());
+        }
+
+        // 2. Group mappings by PO
+        Map<ProgramOutcome, List<OutcomeMapping>> mappingsByPo = approvedMappings.stream()
+            .collect(Collectors.groupingBy(OutcomeMapping::getProgramOutcome));
+
+        // 3. Get all relevant students
+        List<Student> students = studentRepository.findByBatch(batch);
+        if (students.isEmpty()) {
+            return Map.of("message", "No students found for batch: " + batch, "poAttainment", Collections.emptyList());
+        }
+        long totalStudents = students.size();
+
+        List<Map<String, Object>> poResults = new ArrayList<>();
+
+        // 4. For each PO, calculate its attainment
+        for (Map.Entry<ProgramOutcome, List<OutcomeMapping>> entry : mappingsByPo.entrySet()) {
+            ProgramOutcome po = entry.getKey();
+            List<OutcomeMapping> loMappingsForPo = entry.getValue();
+            Set<String> loIdsForPo = loMappingsForPo.stream().map(m -> m.getLearningOutcome().getId()).collect(Collectors.toSet());
+
+            long studentsAchievingPo = 0;
+
+            // 5. For each student, check if they achieved this PO
+            for (Student student : students) {
+                boolean studentAchievedPo = checkStudentPoAchievement(student, loIdsForPo, batch, markType);
+                if (studentAchievedPo) {
+                    studentsAchievingPo++;
+                }
+            }
+
+            // 6. Calculate PO attainment percentage
+            double attainmentPercent = (totalStudents > 0) ? ((double) studentsAchievingPo / totalStudents) * 100.0 : 0.0;
+
+            Map<String, Object> poResult = new LinkedHashMap<>();
+            poResult.put("poId", po.getId());
+            poResult.put("poCode", po.getCode());
+            poResult.put("poDescription", po.getDescription());
+            poResult.put("totalStudents", totalStudents);
+            poResult.put("studentsAchieved", studentsAchievingPo);
+            poResult.put("attainmentPercent", attainmentPercent);
+            poResult.put("benchmark", poThreshold);
+            poResult.put("metBenchmark", attainmentPercent >= poThreshold);
+            poResult.put("formula", "(studentsAchieved / totalStudents) * 100");
+            poResults.add(poResult);
+        }
+
+        // Sort results by PO code
+        poResults.sort(Comparator.comparing(m -> (String) m.get("poCode")));
+
+        Map<String, Object> finalResult = new LinkedHashMap<>();
+        finalResult.put("batch", batch);
+        finalResult.put("markType", markType);
+        finalResult.put("poAttainment", poResults);
+        finalResult.put("count", poResults.size());
+
+        return finalResult;
+    }
+
+    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch, String markType) {
+        return checkStudentPoAchievement(student, loIdsForPo, batch, markType, 50.0);
+    }
+
+    /**
+     * Check if a student achieves a PO (passes all LOs mapped to it).
+     * Uses normalized percentage thresholds: if assessment items exist, compute (score / maxMarks) * 100;
+     * otherwise assume StudentMark.score is already a percentage.
+     * @param student Student entity
+     * @param loIdsForPo Set of LO IDs mapped to the PO
+     * @param batch Batch identifier
+     * @param markType Mark type
+     * @param loThreshold LO pass threshold (percentage, 0-100)
+     * @return true if student passed all LOs, false otherwise
+     */
+    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch, String markType, double loThreshold) {
+        // A student achieves a PO if they pass ALL LOs mapped to it.
+        for (String loId : loIdsForPo) {
+            // Check question-based scores first
+            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType);
+            if (!items.isEmpty()) {
+                double totalScore = 0;
+                double totalMaxMarks = 0;
+                for (AssessmentItem item : items) {
+                    Optional<StudentAssessmentScore> scoreOpt = studentAssessmentScoreRepository.findByStudentAndAssessmentItem(student, item);
+                    if (scoreOpt.isPresent()) {
+                        totalScore += scoreOpt.get().getScore();
+                    }
+                    totalMaxMarks += item.getMaxMarks();
+                }
+                // Normalize: compute percentage and compare to threshold
+                if (totalMaxMarks > 0) {
+                    double loPercentage = (totalScore / totalMaxMarks) * 100.0;
+                    if (loPercentage < loThreshold) {
+                        return false; // Failed this LO, so cannot achieve the PO
+                    }
+                } else {
+                    // No max marks found; assume score is percentage and compare directly
+                    if (totalScore < loThreshold) {
+                        return false;
+                    }
+                }
+            } else {
+                // Fallback to legacy StudentMark (assume score is already percentage)
+                Optional<StudentMark> markOpt = studentMarkRepository.findByStudentAndLos_IdAndBatchAndMarkType(student, loId, batch, MarkType.valueOf(markType));
+                if (markOpt.isEmpty() || markOpt.get().getScore() < loThreshold) {
+                    return false; // Failed this LO
+                }
+            }
+        }
+        return true; // Passed all required LOs for this PO
     }
 }

@@ -45,4 +45,7 @@ public interface StudentRepository extends JpaRepository<Student, String> {
     // Find students by part of student ID (useful for batch operations)
     @Query("SELECT s FROM Student s WHERE s.studentId LIKE :pattern")
     List<Student> findByStudentIdPattern(@Param("pattern") String pattern);
+
+    @Query("SELECT s FROM Student s WHERE s.batch = :batch")
+    List<Student> findByBatch(@Param("batch") String batch);
 }

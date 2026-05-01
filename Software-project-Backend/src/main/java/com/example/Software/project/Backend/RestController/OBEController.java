@@ -10,9 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/obe")
@@ -174,6 +172,40 @@ public class OBEController {
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // --- LECTURE: Upload question-wise marks using a template ---
+    @PostMapping("/marks/upload-question-wise")
+    public ResponseEntity<?> uploadQuestionWiseMarks(
+            @RequestParam("excelFile") MultipartFile file,
+            @RequestParam("templateId") String templateId,
+            @RequestParam("batch") String batch,
+            @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can upload marks", "status", "ERROR"));
+        }
+
+        try {
+            String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
+            return ResponseEntity.ok(Map.of(
+                "message", result,
+                "status", "SUCCESS",
+                "data", Map.of(
+                    "templateId", templateId,
+                    "batch", batch,
+                    "markType", markType
+                )
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to import question-wise marks: " + e.getMessage(),
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
         }
     }
 
@@ -534,6 +566,245 @@ public class OBEController {
             String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Failed to export PO attainment: " + errorDetail, "status", "ERROR"));
+        }
+    }
+
+    // --- TEMPLATE: Generate question-wise Excel template for mark entry ---
+    @PostMapping("/template/marks-question-wise")
+    public ResponseEntity<?> generateQuestionMarkTemplate(@RequestParam(value = "templateId", required = false) String templateId,
+                                                          @RequestBody(required = false) Map<String, Object> request,
+                                                          @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can generate templates", "status", "ERROR"));
+        }
+
+        try {
+            Integer numberOfQuestions = null;
+            List<Map<String, Object>> questionMappings = new ArrayList<>();
+
+            if (request != null) {
+                Object countObj = request.get("numberOfQuestions");
+                if (countObj != null) {
+                    try {
+                        numberOfQuestions = Integer.parseInt(countObj.toString().trim());
+                    } catch (NumberFormatException ex) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "numberOfQuestions must be a positive integer", "status", "ERROR"));
+                    }
+                    if (numberOfQuestions <= 0) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "numberOfQuestions must be greater than 0", "status", "ERROR"));
+                    }
+                }
+
+                Object mappingsObj = request.get("questionMappings");
+                if (mappingsObj instanceof List<?> mappingsList) {
+                    for (Object item : mappingsList) {
+                        if (item instanceof Map<?, ?> mapItem) {
+                            Map<String, Object> normalized = new HashMap<>();
+                            for (Map.Entry<?, ?> e : mapItem.entrySet()) {
+                                if (e.getKey() != null) {
+                                    normalized.put(e.getKey().toString(), e.getValue());
+                                }
+                            }
+                            questionMappings.add(normalized);
+                        }
+                    }
+                }
+            }
+
+            byte[] templateBytes = excelExportService.generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings);
+
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"question_mark_template.xlsx\"")
+                .body(templateBytes);
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to generate question-wise template",
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
+        }
+    }
+
+    // --- REPORT: LO attainment with configurable thresholds (per-LO or per-item) ---
+    @PostMapping("/attainment/lo")
+    public ResponseEntity<?> getLoAttainment(@RequestBody Map<String, Object> request,
+                                             @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view LO attainment", "status", "ERROR"));
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> loIds = (List<String>) request.get("loIds");
+            String templateId = request.get("templateId") != null ? request.get("templateId").toString().trim() : null;
+            Double defaultThreshold = request.get("defaultThreshold") != null
+                ? Double.parseDouble(request.get("defaultThreshold").toString())
+                : 50.0;
+
+            if (defaultThreshold < 0 || defaultThreshold > 100) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "defaultThreshold must be between 0 and 100", "status", "ERROR"));
+            }
+
+            if ((loIds == null || loIds.isEmpty()) && (templateId == null || templateId.isEmpty())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Provide either loIds or templateId", "status", "ERROR"));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> loThresholdRaw = (Map<String, Object>) request.get("loThresholds");
+            Map<String, Double> loThresholds = new HashMap<>();
+            if (loThresholdRaw != null) {
+                for (Map.Entry<String, Object> e : loThresholdRaw.entrySet()) {
+                    if (e.getValue() == null) continue;
+                    Double value = Double.parseDouble(e.getValue().toString());
+                    if (value < 0 || value > 100) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "Each loThreshold must be between 0 and 100", "status", "ERROR"));
+                    }
+                    loThresholds.put(e.getKey(), value);
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> itemThresholdRaw = (Map<String, Object>) request.get("itemThresholds");
+            Map<Long, Double> itemThresholds = new HashMap<>();
+            if (itemThresholdRaw != null) {
+                for (Map.Entry<String, Object> e : itemThresholdRaw.entrySet()) {
+                    if (e.getValue() == null) continue;
+                    Long itemId = Long.parseLong(e.getKey());
+                    Double value = Double.parseDouble(e.getValue().toString());
+                    if (value < 0 || value > 100) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "Each itemThreshold must be between 0 and 100", "status", "ERROR"));
+                    }
+                    itemThresholds.put(itemId, value);
+                }
+            }
+
+            Map<String, Object> result = attainmentService.getLoAttainmentMetrics(loIds, templateId, defaultThreshold, loThresholds, itemThresholds);
+            return ResponseEntity.ok(Map.of("message", "LO attainment calculated", "data", result, "status", "SUCCESS"));
+
+        } catch (NumberFormatException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Invalid numeric input in thresholds", "status", "ERROR"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to calculate LO attainment: " + e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- EXPORT: Generate marks report with per-LO thresholds ---
+    @PostMapping("/export/marks-per-lo-threshold")
+    public ResponseEntity<?> exportMarksWithPerLoThreshold(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can export marks", "status", "ERROR"));
+        }
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<String> losIds = (List<String>) request.get("losIds");
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> loThresholds = (Map<String, Integer>) request.get("loThresholds");
+
+            if (losIds == null || losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            losIds = losIds.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(id -> !id.isEmpty())
+                .toList();
+
+            if (losIds.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: losIds list cannot be empty", "status", "ERROR"));
+            }
+
+            if (markType == null || markType.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: markType is required (FINAL_EXAM or ASSIGNMENT)", "status", "ERROR"));
+            }
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            // Validate mark type
+            try {
+                MarkType.valueOf(markType.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
+            }
+
+            // Validate loThresholds if provided
+            if (loThresholds != null) {
+                for (Integer threshold : loThresholds.values()) {
+                    if (threshold < 0 || threshold > 100) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "Error: each threshold must be between 0 and 100", "status", "ERROR"));
+                    }
+                }
+            }
+
+            // Generate Excel with per-LO thresholds
+            byte[] excelBytes = excelExportService.generateMarksExcelWithPerLoThreshold(losIds, markType, batch, loThresholds);
+
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"marks_report_per_lo_" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .body(excelBytes);
+
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to generate marks report: " + errorDetail,
+                    "error", errorDetail,
+                    "status", "ERROR"
+                ));
+        }
+    }
+
+    // --- REPORT: Overall PO Attainment with Benchmark ---
+    @PostMapping("/po-attainment/overall")
+    public ResponseEntity<?> getOverallPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view PO attainment", "status", "ERROR"));
+        }
+
+        try {
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : "FINAL_EXAM";
+            Double poThreshold = request.get("poThreshold") != null ? Double.parseDouble(request.get("poThreshold").toString()) : null;
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            Map<String, Object> result = poAttainmentService.calculateOverallPOAttainment(batch, markType, poThreshold);
+            return ResponseEntity.ok(Map.of("message", "Overall PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
+
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to calculate overall PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
 
