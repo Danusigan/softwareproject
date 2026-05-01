@@ -128,10 +128,20 @@ public class ExcelExportService {
 
                     if (mark != null && mark.getScore() != null) {
                         double score = mark.getScore();
-                        String passFailStatus = score >= threshold ? "Pass" : "Fail";
+
+                        // Normalize score to percentage before comparing to threshold
+                        double totalMaxMarks = getTotalMaxMarksForLO(losId, batch, markType);
+                        double scorePercentage;
+                        if (totalMaxMarks > 0) {
+                            scorePercentage = (score / totalMaxMarks) * 100.0;
+                        } else {
+                            scorePercentage = score; // Legacy: assume score is percentage
+                        }
+
+                        String passFailStatus = scorePercentage >= threshold ? "Pass" : "Fail";
 
                         markCell.setCellValue(passFailStatus + " (" + String.format("%.2f", score) + ")");
-                        markCell.setCellStyle(score >= threshold ? passStyle : failStyle);
+                        markCell.setCellStyle(scorePercentage >= threshold ? passStyle : failStyle);
                     } else {
                         markCell.setCellValue("N/A");
                         markCell.setCellStyle(dataStyle);
@@ -330,7 +340,7 @@ public class ExcelExportService {
         List<String> poList = (List<String>) attainmentData.get("poList");
         List<Map<String, String>> loList = (List<Map<String, String>>) attainmentData.get("loList");
         if (loList == null) loList = new ArrayList<>();
-        
+
         Map<String, Integer> maxCredits = (Map<String, Integer>) attainmentData.get("maxCredits");
         int totalMaxCredit = (int) attainmentData.get("totalMaxCredit");
         int threshold = (int) attainmentData.get("threshold");
@@ -361,7 +371,7 @@ public class ExcelExportService {
             Cell maxLabel = maxRow.createCell(0);
             maxLabel.setCellValue("Max Credit");
             maxLabel.setCellStyle(headerStyle);
-            
+
             int colIdx = 1;
             // Empty cells for LO columns in max credit row
             for (int i = 0; i < loList.size(); i++) {
@@ -370,7 +380,7 @@ public class ExcelExportService {
                 cell.setCellStyle(headerStyle);
                 colIdx++;
             }
-            
+
             // PO max credits
             for (String poCode : poList) {
                 Cell cell = maxRow.createCell(colIdx);
@@ -398,7 +408,7 @@ public class ExcelExportService {
                 sheet.setColumnWidth(colIdx, 4000);
                 colIdx++;
             }
-            
+
             // PO Headers
             for (String poCode : poList) {
                 Cell poHeader = headerRow.createCell(colIdx);
@@ -422,21 +432,21 @@ public class ExcelExportService {
                 studentIdCell.setCellStyle(dataStyle);
 
                 int col = 1;
-                
+
                 // LO Scores
                 Map<String, String> loScoresMap = (Map<String, String>) student.get("loScores");
                 for (Map<String, String> lo : loList) {
                     Cell cell = dataRow.createCell(col);
                     String scoreLabel = loScoresMap.getOrDefault(lo.get("id"), "N/A");
                     cell.setCellValue(scoreLabel);
-                    
+
                     if (scoreLabel.startsWith("Pass")) cell.setCellStyle(passStyle);
                     else if (scoreLabel.startsWith("Fail")) cell.setCellStyle(failStyle);
                     else cell.setCellStyle(dataStyle);
-                    
+
                     col++;
                 }
-                
+
                 // PO Credits
                 Map<String, Integer> poCredits = (Map<String, Integer>) student.get("poCredits");
                 for (String poCode : poList) {
@@ -688,7 +698,7 @@ public class ExcelExportService {
      * @param loThresholds Map of loId -> threshold (overrides default)
      * @return byte array of Excel file
      */
-    public byte[] generateMarksExcelWithPerLoThreshold(List<String> losIds, String markType, String batch, 
+    public byte[] generateMarksExcelWithPerLoThreshold(List<String> losIds, String markType, String batch,
                                                        Map<String, Integer> loThresholds) throws IOException {
         if (loThresholds == null) {
             loThresholds = new HashMap<>();
@@ -746,7 +756,7 @@ public class ExcelExportService {
             Cell threshLabel = thresholdRow.createCell(0);
             threshLabel.setCellValue("LO Thresholds:");
             threshLabel.setCellStyle(headerStyle);
-            
+
             int threshCol = 1;
             for (String losId : losIds) {
                 int threshold = loThresholds.getOrDefault(losId, DEFAULT_THRESHOLD);
@@ -794,10 +804,20 @@ public class ExcelExportService {
 
                     if (mark != null && mark.getScore() != null) {
                         double score = mark.getScore();
-                        String passFailStatus = score >= threshold ? "Pass" : "Fail";
+
+                        // Normalize score to percentage before comparing to threshold
+                        double totalMaxMarks = getTotalMaxMarksForLO(losId, batch, markType);
+                        double scorePercentage;
+                        if (totalMaxMarks > 0) {
+                            scorePercentage = (score / totalMaxMarks) * 100.0;
+                        } else {
+                            scorePercentage = score; // Legacy: assume score is percentage
+                        }
+
+                        String passFailStatus = scorePercentage >= threshold ? "Pass" : "Fail";
 
                         markCell.setCellValue(passFailStatus + " (" + String.format("%.2f", score) + ")");
-                        markCell.setCellStyle(score >= threshold ? passStyle : failStyle);
+                        markCell.setCellStyle(scorePercentage >= threshold ? passStyle : failStyle);
                     } else {
                         markCell.setCellValue("N/A");
                         markCell.setCellStyle(dataStyle);
@@ -813,5 +833,21 @@ public class ExcelExportService {
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    /**
+     * Helper method to get total max marks for an LO
+     * Sums up all maxMarks from assessment items for a given LO
+     * @param loId LO ID
+     * @param batch Batch year/identifier
+     * @param markType Type of marks (FINAL_EXAM or ASSIGNMENT)
+     * @return Total max marks, or 0 if no assessment items found
+     */
+    private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
+        List<AssessmentItem> items = assessmentItemRepository
+            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase());
+        return items.stream()
+            .mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0)
+            .sum();
     }
 }

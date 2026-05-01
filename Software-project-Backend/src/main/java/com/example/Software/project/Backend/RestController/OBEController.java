@@ -1,4 +1,4 @@
-package com.example.Software.project.BackendRestController;
+package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Repository.*;
