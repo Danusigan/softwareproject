@@ -66,6 +66,8 @@ export default function MarksWorkbenchPage() {
   const [batch, setBatch] = useState(getDefaultBatch())
   const [markType, setMarkType] = useState('FINAL_EXAM')
   const [threshold, setThreshold] = useState(50)
+  const [numberOfQuestions, setNumberOfQuestions] = useState(5)
+  const [questionMappings, setQuestionMappings] = useState([])
   const [uploadFile, setUploadFile] = useState(null)
   const [poAttainment, setPOAttainment] = useState(null)
   const [dragActive, setDragActive] = useState(false)
@@ -77,6 +79,9 @@ export default function MarksWorkbenchPage() {
   const [loading, setLoading] = useState(true)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState({ type: '', text: '' })
+  const [loThresholds, setLoThresholds] = useState({})
+  const [showPerLoThreshold, setShowPerLoThreshold] = useState(false)
+  const [usePerLoThreshold, setUsePerLoThreshold] = useState(false)
 
   useEffect(() => {
     if (!moduleId) return
@@ -116,6 +121,44 @@ export default function MarksWorkbenchPage() {
     () => los.filter((lo) => selectedLosIds.includes(lo.id)),
     [los, selectedLosIds]
   )
+
+  // Initialize loThresholds when selectedLos changes
+  useEffect(() => {
+    setLoThresholds((prev) => {
+      const updated = { ...prev }
+      selectedLos.forEach((lo) => {
+        if (!(lo.id in updated)) {
+          updated[lo.id] = 50
+        }
+      })
+      return updated
+    })
+  }, [selectedLos])
+
+  useEffect(() => {
+    const parsedCount = Number(numberOfQuestions)
+    const safeCount = Number.isFinite(parsedCount) && parsedCount > 0 ? Math.floor(parsedCount) : 1
+    const selectedLoIds = selectedLos.map((lo) => lo.id)
+    const fallbackLoId = selectedLoIds[0] || ''
+
+    setQuestionMappings((prev) => {
+      const next = []
+      for (let i = 0; i < safeCount; i++) {
+        const current = prev[i]
+        const isCurrentLoValid = current?.loId && selectedLoIds.includes(current.loId)
+        next.push({
+          questionNumber: i + 1,
+          loId: isCurrentLoValid ? current.loId : fallbackLoId,
+          maxMarks: current?.maxMarks ?? 10,
+        })
+      }
+      return next
+    })
+  }, [numberOfQuestions, selectedLos])
+
+  const updateQuestionMapping = (index, field, value) => {
+    setQuestionMappings((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
+  }
 
   const selectedLosCount = selectedLos.length
 
@@ -258,6 +301,97 @@ export default function MarksWorkbenchPage() {
       const filename = parseFilename(response.headers?.['content-disposition'], fallbackName)
       downloadBlob(response.data, filename)
       setMessage({ type: 'success', text: 'Excel report exported successfully.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: await readBlobError(error) })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  const handleDownloadQuestionMarkTemplate = async () => {
+    if (!validateWorkflow()) return
+
+    const parsedQuestionCount = Number(numberOfQuestions)
+    if (!Number.isFinite(parsedQuestionCount) || parsedQuestionCount <= 0) {
+      setMessage({ type: 'error', text: 'Number of questions must be a positive number.' })
+      return
+    }
+
+    const loById = new Map(selectedLos.map((lo) => [lo.id, lo]))
+    const mappingsPayload = questionMappings.slice(0, parsedQuestionCount).map((mapping, idx) => {
+      const lo = loById.get(mapping.loId)
+      return {
+        questionNumber: idx + 1,
+        loId: mapping.loId,
+        loName: lo?.name || lo?.description || mapping.loId,
+        maxMarks: Number(mapping.maxMarks),
+      }
+    })
+
+    const hasInvalidMapping = mappingsPayload.some(
+      (m) => !m.loId || !Number.isFinite(m.maxMarks) || m.maxMarks < 0
+    )
+    if (hasInvalidMapping) {
+      setMessage({ type: 'error', text: 'Each question must have a valid LO and max marks value.' })
+      return
+    }
+
+    try {
+      setBusyAction('question-template')
+      setMessage({ type: '', text: '' })
+
+      const token = authService.getToken()
+      const response = await marksService.downloadQuestionMarkTemplate(
+        {
+          templateId: null,
+          numberOfQuestions: Math.floor(parsedQuestionCount),
+          questionMappings: mappingsPayload,
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      )
+
+      const fallbackName = `question_marks_template_${batch}.xlsx`
+      const filename = parseFilename(response.headers?.['content-disposition'], fallbackName)
+      downloadBlob(response.data, filename)
+      setMessage({ type: 'success', text: 'Question-wise template downloaded successfully.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: await readBlobError(error) })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  const handleExportMarksWithPerLoThreshold = async () => {
+    if (!validateWorkflow()) return
+
+    // Validate all per-LO thresholds
+    for (const [loId, thresh] of Object.entries(loThresholds)) {
+      const parsedThresh = Number(thresh)
+      if (!Number.isFinite(parsedThresh) || parsedThresh < 0 || parsedThresh > 100) {
+        setMessage({ type: 'error', text: `Invalid threshold for ${loId}: must be 0-100.` })
+        return
+      }
+    }
+
+    try {
+      setBusyAction('export-per-lo')
+      setMessage({ type: '', text: '' })
+
+      const token = authService.getToken()
+      const response = await marksService.exportMarksWithPerLoThreshold(
+        {
+          losIds: selectedLos.map((lo) => lo.id),
+          markType,
+          batch,
+          loThresholds,
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      )
+
+      const fallbackName = `marks_report_per_lo_${batch}_${markType.toLowerCase()}.xlsx`
+      const filename = parseFilename(response.headers?.['content-disposition'], fallbackName)
+      downloadBlob(response.data, filename)
+      setMessage({ type: 'success', text: 'Per-LO threshold report exported successfully.' })
     } catch (error) {
       setMessage({ type: 'error', text: await readBlobError(error) })
     } finally {
@@ -612,8 +746,81 @@ export default function MarksWorkbenchPage() {
                       Used by the export endpoint to calculate pass and fail values. Default is 50.
                     </p>
                   </div>
+
+                  <div className="border-t border-slate-100 pt-5">
+                    <button
+                      type="button"
+                      onClick={() => setShowPerLoThreshold(!showPerLoThreshold)}
+                      className="flex items-center justify-between w-full px-4 py-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <span className="text-xs font-black text-slate-600 uppercase tracking-widest">Per-LO Threshold Config</span>
+                      <svg className={`w-5 h-5 text-slate-400 transition-transform ${showPerLoThreshold ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </section>
+
+              {showPerLoThreshold && (
+                <section className="glass-card rounded-[2.5rem] p-8 border-amber-200 bg-amber-50/30">
+                  <div className="space-y-6">
+                    <div>
+                      <span className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em] mb-2 block">Advanced</span>
+                      <h2 className="heading-lg">Per-Learning Outcome Thresholds</h2>
+                      <p className="text-sm text-slate-500 mt-3 leading-relaxed">
+                        Set a different pass threshold for each learning outcome. Leave empty to use the default threshold (50%).
+                      </p>
+                    </div>
+
+                    {selectedLos.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedLos.map((lo) => (
+                          <div key={lo.id} className="space-y-2">
+                            <label className="text-xs font-black text-slate-600 uppercase tracking-widest ml-1">
+                              {lo.id} Threshold
+                            </label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={loThresholds[lo.id] ?? 50}
+                                onChange={(e) => setLoThresholds((prev) => ({ ...prev, [lo.id]: e.target.value }))}
+                                className="input-field flex-1"
+                              />
+                              <span className="text-xs font-bold text-slate-400">%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-white/50 p-4 text-center text-slate-500 text-sm">
+                        Select learning outcomes above to configure thresholds
+                      </div>
+                    )}
+
+                    <div className="flex gap-3 pt-4 border-t border-amber-100">
+                      <button
+                        type="button"
+                        onClick={handleExportMarksWithPerLoThreshold}
+                        disabled={busyAction === 'export-per-lo' || !selectedLosCount}
+                        className={`flex-1 py-4 px-6 rounded-2xl text-white font-bold shadow-lg transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 ${busyAction === 'export-per-lo' || !selectedLosCount ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-amber-600 hover:bg-amber-700 hover:shadow-amber-200'}`}
+                      >
+                        {busyAction === 'export-per-lo' && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Export with Per-LO Thresholds
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPerLoThreshold(false)}
+                        className="px-6 py-4 rounded-2xl border border-slate-200 bg-white text-slate-700 font-bold hover:bg-slate-50 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               <section className="glass-card rounded-[2.5rem] p-8 border-slate-100">
                 <div className="space-y-5">
@@ -625,6 +832,47 @@ export default function MarksWorkbenchPage() {
                     </p>
                   </div>
 
+                  <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 space-y-4">
+                    <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Question Template Setup</h3>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Number of questions</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={numberOfQuestions}
+                        onChange={(e) => setNumberOfQuestions(e.target.value)}
+                        className="input-field"
+                      />
+                    </div>
+
+                    <div className="space-y-3 max-h-60 overflow-auto pr-1">
+                      {questionMappings.map((mapping, index) => (
+                        <div key={mapping.questionNumber} className="grid grid-cols-[0.7fr_1.5fr_1fr] gap-2 items-center">
+                          <span className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Q{mapping.questionNumber}</span>
+                          <select
+                            value={mapping.loId || ''}
+                            onChange={(e) => updateQuestionMapping(index, 'loId', e.target.value)}
+                            className="input-field bg-white"
+                          >
+                            {selectedLos.map((lo) => (
+                              <option key={lo.id} value={lo.id}>{lo.id}</option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min="0"
+                            value={mapping.maxMarks}
+                            onChange={(e) => updateQuestionMapping(index, 'maxMarks', e.target.value)}
+                            className="input-field"
+                            placeholder="Max"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleDownloadTemplate}
@@ -632,7 +880,17 @@ export default function MarksWorkbenchPage() {
                     className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-lg transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 ${busyAction === 'template' || !selectedLosCount ? 'bg-slate-300 cursor-not-allowed shadow-none' : 'bg-indigo-600 hover:bg-indigo-700 hover:shadow-indigo-200'}`}
                   >
                     {busyAction === 'template' && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                    Download template
+                    Download template (LO columns)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadQuestionMarkTemplate}
+                    disabled={busyAction === 'question-template' || !selectedLosCount}
+                    className={`w-full py-4 px-6 rounded-2xl border font-bold shadow-sm transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 ${busyAction === 'question-template' || !selectedLosCount ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-700'}`}
+                  >
+                    {busyAction === 'question-template' && <span className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />}
+                    Download template (Question columns)
                   </button>
 
                   <button

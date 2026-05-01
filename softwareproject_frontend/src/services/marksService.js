@@ -55,6 +55,25 @@ export const marksService = {
       { ...config, responseType: 'blob' }
     )
   },
+
+  async downloadQuestionMarkTemplate({ templateId, numberOfQuestions, questionMappings }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/template/marks-question-wise?templateId=${templateId || ''}`,
+      {
+        numberOfQuestions,
+        questionMappings,
+      },
+      { ...config, responseType: 'blob' }
+    )
+  },
+
+  async exportMarksWithPerLoThreshold({ losIds, markType, batch, loThresholds }, config = {}) {
+    return axios.post(
+      `${BASE_URL}/api/obe/export/marks-per-lo-threshold`,
+      { losIds, markType, batch, loThresholds },
+      { ...config, responseType: 'blob' }
+    )
+  },
 }
 
 export default marksService
