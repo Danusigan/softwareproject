@@ -85,5 +85,14 @@ public class AssessmentService {
         }
 
         return saved;
+
+        public List<AssessmentTemplate> listTemplatesByModule(String moduleId) {
+            return templateRepository.findByModule_ModuleIdOrderByCreatedAtDesc(moduleId);
+        }
+
+        public AssessmentTemplate getTemplate(String templateId) {
+            return templateRepository.findById(templateId).orElse(null);
+        }
+    }
     }
 }

@@ -40,6 +40,19 @@ export const marksService = {
     })
   },
 
+  async uploadQuestionWise({ excelFile, templateId, batch, markType }, config = {}) {
+    const formData = new FormData()
+    formData.append('excelFile', excelFile)
+    formData.append('templateId', templateId)
+    formData.append('batch', batch)
+    formData.append('markType', markType)
+
+    return axios.post(`${BASE_URL}/api/obe/marks/upload-question-wise`, formData, {
+      ...config,
+      headers: config.headers || {},
+    })
+  },
+
   async getPOAttainment({ losIds, markType, batch, threshold }, config = {}) {
     return axios.post(
       `${BASE_URL}/api/obe/po-attainment`,
@@ -73,6 +86,15 @@ export const marksService = {
       { losIds, markType, batch, loThresholds },
       { ...config, responseType: 'blob' }
     )
+  },
+}
+
+  async listTemplatesByModule(moduleId, config = {}) {
+    return axios.get(`${BASE_URL}/api/obe/assessment/templates/${moduleId}`, config)
+  },
+
+  async getTemplate(templateId, config = {}) {
+    return axios.get(`${BASE_URL}/api/obe/assessment/template/${templateId}`, config)
   },
 }
 

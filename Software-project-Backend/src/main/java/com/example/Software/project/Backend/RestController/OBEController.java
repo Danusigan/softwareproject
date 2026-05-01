@@ -1,4 +1,4 @@
-package com.example.Software.project.Backend.RestController;
+package com.example.Software.project.BackendRestController;
 
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Repository.*;
@@ -172,6 +172,40 @@ public class OBEController {
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+    // --- LECTURE: Upload question-wise marks using a template ---
+    @PostMapping("/marks/upload-question-wise")
+    public ResponseEntity<?> uploadQuestionWiseMarks(
+            @RequestParam("excelFile") MultipartFile file,
+            @RequestParam("templateId") String templateId,
+            @RequestParam("batch") String batch,
+            @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can upload marks", "status", "ERROR"));
+        }
+
+        try {
+            String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
+            return ResponseEntity.ok(Map.of(
+                "message", result,
+                "status", "SUCCESS",
+                "data", Map.of(
+                    "templateId", templateId,
+                    "batch", batch,
+                    "markType", markType
+                )
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                    "message", "Failed to import question-wise marks: " + e.getMessage(),
+                    "error", e.getMessage(),
+                    "status", "ERROR"
+                ));
         }
     }
 
@@ -743,6 +777,34 @@ public class OBEController {
                     "error", errorDetail,
                     "status", "ERROR"
                 ));
+        }
+    }
+
+    // --- REPORT: Overall PO Attainment with Benchmark ---
+    @PostMapping("/po-attainment/overall")
+    public ResponseEntity<?> getOverallPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view PO attainment", "status", "ERROR"));
+        }
+
+        try {
+            String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
+            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : "FINAL_EXAM";
+            Double poThreshold = request.get("poThreshold") != null ? Double.parseDouble(request.get("poThreshold").toString()) : null;
+
+            if (batch == null || batch.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
+            }
+
+            Map<String, Object> result = poAttainmentService.calculateOverallPOAttainment(batch, markType, poThreshold);
+            return ResponseEntity.ok(Map.of("message", "Overall PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
+
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to calculate overall PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
 

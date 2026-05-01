@@ -10,11 +10,14 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> {
     List<StudentMark> findByLos_Id(String losId);
     List<StudentMark> findByLos_IdOrderByIdDesc(String losId);
+
+    Optional<StudentMark> findByStudentAndLos_IdAndBatchAndMarkType(Student student, String losId, String batch, MarkType markType);
 
     // Query by mark type and batch
     @Query("SELECT sm FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")

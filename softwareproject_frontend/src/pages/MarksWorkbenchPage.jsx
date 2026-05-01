@@ -69,6 +69,7 @@ export default function MarksWorkbenchPage() {
   const [numberOfQuestions, setNumberOfQuestions] = useState(5)
   const [questionMappings, setQuestionMappings] = useState([])
   const [uploadFile, setUploadFile] = useState(null)
+  const [questionTemplateId, setQuestionTemplateId] = useState('')
   const [poAttainment, setPOAttainment] = useState(null)
   const [dragActive, setDragActive] = useState(false)
   const batchInputId = 'marks-workbench-batch'
@@ -504,6 +505,49 @@ export default function MarksWorkbenchPage() {
       setMessage({
         type: 'error',
         text: error.response?.data?.message || error.response?.data?.error || 'Failed to upload marks.',
+      })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
+  const handleUploadQuestionWise = async () => {
+    if (!validateWorkflow()) return
+
+    if (!uploadFile) {
+      setMessage({ type: 'error', text: 'Choose a completed question-wise Excel file before uploading.' })
+      return
+    }
+
+    if (!questionTemplateId.trim()) {
+      setMessage({ type: 'error', text: 'Enter the assessment template ID used to generate the question-wise sheet.' })
+      return
+    }
+
+    try {
+      setBusyAction('upload-question-wise')
+      setMessage({ type: '', text: '' })
+
+      const token = authService.getToken()
+      const response = await marksService.uploadQuestionWise(
+        {
+          excelFile: uploadFile,
+          templateId: questionTemplateId.trim(),
+          batch,
+          markType,
+        },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      )
+
+      setMessage({
+        type: 'success',
+        text: response.data?.message || 'Question-wise marks uploaded successfully.',
+      })
+      resetFile()
+    } catch (error) {
+      setMessage({
+        type: 'error',
+        text: error.response?.data?.message || error.response?.data?.error || 'Failed to upload question-wise marks.',
       })
     } finally {
       setBusyAction('')
@@ -972,6 +1016,20 @@ export default function MarksWorkbenchPage() {
                     </button>
                   )}
 
+                  <div className="space-y-2 rounded-2xl border border-slate-200 bg-white/70 p-4">
+                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Question-wise template ID</label>
+                    <input
+                      type="text"
+                      value={questionTemplateId}
+                      onChange={(event) => setQuestionTemplateId(event.target.value)}
+                      className="input-field"
+                      placeholder="Enter assessment template ID"
+                    />
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Required when uploading a workbook generated from the question-wise template.
+                    </p>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleUploadBulk}
@@ -980,6 +1038,16 @@ export default function MarksWorkbenchPage() {
                   >
                     {busyAction === 'upload' && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                     Upload workbook
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUploadQuestionWise}
+                    disabled={busyAction === 'upload-question-wise' || !uploadFile}
+                    className={`w-full py-4 px-6 rounded-2xl border font-bold shadow-sm transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 ${busyAction === 'upload-question-wise' || !uploadFile ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:border-indigo-200 hover:text-indigo-700'}`}
+                  >
+                    {busyAction === 'upload-question-wise' && <span className="w-4 h-4 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />}
+                    Upload question-wise workbook
                   </button>
                 </div>
               </section>

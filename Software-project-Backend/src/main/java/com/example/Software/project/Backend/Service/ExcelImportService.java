@@ -2,9 +2,13 @@ package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.MarkType;
+import com.example.Software.project.Backend.Model.AssessmentItem;
+import com.example.Software.project.Backend.Model.StudentAssessmentScore;
 import com.example.Software.project.Backend.Model.Student;
 import com.example.Software.project.Backend.Model.StudentMark;
 import com.example.Software.project.Backend.Repository.LosRepository;
+import com.example.Software.project.Backend.Repository.AssessmentItemRepository;
+import com.example.Software.project.Backend.Repository.StudentAssessmentScoreRepository;
 import com.example.Software.project.Backend.Repository.StudentMarkRepository;
 import com.example.Software.project.Backend.Repository.StudentRepository;
 import org.apache.poi.ss.usermodel.*;
@@ -14,7 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class ExcelImportService {
@@ -25,6 +37,12 @@ public class ExcelImportService {
     private LosRepository losRepository;
     @Autowired
     private StudentRepository studentRepository;
+    @Autowired
+    private AssessmentItemRepository assessmentItemRepository;
+    @Autowired
+    private StudentAssessmentScoreRepository studentAssessmentScoreRepository;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Transactional
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch, String markType) {
@@ -232,5 +250,155 @@ public class ExcelImportService {
     // Backward compatibility
     public void importMarks(MultipartFile file, String losId) throws Exception {
         importMarksOBEFormat(losId, file, null);
+    }
+
+    /**
+     * Import question-wise marks using an assessment template.
+     * Expected Excel layout: Student ID | Student Name | Q1 | Q2 | ...
+     */
+    @Transactional
+    public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType) {
+        try {
+            if (templateId == null || templateId.trim().isEmpty()) {
+                throw new Exception("templateId is required for question-wise import");
+            }
+
+            MarkType type = MarkType.FINAL_EXAM;
+            if (markType != null && !markType.trim().isEmpty()) {
+                try {
+                    type = MarkType.valueOf(markType.trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    type = MarkType.FINAL_EXAM;
+                }
+            }
+
+            List<AssessmentItem> items = assessmentItemRepository.findByAssessmentTemplate_IdOrderByQuestionNumber(templateId.trim());
+            if (items.isEmpty()) {
+                throw new Exception("No assessment items found for template: " + templateId);
+            }
+
+            studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(templateId.trim());
+
+            Map<String, Double> totalsByStudentAndLo = new HashMap<>();
+            Map<String, Student> studentsById = new HashMap<>();
+            int questionScoresSaved = 0;
+
+            try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+                Sheet sheet = workbook.getSheetAt(0);
+                int dataStartRow = 3;
+
+                for (Row row : sheet) {
+                    if (row.getRowNum() < dataStartRow) continue;
+
+                    Cell studentIdCell = row.getCell(0);
+                    Cell studentNameCell = row.getCell(1);
+                    if (studentIdCell == null || studentIdCell.toString().trim().isEmpty()) {
+                        continue;
+                    }
+
+                    String studentId = studentIdCell.toString().trim();
+                    String studentName = studentNameCell != null ? studentNameCell.toString().trim() : "Unknown";
+
+                    Student student = studentRepository.findById(studentId).orElseGet(() -> {
+                        Student newStudent = new Student();
+                        newStudent.setStudentId(studentId);
+                        newStudent.setStudentName(studentName.isEmpty() ? "Unknown" : studentName);
+                        return studentRepository.save(newStudent);
+                    });
+
+                    if (student.getStudentName() == null || student.getStudentName().equals("Unknown")) {
+                        student.setStudentName(studentName.isEmpty() ? "Unknown" : studentName);
+                        studentRepository.save(student);
+                    }
+                    studentsById.put(studentId, student);
+
+                    for (int i = 0; i < items.size(); i++) {
+                        AssessmentItem item = items.get(i);
+                        Cell markCell = row.getCell(i + 2); // Student ID + Student Name
+                        if (markCell == null || markCell.toString().trim().isEmpty()) {
+                            continue;
+                        }
+
+                        Double score = parseScore(markCell);
+                        if (score == null) {
+                            continue;
+                        }
+                        score = Math.max(0.0, Math.min(item.getMaxMarks() != null ? item.getMaxMarks() : 100.0, score));
+
+                        StudentAssessmentScore assessmentScore = new StudentAssessmentScore();
+                        assessmentScore.setStudent(student);
+                        assessmentScore.setAssessmentItem(item);
+                        assessmentScore.setScore(score);
+                        studentAssessmentScoreRepository.save(assessmentScore);
+                        questionScoresSaved++;
+
+                        String loId = item.getLos() != null ? item.getLos().getId() : null;
+                        if (loId != null) {
+                            String key = studentId + "::" + loId;
+                            totalsByStudentAndLo.put(key, totalsByStudentAndLo.getOrDefault(key, 0.0) + score);
+                        }
+                    }
+                }
+            }
+
+            // Rebuild aggregated LO marks so existing export/report flows continue to work
+            List<String> affectedLoIds = new ArrayList<>();
+            for (AssessmentItem item : items) {
+                if (item.getLos() != null && item.getLos().getId() != null && !affectedLoIds.contains(item.getLos().getId())) {
+                    affectedLoIds.add(item.getLos().getId());
+                }
+            }
+            for (String loId : affectedLoIds) {
+                if (batch != null && !batch.trim().isEmpty()) {
+                    markRepository.deleteByLos_IdAndBatch(loId, batch.trim());
+                } else {
+                    markRepository.deleteByLos_Id(loId);
+                }
+            }
+
+            int aggregatedMarksSaved = 0;
+            for (Map.Entry<String, Double> entry : totalsByStudentAndLo.entrySet()) {
+                String[] parts = entry.getKey().split("::", 2);
+                if (parts.length != 2) continue;
+                String studentId = parts[0];
+                String loId = parts[1];
+
+                Student student = studentsById.get(studentId);
+                if (student == null) {
+                    student = studentRepository.findById(studentId).orElse(null);
+                }
+                Los los = losRepository.findById(loId).orElse(null);
+                if (student == null || los == null) continue;
+
+                StudentMark mark = new StudentMark();
+                mark.setStudent(student);
+                mark.setLos(los);
+                mark.setScore(entry.getValue());
+                mark.setBatch(batch);
+                mark.setMarkType(type);
+                markRepository.save(mark);
+                aggregatedMarksSaved++;
+            }
+
+            return "Successfully imported " + questionScoresSaved + " question scores and " + aggregatedMarksSaved + " aggregated LO marks for template " + templateId;
+        } catch (Exception e) {
+            throw new RuntimeException("Error importing question-wise marks: " + e.getMessage(), e);
+        }
+    }
+
+    private Double parseScore(Cell cell) {
+        if (cell == null) return null;
+        if (cell.getCellType() == CellType.NUMERIC) {
+            return cell.getNumericCellValue();
+        }
+        String val = cell.toString().trim().toUpperCase();
+        if (val.isEmpty() || val.equals("N/A") || val.equals("AB") || val.equals("MC")) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(val);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 }
