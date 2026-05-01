@@ -87,8 +87,6 @@ export const marksService = {
       { ...config, responseType: 'blob' }
     )
   },
-}
-
   async listTemplatesByModule(moduleId, config = {}) {
     return axios.get(`${BASE_URL}/api/obe/assessment/templates/${moduleId}`, config)
   },
