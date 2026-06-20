@@ -13,7 +13,6 @@ export default function CreateLOWithMappingPage() {
         id: '',
         name: '',
         description: '',
-        batch: new Date().getFullYear().toString().slice(-2) // Default to current year
     });
     
     // Mapping state
@@ -165,6 +164,7 @@ export default function CreateLOWithMappingPage() {
         if (!formData.id.trim()) return 'LO ID is required';
         if (!formData.name.trim()) return 'LO Name is required';
         if (!formData.description.trim()) return 'LO Description is required';
+        // Note: batch is no longer part of LO — it belongs to mark uploads
         
         // Validate mappings
         const activeMappings = Object.entries(mappings).filter(([_, weight]) => weight > 0);
@@ -322,32 +322,17 @@ export default function CreateLOWithMappingPage() {
                                 </div>
                                 
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-sm font-semibold text-slate-700 mb-3">LO ID <span className="text-red-500">*</span></label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white hover:border-slate-300"
-                                                value={formData.id}
-                                                onChange={(e) => handleFormDataChange('id', e.target.value)}
-                                                placeholder="e.g., LO1"
-                                                required
-                                            />
-                                            <p className="text-xs text-slate-500 mt-2">Unique identifier for this learning outcome</p>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-sm font-semibold text-slate-700 mb-3">Batch Year <span className="text-red-500">*</span></label>
-                                            <input
-                                                type="text"
-                                                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white hover:border-slate-300"
-                                                value={formData.batch}
-                                                onChange={(e) => handleFormDataChange('batch', e.target.value)}
-                                                placeholder="e.g., 24"
-                                                required
-                                            />
-                                            <p className="text-xs text-slate-500 mt-2">Academic batch year</p>
-                                        </div>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-3">LO ID <span className="text-red-500">*</span></label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white hover:border-slate-300"
+                                            value={formData.id}
+                                            onChange={(e) => handleFormDataChange('id', e.target.value)}
+                                            placeholder="e.g., LO1"
+                                            required
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2">Unique identifier for this learning outcome</p>
                                     </div>
 
                                     <div>

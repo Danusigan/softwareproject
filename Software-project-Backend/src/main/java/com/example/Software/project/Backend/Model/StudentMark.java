@@ -28,6 +28,9 @@ public class StudentMark {
     @Column(name = "mark_type")
     private MarkType markType; // FINAL_EXAM or ASSIGNMENT
 
+    @Column(name = "assignment_label")
+    private String assignmentLabel; // e.g. "Assignment 1", "Assignment 2"
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -46,6 +49,9 @@ public class StudentMark {
 
     public MarkType getMarkType() { return markType; }
     public void setMarkType(MarkType markType) { this.markType = markType; }
+
+    public String getAssignmentLabel() { return assignmentLabel; }
+    public void setAssignmentLabel(String assignmentLabel) { this.assignmentLabel = assignmentLabel; }
 
     // Helper to get student index for backward compatibility/display
     public String getStudentIndex() {

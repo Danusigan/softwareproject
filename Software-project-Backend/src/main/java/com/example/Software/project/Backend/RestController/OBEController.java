@@ -26,6 +26,9 @@ public class OBEController {
     @Autowired private POAttainmentService poAttainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired private AssessmentTemplateRepository assessmentTemplateRepo;
+    @Autowired private AssessmentItemRepository assessmentItemRepo;
+    @Autowired private ModuleRepository moduleRepo;
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
@@ -175,12 +178,75 @@ public class OBEController {
         }
     }
 
+    // --- MARKS: Unified upload — auto-detects LO-wise vs question-wise from METADATA sheet ---
+    @PostMapping("/marks/upload")
+    public ResponseEntity<?> uploadMarksUnified(
+            @RequestParam("excelFile") MultipartFile file,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied", "status", "ERROR"));
+        }
+        try {
+            Map<String, String> meta = excelService.readMetadata(file);
+            String templateType = meta.getOrDefault("TEMPLATE_TYPE", "LO_WISE");
+            String batch = meta.getOrDefault("BATCH", "");
+            String markType = meta.getOrDefault("MARK_TYPE", "FINAL_EXAM");
+            String assignmentLabel = meta.getOrDefault("ASSIGNMENT_LABEL", "");
+
+            if (batch.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Could not determine batch from file. Please use a template downloaded from this system.", "status", "ERROR"));
+            }
+
+            String result;
+            if ("QUESTION_WISE".equalsIgnoreCase(templateType)) {
+                String templateId = meta.getOrDefault("TEMPLATE_ID", "");
+                if (templateId.isBlank()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "TEMPLATE_ID not found in file. Please re-download the template.", "status", "ERROR"));
+                }
+                result = excelService.importQuestionWiseMarks(file, templateId, batch, markType,
+                    assignmentLabel.isBlank() ? null : assignmentLabel);
+            } else {
+                String losIdsStr = meta.getOrDefault("LO_IDS", "");
+                if (losIdsStr.isBlank()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "LO_IDS not found in file. Please re-download the template.", "status", "ERROR"));
+                }
+                String[] losIds = losIdsStr.split(",");
+                // Parse per-LO max marks: "LO1:50,LO2:30" → Map
+                Map<String, Double> perLoMaxMarks = new java.util.LinkedHashMap<>();
+                String loMaxMeta = meta.getOrDefault("LO_MAX_MARKS", "");
+                if (!loMaxMeta.isBlank()) {
+                    for (String pair : loMaxMeta.split(",")) {
+                        String[] parts = pair.trim().split(":");
+                        if (parts.length == 2) {
+                            try { perLoMaxMarks.put(parts[0].trim(), Double.parseDouble(parts[1].trim())); } catch (Exception ignored) {}
+                        }
+                    }
+                }
+                result = excelService.importMarksBulk(file, losIds, batch, markType,
+                    assignmentLabel.isBlank() ? null : assignmentLabel, perLoMaxMarks);
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "message", result,
+                "status", "SUCCESS",
+                "data", Map.of("batch", batch, "markType", markType, "assignmentLabel", assignmentLabel, "templateType", templateType)
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
     // --- LECTURE: Upload question-wise marks using a template ---
     @PostMapping("/marks/upload-question-wise")
     public ResponseEntity<?> uploadQuestionWiseMarks(
             @RequestParam("excelFile") MultipartFile file,
-            @RequestParam("templateId") String templateId,
-            @RequestParam("batch") String batch,
+            @RequestParam(value = "templateId", required = false) String templateId,
+            @RequestParam(value = "batch", required = false) String batch,
             @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
             @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
@@ -189,6 +255,23 @@ public class OBEController {
         }
 
         try {
+            // Read embedded metadata from the Excel file (batch, markType, templateId)
+            Map<String, String> meta = excelService.readMetadata(file);
+            if (meta.containsKey("TEMPLATE_ID") && !meta.get("TEMPLATE_ID").isEmpty()
+                    && (templateId == null || templateId.isBlank())) {
+                templateId = meta.get("TEMPLATE_ID");
+            }
+            if (meta.containsKey("BATCH") && !meta.get("BATCH").isEmpty()
+                    && (batch == null || batch.isBlank())) {
+                batch = meta.get("BATCH");
+            }
+            if (meta.containsKey("MARK_TYPE") && !meta.get("MARK_TYPE").isEmpty()) {
+                markType = meta.get("MARK_TYPE");
+            }
+            if (templateId == null || templateId.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "templateId is required (or embed it in the template METADATA sheet)", "status", "ERROR"));
+            }
             String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
             return ResponseEntity.ok(Map.of(
                 "message", result,
@@ -229,6 +312,16 @@ public class OBEController {
     public ResponseEntity<?> getLoTrend(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
+    }
+
+    // --- ANALYSIS: LO Pass Rate by Batch ---
+    @GetMapping("/analysis/pass-rate/lo/{moduleId}")
+    public ResponseEntity<?> getLoPassRate(
+            @PathVariable String moduleId,
+            @RequestParam(defaultValue = "50") double threshold,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
     }
 
     // --- EXPORT: Generate Excel with selected LOs and mark type ---
@@ -357,8 +450,34 @@ public class OBEController {
                     .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
             }
 
+            int threshold = 50;
+            Object threshObj = request.get("threshold");
+            if (threshObj != null) { try { threshold = Integer.parseInt(threshObj.toString().trim()); } catch (Exception ignored) {} }
+            double maxMarks = 100;
+            Object mmObj = request.get("maxMarksPerLo");
+            if (mmObj != null) { try { maxMarks = Double.parseDouble(mmObj.toString().trim()); } catch (Exception ignored) {} }
+            String moduleId = request.get("moduleId") != null ? request.get("moduleId").toString().trim() : null;
+            String assignmentLabelLo = request.get("assignmentLabel") != null ? request.get("assignmentLabel").toString().trim() : null;
+            if (assignmentLabelLo != null && assignmentLabelLo.isEmpty()) assignmentLabelLo = null;
+
+            // Per-LO max marks (map of loId → maxMarks)
+            java.util.Map<String, Double> perLoMaxMarks = new java.util.LinkedHashMap<>();
+            Object perLoRaw = request.get("perLoMaxMarks");
+            if (perLoRaw instanceof java.util.Map) {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> perLoMap = (java.util.Map<String, Object>) perLoRaw;
+                for (java.util.Map.Entry<String, Object> e : perLoMap.entrySet()) {
+                    try { perLoMaxMarks.put(e.getKey(), Double.parseDouble(e.getValue().toString())); } catch (Exception ignored) {}
+                }
+            }
+            // Fall back to global maxMarks if no per-LO map provided
+            if (perLoMaxMarks.isEmpty()) {
+                final double globalMax = maxMarks;
+                losIds.forEach(id -> perLoMaxMarks.put(id, globalMax));
+            }
+
             // Generate template
-            byte[] templateBytes = excelExportService.generateMarkTemplate(losIds);
+            byte[] templateBytes = excelExportService.generateMarkTemplate(losIds, batch, markType, threshold, perLoMaxMarks, moduleId, assignmentLabelLo);
 
             // Return as file download
             return ResponseEntity.ok()
@@ -376,62 +495,170 @@ public class OBEController {
         }
     }
 
-    // --- BULK UPLOAD: Upload marks for multiple LOs in one Excel file ---
+    // --- BULK UPLOAD: Upload marks — reads batch/markType from METADATA sheet if present ---
     @PostMapping("/marks/upload-bulk")
     public ResponseEntity<?> uploadMarksBulk(
             @RequestParam("excelFile") MultipartFile file,
-            @RequestParam("losIds") String losIdsParam,
-            @RequestParam("batch") String batch,
+            @RequestParam(value = "losIds", required = false) String losIdsParam,
+            @RequestParam(value = "batch", required = false) String batch,
             @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
             @RequestHeader("Authorization") String token) {
 
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can upload marks", "status", "ERROR"));
+                .body(Map.of("message", "Access Denied", "status", "ERROR"));
         }
 
         try {
-            // Parse losIds from comma-separated string
-            String[] losIds = losIdsParam.split(",");
+            // Read metadata from Excel first — overrides form params if present
+            Map<String, String> meta = excelService.readMetadata(file);
+            if (meta.containsKey("BATCH") && !meta.get("BATCH").isEmpty()) batch = meta.get("BATCH");
+            if (meta.containsKey("MARK_TYPE") && !meta.get("MARK_TYPE").isEmpty()) markType = meta.get("MARK_TYPE");
+            if (meta.containsKey("LO_IDS") && !meta.get("LO_IDS").isEmpty() && (losIdsParam == null || losIdsParam.isBlank()))
+                losIdsParam = meta.get("LO_IDS");
 
-            if (losIds.length == 0) {
+            if (losIdsParam == null || losIdsParam.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of(
-                        "message", "Error: losIds cannot be empty",
-                        "status", "ERROR"
-                    ));
+                    .body(Map.of("message", "Error: losIds cannot be determined. Use a template downloaded from this system.", "status", "ERROR"));
             }
-
             if (batch == null || batch.trim().isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of(
-                        "message", "Error: batch is required",
-                        "status", "ERROR"
-                    ));
+                    .body(Map.of("message", "Error: batch is required (or use a template that contains METADATA).", "status", "ERROR"));
             }
 
-            // Import marks using bulk method
-            String result = excelService.importMarksBulk(file, losIds, batch, markType);
+            String[] losIds = losIdsParam.split(",");
+            String result = excelService.importMarksBulk(file, losIds, batch.trim(), markType);
 
             return ResponseEntity.ok(Map.of(
-                "message", result,
-                "status", "SUCCESS",
-                "data", Map.of(
-                    "losCount", losIds.length,
-                    "batch", batch,
-                    "markType", markType
-                )
+                "message", result, "status", "SUCCESS",
+                "data", Map.of("losCount", losIds.length, "batch", batch.trim(), "markType", markType)
             ));
-
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of(
-                    "message", "Failed to import marks: " + e.getMessage(),
-                    "error", e.getMessage(),
-                    "status", "ERROR"
-                ));
+                .body(Map.of("message", "Failed to import marks: " + e.getMessage(), "status", "ERROR"));
         }
     }
+
+    // --- MARKS: List available marks (batch+markType+assignmentLabel groups) for a module ---
+    @GetMapping("/marks/available/module/{moduleId}")
+    public ResponseEntity<?> getAvailableMarks(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            List<Object[]> raw = markRepo().findMarksSummaryByModuleId(moduleId);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Object[] row : raw) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("batch", row[0]);
+                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                entry.put("assignmentLabel", row[2] != null ? row[2].toString() : null);
+                entry.put("markCount", row[3]);
+                entry.put("loCount", row[4]);
+                result.add(entry);
+            }
+            return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- MARKS: Delete one assignment's marks for a module ---
+    @DeleteMapping("/marks/assignment/module/{moduleId}")
+    public ResponseEntity<?> deleteAssignmentMarks(
+            @PathVariable String moduleId,
+            @RequestParam String batch,
+            @RequestParam String markType,
+            @RequestParam(required = false) String assignmentLabel,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            MarkType type = MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_"));
+            if (assignmentLabel == null || assignmentLabel.isBlank()) {
+                // Delete ALL marks for this module+batch+markType regardless of assignment
+                markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, type);
+                assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
+                    .forEach(t -> assessmentTemplateRepo.delete(t));
+            } else {
+                markRepo().deleteByModuleIdAndBatchAndMarkTypeAndAssignmentLabel(
+                    moduleId, batch, type, assignmentLabel);
+                assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
+                    .stream()
+                    .filter(t -> assignmentLabel.equals(t.getAssignmentLabel()))
+                    .forEach(t -> assessmentTemplateRepo.delete(t));
+            }
+            return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- MARKS: Delete all marks for a module+batch+markType ---
+    @DeleteMapping("/marks/module/{moduleId}")
+    public ResponseEntity<?> deleteMarksBatch(
+            @PathVariable String moduleId,
+            @RequestParam String batch,
+            @RequestParam String markType,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_")));
+            return ResponseEntity.ok(Map.of("message", "Marks deleted", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- MARKS: Download existing marks for a module+batch+markType as Excel ---
+    @GetMapping("/marks/export/module/{moduleId}")
+    public ResponseEntity<?> exportBatchMarks(
+            @PathVariable String moduleId,
+            @RequestParam String batch,
+            @RequestParam String markType,
+            @RequestParam(defaultValue = "50") int threshold,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            List<String> losIds = markRepo().findLoIdsByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase()));
+            if (losIds.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "No marks found for this batch/markType", "status", "ERROR"));
+            byte[] bytes = excelExportService.generateMarksExcel(losIds, markType, batch, threshold);
+            return ResponseEntity.ok()
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                .header("Content-Disposition", "attachment; filename=\"marks_" + moduleId + "_batch" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .body(bytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- MARKS: List available marks for a single LO ---
+    @GetMapping("/marks/available/lo/{loId}")
+    public ResponseEntity<?> getAvailableMarksForLo(@PathVariable String loId, @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            List<Object[]> raw = markRepo().findMarksSummaryByLosId(loId);
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Object[] row : raw) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("batch", row[0]);
+                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                entry.put("markCount", row[2]);
+                result.add(entry);
+            }
+            return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    private StudentMarkRepository markRepo() {
+        return studentMarkRepository;
+    }
+    @Autowired private StudentMarkRepository studentMarkRepository;
 
     // --- PO ATTAINMENT: Calculate per-student PO credits based on LO pass/fail ---
     @PostMapping("/po-attainment")
@@ -490,7 +717,13 @@ public class OBEController {
                     .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
-            Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+            double maxMarksPerLo = 0.0;
+            Object maxMarksObj = request.get("maxMarksPerLo");
+            if (maxMarksObj != null) {
+                try { maxMarksPerLo = Double.parseDouble(maxMarksObj.toString().trim()); } catch (Exception ignored) {}
+            }
+
+            Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold, maxMarksPerLo);
             return ResponseEntity.ok(Map.of("message", "PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
@@ -551,8 +784,14 @@ public class OBEController {
                     .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
             }
 
+            double maxMarksPerLoExport = 0.0;
+            Object maxMarksObjExport = request.get("maxMarksPerLo");
+            if (maxMarksObjExport != null) {
+                try { maxMarksPerLoExport = Double.parseDouble(maxMarksObjExport.toString().trim()); } catch (Exception ignored) {}
+            }
+
             // Calculate PO credits
-            Map<String, Object> attainmentData = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+            Map<String, Object> attainmentData = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold, maxMarksPerLoExport);
 
             // Generate Excel
             byte[] excelBytes = excelExportService.generatePOAttainmentExcel(attainmentData);
@@ -582,6 +821,9 @@ public class OBEController {
         try {
             Integer numberOfQuestions = null;
             List<Map<String, Object>> questionMappings = new ArrayList<>();
+            String batch = null;
+            String markType = "FINAL_EXAM";
+            String moduleId = null;
 
             if (request != null) {
                 Object countObj = request.get("numberOfQuestions");
@@ -612,13 +854,69 @@ public class OBEController {
                         }
                     }
                 }
+
+                if (request.get("batch") != null) batch = request.get("batch").toString().trim();
+                if (request.get("markType") != null) markType = request.get("markType").toString().trim();
+                if (request.get("moduleId") != null) moduleId = request.get("moduleId").toString().trim();
             }
 
-            byte[] templateBytes = excelExportService.generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings);
+            // Read assignmentLabel from request
+            String assignmentLabel = null;
+            if (request != null && request.get("assignmentLabel") != null) {
+                assignmentLabel = request.get("assignmentLabel").toString().trim();
+                if (assignmentLabel.isEmpty()) assignmentLabel = null;
+            }
 
+            // Generate a unique template ID and persist AssessmentTemplate + AssessmentItems to DB
+            String generatedTemplateId = (templateId != null && !templateId.isBlank())
+                ? templateId
+                : java.util.UUID.randomUUID().toString();
+
+            AssessmentTemplate tmpl = new AssessmentTemplate();
+            tmpl.setId(generatedTemplateId);
+            tmpl.setName((moduleId != null ? moduleId : "module") + "_" + (batch != null ? batch : "batch") + "_" + markType + (assignmentLabel != null ? "_" + assignmentLabel : ""));
+            tmpl.setBatch(batch);
+            tmpl.setMarkType(markType);
+            tmpl.setAssignmentLabel(assignmentLabel);
+            if (moduleId != null) {
+                moduleRepo.findById(moduleId).ifPresent(tmpl::setModule);
+            }
+            assessmentTemplateRepo.save(tmpl);
+
+            if (!questionMappings.isEmpty()) {
+                int qIdx = 0;
+                for (Map<String, Object> mapping : questionMappings) {
+                    qIdx++;
+                    Double maxMarks = null;
+                    Object maxMarksObj = mapping.get("maxMarks");
+                    if (maxMarksObj != null) {
+                        try { maxMarks = Double.parseDouble(maxMarksObj.toString()); } catch (Exception ignored) {}
+                    }
+                    Los lo = null;
+                    Object loIdObj = mapping.get("loId");
+                    if (loIdObj != null && !loIdObj.toString().isBlank()) {
+                        lo = losRepo.findById(loIdObj.toString().trim()).orElse(null);
+                    }
+                    if (lo == null || maxMarks == null) continue; // los and maxMarks are non-nullable
+
+                    AssessmentItem item = new AssessmentItem();
+                    item.setQuestionNumber(qIdx);
+                    Object qLabel = mapping.get("questionNumber");
+                    item.setQuestionLabel("Q" + (qLabel != null ? qLabel.toString() : qIdx));
+                    item.setMaxMarks(maxMarks);
+                    item.setLos(lo);
+                    item.setAssessmentTemplate(tmpl);
+                    assessmentItemRepo.save(item);
+                }
+            }
+
+            byte[] templateBytes = excelExportService.generateQuestionMarkTemplate(generatedTemplateId, numberOfQuestions, questionMappings, batch, markType, assignmentLabel);
+
+            String fname = "question_mark_template_" + (batch != null ? batch : "batch")
+                + (assignmentLabel != null ? "_" + assignmentLabel.replaceAll("[^a-zA-Z0-9]", "_") : "") + ".xlsx";
             return ResponseEntity.ok()
                 .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .header("Content-Disposition", "attachment; filename=\"question_mark_template.xlsx\"")
+                .header("Content-Disposition", "attachment; filename=\"" + fname + "\"")
                 .body(templateBytes);
 
         } catch (Exception e) {

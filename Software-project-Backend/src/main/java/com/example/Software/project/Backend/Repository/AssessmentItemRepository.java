@@ -21,4 +21,11 @@ public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, 
         @Param("batch") String batch,
         @Param("markType") String markType
     );
+
+    // All items for a LO+batch regardless of markType (used for cross-assignment normalization in trends)
+    @Query("SELECT ai FROM AssessmentItem ai WHERE ai.los.id = :losId AND ai.assessmentTemplate.batch = :batch")
+    List<AssessmentItem> findByLos_IdAndAssessmentTemplate_Batch(
+        @Param("losId") String losId,
+        @Param("batch") String batch
+    );
 }

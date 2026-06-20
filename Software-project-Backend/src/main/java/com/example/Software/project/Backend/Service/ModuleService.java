@@ -1,9 +1,11 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Module;
+import com.example.Software.project.Backend.Repository.AssessmentTemplateRepository;
 import com.example.Software.project.Backend.Repository.LosRepository;
 import com.example.Software.project.Backend.Repository.ModuleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +23,12 @@ public class ModuleService {
 
     @Autowired
     private LosService losService;
+
+    @Autowired
+    private AssessmentTemplateRepository assessmentTemplateRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     // Create (Admin)
     public Module createModule(Module module) throws Exception {
@@ -68,11 +76,24 @@ public class ModuleService {
             throw new Exception("Module not found");
         }
 
+        // 1. Delete CqiAction records FIRST — they reference BOTH module_id (NOT NULL) and los_id (nullable).
+        //    Must run before LO deletions, otherwise los_id FK blocks each LO delete.
+        try { jdbcTemplate.update("DELETE FROM cqi_action WHERE module_id = ?", id); } catch (Exception ignored) {}
+
+        // 2. Nullify AssessmentTemplate.module_id — nullable FK still enforced by MySQL
+        try {
+            jdbcTemplate.update("UPDATE assessment_template SET module_id = NULL WHERE module_id = ?", id);
+        } catch (Exception e) {
+            try { assessmentTemplateRepository.deleteAll(assessmentTemplateRepository.findByModule_ModuleId(id)); } catch (Exception ignored) {}
+        }
+
+        // 3. Delete each LO — handles StudentMark, StudentAssessmentScore, AssessmentItem, LO-PO mappings
         List<String> losIds = losRepository.findIdsByModuleId(id);
         for (String losId : losIds) {
             losService.deleteLos(losId);
         }
 
+        // 4. Delete the module
         moduleRepository.deleteById(id);
     }
 }

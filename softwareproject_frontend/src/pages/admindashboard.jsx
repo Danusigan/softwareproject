@@ -129,7 +129,7 @@ export default function AdminDashboard() {
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to create module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to create module'
             });
         } finally {
             setLoading(false);
@@ -169,7 +169,7 @@ export default function AdminDashboard() {
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to update module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to update module'
             });
         } finally {
             setLoading(false);
@@ -190,7 +190,7 @@ export default function AdminDashboard() {
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to delete module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to delete module'
             });
         }
     };

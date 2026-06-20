@@ -11,10 +11,10 @@ export const marksService = {
     return axios.get(`${BASE_URL}/api/lospos/module/${moduleId}`, config)
   },
 
-  async downloadTemplate({ losIds, markType, batch }, config = {}) {
+  async downloadTemplate({ losIds, markType, batch, threshold, maxMarksPerLo, perLoMaxMarks, moduleId, assignmentLabel }, config = {}) {
     return axios.post(
       `${BASE_URL}/api/obe/template/marks`,
-      { losIds, markType, batch },
+      { losIds, markType, batch, threshold, maxMarksPerLo, perLoMaxMarks, moduleId, assignmentLabel },
       { ...config, responseType: 'blob' }
     )
   },
@@ -69,14 +69,29 @@ export const marksService = {
     )
   },
 
-  async downloadQuestionMarkTemplate({ templateId, numberOfQuestions, questionMappings }, config = {}) {
+  async downloadQuestionMarkTemplate({ templateId, numberOfQuestions, questionMappings, batch, markType, moduleId, assignmentLabel }, config = {}) {
+    const params = templateId ? `?templateId=${templateId}` : ''
     return axios.post(
-      `${BASE_URL}/api/obe/template/marks-question-wise?templateId=${templateId || ''}`,
-      {
-        numberOfQuestions,
-        questionMappings,
-      },
+      `${BASE_URL}/api/obe/template/marks-question-wise${params}`,
+      { numberOfQuestions, questionMappings, batch, markType, moduleId, assignmentLabel },
       { ...config, responseType: 'blob' }
+    )
+  },
+
+  async uploadMarks({ excelFile }, config = {}) {
+    const formData = new FormData()
+    formData.append('excelFile', excelFile)
+    return axios.post(`${BASE_URL}/api/obe/marks/upload`, formData, {
+      ...config,
+      headers: config.headers || {},
+    })
+  },
+
+  async deleteAssignmentMarks({ moduleId, batch, markType, assignmentLabel }, config = {}) {
+    const token = config.headers?.Authorization || ''
+    return axios.delete(
+      `${BASE_URL}/api/obe/marks/assignment/module/${moduleId}?batch=${encodeURIComponent(batch)}&markType=${encodeURIComponent(markType)}&assignmentLabel=${encodeURIComponent(assignmentLabel)}`,
+      config
     )
   },
 
