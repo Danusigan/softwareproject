@@ -227,7 +227,8 @@ public class POAttainmentService {
      * @return Total max marks, or 0 if no items found
      */
     private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
-        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType);
+        MarkType type = MarkType.valueOf(markType.toUpperCase());
+        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType, type);
         return items.stream().mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0).sum();
     }
 
@@ -317,7 +318,7 @@ public class POAttainmentService {
         // A student achieves a PO if they pass ALL LOs mapped to it.
         for (String loId : loIdsForPo) {
             // Check question-based scores first
-            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType);
+            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType, MarkType.valueOf(markType.toUpperCase()));
             if (!items.isEmpty()) {
                 double totalScore = 0;
                 double totalMaxMarks = 0;

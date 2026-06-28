@@ -68,8 +68,8 @@ export default function LecturerDashboard() {
         } catch { setLos([]); }
     };
 
-    const openLoCreationInNewWindow = (moduleId) => {
-        window.open(`${window.location.origin}/create-lo-mapping/${moduleId}`, '_blank', 'noopener,noreferrer');
+    const openLoCreation = (moduleId) => {
+        navigate(`/create-lo-mapping/${moduleId}`);
     };
 
     const toggleModuleMenu = (moduleId) => setActiveModuleMenuId(prev => prev === moduleId ? null : moduleId);
@@ -208,7 +208,7 @@ export default function LecturerDashboard() {
                                         >
                                             <button
                                                 type="button"
-                                                onClick={() => { openLoCreationInNewWindow(module.moduleId); setActiveModuleMenuId(null); }}
+                                                onClick={() => { openLoCreation(module.moduleId); setActiveModuleMenuId(null); }}
                                                 className="w-full text-left px-4 py-3 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-3"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -305,7 +305,7 @@ export default function LecturerDashboard() {
                                 </button>
 
                                 <button
-                                    onClick={() => openLoCreationInNewWindow(selectedModule.moduleId)}
+                                    onClick={() => openLoCreation(selectedModule.moduleId)}
                                     className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300"
                                 >
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -8,7 +8,6 @@ import authService from '../services/authService';
 export default function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [userRole, setUserRole] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -19,18 +18,10 @@ export default function LoginPage() {
         setIsLoading(true);
         setError('');
 
-        // ✅ FIX 1: Validate role is selected
-        if (!userRole) {
-            setError('Please select a user role.');
-            setIsLoading(false);
-            return;
-        }
-
         try {
             const res = await axios.post('http://localhost:8080/api/auth/login', {
                 userID: username,
-                password,
-                userType: userRole  // ✅ FIX 2: Send userRole to backend
+                password
             });
 
             console.log('=== LOGIN RESPONSE ===');
@@ -38,7 +29,7 @@ export default function LoginPage() {
 
             if (res.data?.status === 'SUCCESS') {
                 const loggedInUsername = res.data.userId;
-                const userType = res.data.userType || userRole;
+                const userType = res.data.userType;
                 const token = res.data.token;
 
                 // ✅ Use authService to store login with 2-hour expiration
@@ -71,9 +62,9 @@ export default function LoginPage() {
             if (backendMessage) {
                 setError(backendMessage);
             } else if (err.response?.status === 401) {
-                setError('Login failed. Incorrect username, password, or user role.');
+                setError('Login failed. Incorrect username or password.');
             } else if (err.response?.status === 403) {
-                setError('Access denied. Your role does not match the selected profile.');
+                setError('Access denied.');
             } else {
                 setError('Login failed. Please check your credentials.');
             }
@@ -111,23 +102,6 @@ export default function LoginPage() {
                         )}
 
                         <form onSubmit={handleLogin} className="space-y-5">
-                            {/* User Role */}
-                            <div className="space-y-2">
-                                <label htmlFor="userRole" className="text-sm font-medium text-slate-700 ml-1">Role</label>
-                                <select
-                                    id="userRole"
-                                    className="input-field appearance-none bg-white"
-                                    value={userRole}
-                                    onChange={(e) => setUserRole(e.target.value)}
-                                    required
-                                >
-                                    <option value="">Select User Role</option>
-                                    <option value="superadmin">Superadmin</option>
-                                    <option value="admin">Admin</option>
-                                    <option value="lecture">Lecturer</option>
-                                </select>
-                            </div>
-
                             {/* Username */}
                             <div className="space-y-2">
                                 <label htmlFor="username" className="text-sm font-medium text-slate-700 ml-1">Username</label>

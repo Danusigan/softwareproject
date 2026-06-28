@@ -28,8 +28,9 @@ export default function LOPOMappingManagementPage() {
         search: ''
     });
     
-    // View mode
-    const [viewMode, setViewMode] = useState('list'); // 'list', 'grid', 'matrix'
+    // View mode - 'modules' (grouped overview, the default landing view) drills into
+    // 'list'/'grid'/'matrix' (the original flat views) when a module card is clicked.
+    const [viewMode, setViewMode] = useState('modules');
     
     // Modal state
     const [selectedMapping, setSelectedMapping] = useState(null);
@@ -287,7 +288,13 @@ export default function LOPOMappingManagementPage() {
         return (rawMappings || []).map((mapping) => ({
             ...mapping,
             mappingId: mapping?.mappingId ?? mapping?.id,
-            learningOutcome: mapping?.learningOutcome || {},
+            moduleId: mapping?.moduleId ?? null,
+            learningOutcome: {
+                id: mapping?.learningOutcomeId ?? mapping?.learningOutcome?.id,
+                name: mapping?.learningOutcomeName ?? mapping?.learningOutcome?.name,
+                description: mapping?.learningOutcome?.description,
+                ...mapping?.learningOutcome
+            },
             programOutcome: mapping?.programOutcome || {},
             approvalStatus: mapping?.approvalStatus || mapping?.status || 'PENDING',
             correlationWeight: mapping?.correlationWeight ?? mapping?.weight ?? 0
@@ -322,6 +329,32 @@ export default function LOPOMappingManagementPage() {
         acc[key].mappings.push(mapping);
         return acc;
     }, {});
+
+    // Group mappings by module for the module-wise overview
+    const moduleSummaries = mappings.reduce((acc, mapping) => {
+        const moduleId = mapping.moduleId || 'UNASSIGNED';
+        if (!acc[moduleId]) {
+            acc[moduleId] = {
+                moduleId,
+                moduleName: modules.find(m => m.moduleId === moduleId)?.moduleName || (moduleId === 'UNASSIGNED' ? 'Unassigned' : moduleId),
+                total: 0,
+                pending: 0,
+                approved: 0,
+                rejected: 0
+            };
+        }
+        acc[moduleId].total += 1;
+        if (mapping.approvalStatus === 'PENDING') acc[moduleId].pending += 1;
+        if (mapping.approvalStatus === 'APPROVED') acc[moduleId].approved += 1;
+        if (mapping.approvalStatus === 'REJECTED') acc[moduleId].rejected += 1;
+        return acc;
+    }, {});
+    const moduleSummaryList = Object.values(moduleSummaries).sort((a, b) => b.pending - a.pending);
+
+    const openModule = (moduleId) => {
+        setFilters(prev => ({ ...prev, moduleId }));
+        setViewMode('list');
+    };
 
     const isAdminUser = userRole === 'ADMIN' || userRole === 'SUPERADMIN';
     const canEditRejected = !isAdminUser;
@@ -499,6 +532,16 @@ export default function LOPOMappingManagementPage() {
                         {/* View Controls */}
                         <div className="flex gap-2">
                             <button
+                                onClick={() => { setFilters(prev => ({ ...prev, moduleId: '' })); setViewMode('modules'); }}
+                                className={`px-3 py-2 rounded-lg font-medium transition-colors ${
+                                    viewMode === 'modules'
+                                        ? 'bg-indigo-100 text-indigo-700'
+                                        : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                            >
+                                Modules
+                            </button>
+                            <button
                                 onClick={() => setViewMode('list')}
                                 className={`px-3 py-2 rounded-lg font-medium transition-colors ${
                                     viewMode === 'list' 
@@ -533,6 +576,43 @@ export default function LOPOMappingManagementPage() {
                 </div>
 
                 {/* Content based on view mode */}
+                {viewMode === 'modules' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {moduleSummaryList.map((summary) => (
+                            <button
+                                key={summary.moduleId}
+                                onClick={() => openModule(summary.moduleId)}
+                                className="glass-card rounded-2xl p-6 text-left hover:shadow-lg hover:border-indigo-200 transition-all"
+                            >
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900">{summary.moduleName}</h3>
+                                        <p className="text-xs text-slate-500 mt-1">{summary.moduleId}</p>
+                                    </div>
+                                    <span className="text-sm text-slate-500">{summary.total} mappings</span>
+                                </div>
+                                <div className="flex gap-2 flex-wrap">
+                                    {summary.pending > 0 && (
+                                        <span className="px-3 py-1 rounded-full text-xs font-medium border bg-yellow-100 text-yellow-800 border-yellow-200">
+                                            {summary.pending} Pending
+                                        </span>
+                                    )}
+                                    {summary.approved > 0 && (
+                                        <span className="px-3 py-1 rounded-full text-xs font-medium border bg-green-100 text-green-800 border-green-200">
+                                            {summary.approved} Approved
+                                        </span>
+                                    )}
+                                    {summary.rejected > 0 && (
+                                        <span className="px-3 py-1 rounded-full text-xs font-medium border bg-red-100 text-red-800 border-red-200">
+                                            {summary.rejected} Rejected
+                                        </span>
+                                    )}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {viewMode === 'list' && (
                     <div className="glass-card rounded-2xl overflow-hidden">
                         <div className="overflow-x-auto">
@@ -565,7 +645,7 @@ export default function LOPOMappingManagementPage() {
                                             </td>
                                             <td className="py-4 px-6">
                                                 <span className="text-slate-700">
-                                                    {mapping.module?.moduleName || 'N/A'}
+                                                    {modules.find(m => m.moduleId === mapping.moduleId)?.moduleName || mapping.moduleId || 'N/A'}
                                                 </span>
                                             </td>
                                             <td className="py-4 px-6">
@@ -657,7 +737,7 @@ export default function LOPOMappingManagementPage() {
                                 <div className="space-y-3">
                                     <div className="flex justify-between">
                                         <span className="text-sm text-slate-600">Module:</span>
-                                        <span className="text-sm font-medium">{modules.find(m => m.moduleId === mapping.learningOutcome?.moduleId)?.moduleName || 'N/A'}</span>
+                                        <span className="text-sm font-medium">{modules.find(m => m.moduleId === mapping.moduleId)?.moduleName || mapping.moduleId || 'N/A'}</span>
                                     </div>
 
                                     <div className="flex justify-between">

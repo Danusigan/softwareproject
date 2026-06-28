@@ -215,7 +215,7 @@ export default function CreateLOWithMappingPage() {
             if (response.data.status === 'SUCCESS') {
                 setSuccess('Learning Outcome created successfully with PO mappings!');
                 setTimeout(() => {
-                    navigate(`/modules`);
+                    navigate('/lecturer-dashboard');
                 }, 2000);
             }
 

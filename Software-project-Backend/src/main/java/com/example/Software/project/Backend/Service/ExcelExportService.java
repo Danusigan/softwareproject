@@ -942,7 +942,7 @@ public class ExcelExportService {
      */
     private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
         List<AssessmentItem> items = assessmentItemRepository
-            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase());
+            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase(), MarkType.valueOf(markType.toUpperCase()));
         return items.stream()
             .mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0)
             .sum();

@@ -47,13 +47,21 @@ public class ModuleRestController {
         }
     }
 
-    // Read All (Public/Auth)
+    // Read All - lecturers only see modules they're assigned to (or unassigned ones); admins see everything
     @GetMapping("/all")
     public ResponseEntity<?> getAllModules(@RequestHeader("Authorization") String token) {
         try {
+            String bearerToken = token != null && token.startsWith("Bearer ") ? token.substring(7) : token;
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+
+            List<com.example.Software.project.Backend.Model.Module> modules = "lecture".equals(role)
+                ? moduleService.getModulesForLecturer(jwtUtil.extractUsername(bearerToken))
+                : moduleService.getAllModules();
+
             return ResponseEntity.ok(Map.of(
                 "message", "All modules retrieved successfully",
-                "data", moduleService.getAllModules(),
+                "data", modules,
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
