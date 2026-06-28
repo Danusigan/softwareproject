@@ -1,9 +1,12 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Model.AssessmentItem;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.Module;
+import com.example.Software.project.Backend.Repository.AssessmentItemRepository;
 import com.example.Software.project.Backend.Repository.LosRepository;
 import com.example.Software.project.Backend.Repository.ModuleRepository;
+import com.example.Software.project.Backend.Repository.StudentAssessmentScoreRepository;
 import com.example.Software.project.Backend.Repository.StudentMarkRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,12 @@ public class LosService {
 
     @Autowired
     private StudentMarkRepository studentMarkRepository;
+
+    @Autowired
+    private AssessmentItemRepository assessmentItemRepository;
+
+    @Autowired
+    private StudentAssessmentScoreRepository studentAssessmentScoreRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -116,20 +125,35 @@ public class LosService {
         return losRepository.save(los);
     }
 
-    // Delete Los (Lecture)
+    // Delete Los (Lecture or as part of module delete)
     @Transactional
     public void deleteLos(String id) throws Exception {
         String storedLosId = resolveStoredLosId(id);
 
+        // 1. Delete student marks for this LO
         studentMarkRepository.deleteByLos_Id(storedLosId);
 
-        jdbcTemplate.update("DELETE FROM lo_po_mappings WHERE los_id = ? OR lospos_id = ?", storedLosId, storedLosId);
-
-        try {
-            jdbcTemplate.update("DELETE FROM assignments WHERE los_pos_id = ?", storedLosId);
-        } catch (Exception ignored) {
+        // 2. Delete student_assessment_score rows — FK assessment_item_id blocks AssessmentItem deletion
+        List<AssessmentItem> items = assessmentItemRepository.findByLos_Id(storedLosId);
+        for (AssessmentItem item : items) {
+            studentAssessmentScoreRepository.deleteAll(
+                studentAssessmentScoreRepository.findByAssessmentItem_Id(item.getId())
+            );
         }
 
+        // 3. Delete assessment items for this LO
+        assessmentItemRepository.deleteAll(items);
+
+        // 4. Delete CqiAction rows that reference this LO (nullable FK los_id blocks LO deletion)
+        try { jdbcTemplate.update("DELETE FROM cqi_action WHERE los_id = ?", storedLosId); } catch (Exception ignored) {}
+
+        // 5. Delete LO-PO mappings
+        try { jdbcTemplate.update("DELETE FROM lo_po_mappings WHERE los_id = ? OR lospos_id = ?", storedLosId, storedLosId); } catch (Exception ignored) {}
+
+        // 6. Delete legacy assignments table if present
+        try { jdbcTemplate.update("DELETE FROM assignments WHERE los_pos_id = ?", storedLosId); } catch (Exception ignored) {}
+
+        // 7. Delete the LO
         losRepository.deleteById(storedLosId);
     }
 }

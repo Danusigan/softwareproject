@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -15,7 +16,10 @@ public class UserService {
     // Optional<User> findByUsername(String username);
     @Autowired
     private UserRepository userRepository;
-    
+
+    @Autowired
+    private ModuleService moduleService;
+
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -57,6 +61,45 @@ public class UserService {
      */
     public Optional<User> findByUsertype(String usertype) {
         return userRepository.findByUsertype(usertype);
+    }
+
+    /**
+     * Lists all lecturers, for admin module-assignment pickers.
+     */
+    public List<User> findAllLecturers() {
+        return userRepository.findAllByUsertype("lecture");
+    }
+
+    /**
+     * Updates a lecturer's email (and password, if provided). Username/usertype are fixed.
+     */
+    public User updateLecturer(String username, String email, String password) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+        if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not a lecturer");
+        }
+        if (email != null && !email.isBlank()) {
+            user.setEmail(email);
+        }
+        if (password != null && !password.isBlank()) {
+            user.setPassword(password);
+        }
+        return userRepository.save(user);
+    }
+
+    /**
+     * Deletes a lecturer. Clears their module assignments first so the
+     * module_lecturers foreign key doesn't block the delete.
+     */
+    public void deleteLecturer(String username) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+        if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not a lecturer");
+        }
+        moduleService.removeLecturerFromAllModules(username);
+        userRepository.delete(user);
     }
 
     /**

@@ -36,6 +36,9 @@ public class AssessmentTemplate {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "assignment_label")
+    private String assignmentLabel; // e.g. "Assignment 1", "Assignment 2", "Final Exam 2024"
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "module_id")
     private Module module;
@@ -86,4 +89,7 @@ public class AssessmentTemplate {
 
     public List<AssessmentItem> getItems() { return items; }
     public void setItems(List<AssessmentItem> items) { this.items = items; }
+
+    public String getAssignmentLabel() { return assignmentLabel; }
+    public void setAssignmentLabel(String assignmentLabel) { this.assignmentLabel = assignmentLabel; }
 }

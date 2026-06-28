@@ -136,10 +136,23 @@ public class OutcomeMapping {
         this.programOutcome = programOutcome;
     }
 
-    // Custom getters for IDs to be included in JSON output
+    // Custom getters for IDs to be included in JSON output.
+    // learningOutcome itself is excluded from JSON by @JsonBackReference (needed to avoid
+    // infinite recursion when a Los is serialized with its mappings list), so these flattened
+    // fields are the only way callers see LO name/module without that object.
     @JsonProperty("learningOutcomeId")
     public String getLearningOutcomeId() {
         return learningOutcome != null ? learningOutcome.getId() : null;
+    }
+
+    @JsonProperty("learningOutcomeName")
+    public String getLearningOutcomeName() {
+        return learningOutcome != null ? learningOutcome.getName() : null;
+    }
+
+    @JsonProperty("moduleId")
+    public String getModuleId() {
+        return learningOutcome != null ? learningOutcome.getModuleId() : null;
     }
 
     @JsonProperty("programOutcomeCode")

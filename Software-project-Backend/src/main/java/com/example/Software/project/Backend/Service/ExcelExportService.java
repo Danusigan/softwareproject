@@ -233,6 +233,29 @@ public class ExcelExportService {
      * @return byte array of Excel template file
      */
     public byte[] generateMarkTemplate(List<String> losIds) throws IOException {
+        return generateMarkTemplate(losIds, null, null, 50, 100, null);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, double maxMarksPerLo, String moduleId) throws IOException {
+        return generateMarkTemplate(losIds, batch, markType, threshold, maxMarksPerLo, moduleId, null);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, double maxMarksPerLo, String moduleId,
+                                       String assignmentLabel) throws IOException {
+        // Build per-LO max marks using the global value
+        Map<String, Double> perLoMaxMarks = new LinkedHashMap<>();
+        for (String id : losIds) perLoMaxMarks.put(id, maxMarksPerLo);
+        return generateMarkTemplate(losIds, batch, markType, threshold, perLoMaxMarks, moduleId, assignmentLabel);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, Map<String, Double> perLoMaxMarks, String moduleId,
+                                       String assignmentLabel) throws IOException {
+        if (perLoMaxMarks == null) perLoMaxMarks = new LinkedHashMap<>();
+        final Map<String, Double> loMaxMap = perLoMaxMarks;
+
         // Fetch all LOs
         Map<String, Los> losMap = new HashMap<>();
         for (String losId : losIds) {
@@ -240,93 +263,149 @@ public class ExcelExportService {
             los.ifPresent(l -> losMap.put(losId, l));
         }
 
-        // Create workbook
+        // Build LO_MAX_MARKS metadata value: "LO1:50,LO2:30"
+        StringBuilder loMaxMeta = new StringBuilder();
+        for (int i = 0; i < losIds.size(); i++) {
+            if (i > 0) loMaxMeta.append(",");
+            String id = losIds.get(i);
+            double mx = loMaxMap.getOrDefault(id, 100.0);
+            loMaxMeta.append(id).append(":").append((int) mx);
+        }
+
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Mark Template");
 
-            // Define styles
             CellStyle headerStyle = createHeaderStyle(workbook);
             CellStyle inputStyle = createInputStyle(workbook);
 
-            // Create header row
-            Row headerRow = sheet.createRow(0);
+            // Title row (row 0)
+            Row titleRow = sheet.createRow(0);
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 12);
+            titleFont.setColor(IndexedColors.DARK_BLUE.getIndex());
+            titleStyle.setFont(titleFont);
+            Cell titleCell = titleRow.createCell(0);
+            String assignLabel = (assignmentLabel != null && !assignmentLabel.isBlank()) ? assignmentLabel : "";
+            titleCell.setCellValue("LO-wise Mark Entry Template"
+                + (assignLabel.isEmpty() ? "" : " — " + assignLabel)
+                + " | Batch: " + (batch != null ? batch : "-")
+                + " | Type: " + (markType != null ? markType.replace("_", " ") : "FINAL EXAM"));
+            titleCell.setCellStyle(titleStyle);
 
-            // First column - Student Index
+            // Header row (row 1): Student Index | LO1 (max=50) | LO2 (max=30) ...
+            Row headerRow = sheet.createRow(1);
             Cell indexHeader = headerRow.createCell(0);
             indexHeader.setCellValue("Student Index");
             indexHeader.setCellStyle(headerStyle);
             sheet.setColumnWidth(0, 5000);
 
-            // LO columns
             int colIndex = 1;
             for (String losId : losIds) {
                 Los los = losMap.get(losId);
+                String loName = los != null ? los.getName() : losId;
+                double maxMark = loMaxMap.getOrDefault(losId, 100.0);
                 Cell loHeader = headerRow.createCell(colIndex);
-                loHeader.setCellValue(los != null ? los.getName() : losId);
+                loHeader.setCellValue(loName + " (max=" + (int) maxMark + ")");
                 loHeader.setCellStyle(headerStyle);
-                sheet.setColumnWidth(colIndex, 4000);
+                sheet.setColumnWidth(colIndex, 5000);
                 colIndex++;
             }
 
-            // Add sample rows (10 empty rows for user to fill in)
-            for (int rowNum = 1; rowNum <= 10; rowNum++) {
+            // Data rows (30 empty rows)
+            for (int rowNum = 2; rowNum <= 31; rowNum++) {
                 Row row = sheet.createRow(rowNum);
-
-                // Student index column (user fills this)
-                Cell studentCell = row.createCell(0);
-                studentCell.setCellStyle(inputStyle);
-
-                // LO mark columns (user fills these with scores 0-100)
+                row.createCell(0).setCellStyle(inputStyle);
                 for (int col = 1; col <= losIds.size(); col++) {
-                    Cell markCell = row.createCell(col);
-                    markCell.setCellStyle(inputStyle);
-                    // Set cell format as number with 2 decimal places
-                    markCell.setCellValue(""); // Leave empty for user to fill
+                    row.createCell(col).setCellStyle(inputStyle);
                 }
             }
 
-            // Add instructions sheet
-            Sheet instructionsSheet = workbook.createSheet("Instructions");
-            instructionsSheet.setColumnWidth(0, 15000);
+            // METADATA sheet
+            writeMetadataSheet(workbook, batch, markType, threshold, loMaxMap, moduleId,
+                               String.join(",", losIds), assignmentLabel, loMaxMeta.toString());
 
-            int instrRow = 0;
+            // Instructions sheet
+            Sheet instrSheet = workbook.createSheet("Instructions");
+            instrSheet.setColumnWidth(0, 18000);
+            int ir = 0;
 
-            // Add title
-            Row titleRow = instructionsSheet.createRow(instrRow++);
-            Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("Mark Entry Template - Instructions");
-            Font titleFont = workbook.createFont();
-            titleFont.setBold(true);
-            titleFont.setFontHeightInPoints((short) 14);
-            CellStyle titleStyle = workbook.createCellStyle();
-            titleStyle.setFont(titleFont);
-            titleCell.setCellStyle(titleStyle);
+            Row insTitleRow = instrSheet.createRow(ir++);
+            Cell insTitleCell = insTitleRow.createCell(0);
+            insTitleCell.setCellValue("LO-wise Mark Entry — Instructions");
+            CellStyle insTitleStyle = workbook.createCellStyle();
+            Font insTitleFont = workbook.createFont();
+            insTitleFont.setBold(true); insTitleFont.setFontHeightInPoints((short) 14);
+            insTitleStyle.setFont(insTitleFont);
+            insTitleCell.setCellStyle(insTitleStyle);
+            ir++;
 
-            instrRow++; // blank row
-
-            // Instructions
             String[] instructions = {
-                "1. Fill in the 'Student Index' column with student IDs (e.g., EN001, EN002)",
-                "2. Fill in the mark columns with scores between 0 and 100",
-                "3. Use decimal values (e.g., 85.50, 92.00)",
-                "4. Do NOT modify the header row",
-                "5. Do NOT change the column order",
-                "6. Do NOT change sheet names",
-                "7. Save the file as Excel format (.xlsx)",
-                "8. Upload the completed file back to the system"
+                "Assignment: " + (assignLabel.isEmpty() ? "(not set)" : assignLabel),
+                "Batch: " + (batch != null ? batch : "-") + "  |  Type: " + (markType != null ? markType : "FINAL_EXAM"),
+                "",
+                "Max marks per Learning Outcome:",
             };
-
-            for (String instruction : instructions) {
-                Row instrRowObj = instructionsSheet.createRow(instrRow++);
-                Cell instrCell = instrRowObj.createCell(0);
-                instrCell.setCellValue(instruction);
-                instrRowObj.setHeightInPoints(20);
+            for (String s : instructions) {
+                instrSheet.createRow(ir++).createCell(0).setCellValue(s);
+            }
+            for (String losId : losIds) {
+                Los los = losMap.get(losId);
+                double mx = loMaxMap.getOrDefault(losId, 100.0);
+                instrSheet.createRow(ir++).createCell(0)
+                    .setCellValue("  • " + (los != null ? los.getName() : losId) + ": max = " + (int) mx + " marks");
+            }
+            ir++;
+            String[] rules = {
+                "Instructions:",
+                "1. Fill 'Student Index' column with student IDs (e.g. EG/2024/5667)",
+                "2. Fill each LO column with the student's raw score for that LO",
+                "3. Each score must be between 0 and the max shown in the column header",
+                "4. Leave a cell empty if a student was absent for that LO",
+                "5. Do NOT modify the header row, title row, or METADATA sheet",
+                "6. Save as .xlsx and upload — all settings are detected automatically",
+            };
+            for (String r : rules) {
+                instrSheet.createRow(ir++).createCell(0).setCellValue(r);
             }
 
-            // Convert to byte array
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             workbook.write(output);
             return output.toByteArray();
+        }
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, double maxMarksPerLo, String moduleId, String loIds) {
+        writeMetadataSheet(workbook, batch, markType, threshold, maxMarksPerLo, moduleId, loIds, null);
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, double maxMarksPerLo, String moduleId, String loIds,
+                                    String assignmentLabel) {
+        writeMetadataSheet(workbook, batch, markType, threshold,
+            (Map<String, Double>) null, moduleId, loIds, assignmentLabel, "");
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, Map<String, Double> perLoMaxMarks, String moduleId,
+                                    String loIds, String assignmentLabel, String loMaxMeta) {
+        Sheet meta = workbook.createSheet("METADATA");
+        String[][] entries = {
+            {"TEMPLATE_TYPE",    "LO_WISE"},
+            {"BATCH",            batch != null ? batch : ""},
+            {"MARK_TYPE",        markType != null ? markType : "FINAL_EXAM"},
+            {"THRESHOLD",        String.valueOf((int) threshold)},
+            {"MODULE_ID",        moduleId != null ? moduleId : ""},
+            {"LO_IDS",           loIds != null ? loIds : ""},
+            {"ASSIGNMENT_LABEL", assignmentLabel != null ? assignmentLabel : ""},
+            {"LO_MAX_MARKS",     loMaxMeta != null ? loMaxMeta : ""},
+        };
+        for (int i = 0; i < entries.length; i++) {
+            Row row = meta.createRow(i);
+            row.createCell(0).setCellValue(entries[i][0]);
+            row.createCell(1).setCellValue(entries[i][1]);
         }
     }
 
@@ -507,6 +586,17 @@ public class ExcelExportService {
      */
     public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
                                                List<Map<String, Object>> questionMappings) throws IOException {
+        return generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings, null, null, null);
+    }
+
+    /**
+     * Build question-wise template.
+     * Layout: Student ID (col 0) | Q1 (col 1) | Q2 (col 2) | ...
+     * No "Student Name" column — keeps the sheet lean and avoids LO-name confusion.
+     */
+    public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
+                                               List<Map<String, Object>> questionMappings,
+                                               String batch, String markType, String assignmentLabel) throws IOException {
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Question Mark Template");
             CellStyle headerStyle = createHeaderStyle(workbook);
@@ -515,7 +605,9 @@ public class ExcelExportService {
             // Row 0: Title
             Row titleRow = sheet.createRow(0);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("Question-wise Mark Entry Template");
+            String title = "Question-wise Mark Entry Template";
+            if (assignmentLabel != null && !assignmentLabel.isBlank()) title += " — " + assignmentLabel;
+            titleCell.setCellValue(title);
             Font titleFont = workbook.createFont();
             titleFont.setBold(true);
             titleFont.setFontHeightInPoints((short) 14);
@@ -523,17 +615,12 @@ public class ExcelExportService {
             titleStyle.setFont(titleFont);
             titleCell.setCellStyle(titleStyle);
 
-            // Row 2: Column headers
+            // Row 2: Column headers — Student ID (col 0), then Q1, Q2, ...
             Row headerRow = sheet.createRow(2);
             Cell studentIdHeader = headerRow.createCell(0);
             studentIdHeader.setCellValue("Student ID");
             studentIdHeader.setCellStyle(headerStyle);
             sheet.setColumnWidth(0, 5000);
-
-            Cell studentNameHeader = headerRow.createCell(1);
-            studentNameHeader.setCellValue("Student Name");
-            studentNameHeader.setCellStyle(headerStyle);
-            sheet.setColumnWidth(1, 7000);
 
             // Load assessment items if template exists
             List<AssessmentItem> items = new ArrayList<>();
@@ -555,14 +642,8 @@ public class ExcelExportService {
                     Object qNumObj = mapping.get("questionNumber");
                     if (qNumObj == null) continue;
                     Integer qNum;
-                    try {
-                        qNum = Integer.parseInt(qNumObj.toString().trim());
-                    } catch (Exception ex) {
-                        continue;
-                    }
-                    if (qNum > 0) {
-                        mappingByQuestion.put(qNum, mapping);
-                    }
+                    try { qNum = Integer.parseInt(qNumObj.toString().trim()); } catch (Exception ex) { continue; }
+                    if (qNum > 0) mappingByQuestion.put(qNum, mapping);
                 }
             }
 
@@ -572,12 +653,15 @@ public class ExcelExportService {
             } else if (!mappingByQuestion.isEmpty()) {
                 numQuestions = Collections.max(mappingByQuestion.keySet());
             } else {
-                // Backward-compatible default behavior
                 numQuestions = Math.max(5, items.size());
             }
 
+            // Build per-question info for instructions sheet
+            List<String> questionInfoLines = new ArrayList<>();
+
             for (int q = 1; q <= numQuestions; q++) {
-                Cell qHeader = headerRow.createCell(q + 1);
+                // Q columns start at col 1 (no Student Name column)
+                Cell qHeader = headerRow.createCell(q);
 
                 String loName = null;
                 Double maxMarks = null;
@@ -586,18 +670,12 @@ public class ExcelExportService {
                 if (mapping != null) {
                     Object maxObj = mapping.get("maxMarks");
                     if (maxObj != null) {
-                        try {
-                            maxMarks = Double.parseDouble(maxObj.toString().trim());
-                        } catch (Exception ignored) {
-                            maxMarks = null;
-                        }
+                        try { maxMarks = Double.parseDouble(maxObj.toString().trim()); } catch (Exception ignored) {}
                     }
-
                     Object loNameObj = mapping.get("loName");
                     if (loNameObj != null && !loNameObj.toString().trim().isEmpty()) {
                         loName = loNameObj.toString().trim();
                     }
-
                     if (loName == null) {
                         Object loIdObj = mapping.get("loId");
                         if (loIdObj != null && !loIdObj.toString().trim().isEmpty()) {
@@ -606,7 +684,6 @@ public class ExcelExportService {
                         }
                     }
                 }
-
                 if (loName == null || maxMarks == null) {
                     AssessmentItem item = itemByQuestion.get(q);
                     if (item != null) {
@@ -615,79 +692,99 @@ public class ExcelExportService {
                     }
                 }
 
-                if (loName != null || maxMarks != null) {
-                    StringBuilder label = new StringBuilder();
-                    label.append("Q").append(q).append(" (");
-                    label.append(loName != null ? loName : "LO");
-                    if (maxMarks != null) {
-                        label.append(", max=").append(maxMarks);
-                    }
-                    label.append(")");
-                    qHeader.setCellValue(label.toString());
-                } else {
-                    qHeader.setCellValue("Q" + q);
-                }
+                // Header: "Q1 (max=10)"
+                StringBuilder label = new StringBuilder("Q").append(q);
+                if (maxMarks != null) label.append(" (max=").append(maxMarks.intValue()).append(")");
+                qHeader.setCellValue(label.toString());
                 qHeader.setCellStyle(headerStyle);
-                sheet.setColumnWidth(q + 1, 4500);
+                sheet.setColumnWidth(q, 4000);
+
+                // Collect info for instructions
+                String info = "  Q" + q + ": max marks = " + (maxMarks != null ? maxMarks.intValue() : "?");
+                if (loName != null) info += " → LO: " + loName;
+                questionInfoLines.add(info);
             }
 
-            // Add 10 empty data rows for user entry
-            for (int rowNum = 3; rowNum <= 12; rowNum++) {
+            // Data rows — Student ID (col 0), Q marks (col 1..n)
+            for (int rowNum = 3; rowNum <= 30; rowNum++) {
                 Row row = sheet.createRow(rowNum);
-                Cell studentIdCell = row.createCell(0);
-                studentIdCell.setCellStyle(inputStyle);
-
-                Cell studentNameCell = row.createCell(1);
-                studentNameCell.setCellStyle(inputStyle);
-
+                row.createCell(0).setCellStyle(inputStyle);
                 for (int q = 1; q <= numQuestions; q++) {
-                    Cell markCell = row.createCell(q + 1);
+                    Cell markCell = row.createCell(q);
                     markCell.setCellStyle(inputStyle);
                     markCell.setCellValue("");
                 }
             }
 
-            // Add instructions sheet
+            // ── Instructions sheet ──────────────────────────────────────────
             Sheet instructSheet = workbook.createSheet("Instructions");
-            instructSheet.setColumnWidth(0, 15000);
+            instructSheet.setColumnWidth(0, 18000);
             int instrRow = 0;
 
-            Row instrTitle = instructSheet.createRow(instrRow++);
-            Cell instrTitleCell = instrTitle.createCell(0);
-            instrTitleCell.setCellValue("Question-wise Mark Entry Instructions");
-            Font instrFont = workbook.createFont();
-            instrFont.setBold(true);
-            instrFont.setFontHeightInPoints((short) 12);
-            CellStyle instrTitleStyle = workbook.createCellStyle();
-            instrTitleStyle.setFont(instrFont);
-            instrTitleCell.setCellStyle(instrTitleStyle);
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+            boldFont.setFontHeightInPoints((short) 12);
+            CellStyle boldStyle = workbook.createCellStyle();
+            boldStyle.setFont(boldFont);
 
+            Row instrTitleRow = instructSheet.createRow(instrRow++);
+            Cell instrTitleCell = instrTitleRow.createCell(0);
+            instrTitleCell.setCellValue("Question-wise Mark Entry Instructions");
+            instrTitleCell.setCellStyle(boldStyle);
             instrRow++;
 
             String[] instructions = {
-                "1. Fill 'Student ID' and 'Student Name' columns",
-                "2. Enter question marks for Q1, Q2, Q3... columns",
-                "3. Each question mark should be 0 to (max marks for that question)",
-                "4. Use decimal values (e.g., 8.5, 9.0)",
-                "5. Do NOT modify header row or sheet name",
-                "6. Save as Excel format (.xlsx)",
+                "TEMPLATE TYPE : Question-wise (marks entered per question, aggregated to LO automatically)",
+                "Assignment     : " + (assignmentLabel != null ? assignmentLabel : "-"),
+                "Batch          : " + (batch != null ? batch : "-"),
+                "Mark Type      : " + (markType != null ? markType : "-"),
                 "",
-                "Example:",
-                "Student ID | Student Name | Q1 (max=10) | Q2 (max=15) | Q3 (max=10)",
-                "EN001      | Alex Silva   | 8.5         | 12.0        | 9.0",
-                "EN002      | Priya N      | 9.0         | 14.5        | 8.5"
+                "How to fill:",
+                "  1. Enter Student ID in column A (e.g., EG/2024/5667)",
+                "  2. Enter question marks in columns B, C, D... (Q1, Q2, Q3...)",
+                "  3. Each mark must be between 0 and the max marks shown in the column header",
+                "  4. Marks outside the valid range will REJECT the entire upload with an error",
+                "  5. Leave cells empty for absent/missing questions (not 0)",
+                "  6. Do NOT modify the header row, sheet names, or METADATA sheet",
+                "  7. Upload using the 'Upload Marks' button — type is detected automatically",
+                "",
+                "Question max marks:"
             };
+            for (String line : instructions) {
+                Row r = instructSheet.createRow(instrRow++);
+                r.createCell(0).setCellValue(line);
+            }
+            for (String qLine : questionInfoLines) {
+                Row r = instructSheet.createRow(instrRow++);
+                r.createCell(0).setCellValue(qLine);
+            }
 
-            for (String instruction : instructions) {
-                Row instrRow2 = instructSheet.createRow(instrRow++);
-                Cell instrCell = instrRow2.createCell(0);
-                instrCell.setCellValue(instruction);
+            // ── METADATA sheet ──────────────────────────────────────────────
+            Sheet meta = workbook.createSheet("METADATA");
+            String[][] entries = {
+                {"TEMPLATE_TYPE",   "QUESTION_WISE"},
+                {"TEMPLATE_ID",     templateId != null ? templateId : ""},
+                {"BATCH",           batch != null ? batch : ""},
+                {"MARK_TYPE",       markType != null ? markType : "FINAL_EXAM"},
+                {"ASSIGNMENT_LABEL", assignmentLabel != null ? assignmentLabel : ""},
+            };
+            for (int i = 0; i < entries.length; i++) {
+                org.apache.poi.ss.usermodel.Row row = meta.createRow(i);
+                row.createCell(0).setCellValue(entries[i][0]);
+                row.createCell(1).setCellValue(entries[i][1]);
             }
 
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             workbook.write(output);
             return output.toByteArray();
         }
+    }
+
+    /** Backward-compat overload — delegates to the full method. */
+    public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
+                                               List<Map<String, Object>> questionMappings,
+                                               String batch, String markType) throws IOException {
+        return generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings, batch, markType, null);
     }
 
     /**
@@ -845,7 +942,7 @@ public class ExcelExportService {
      */
     private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
         List<AssessmentItem> items = assessmentItemRepository
-            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase());
+            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase(), MarkType.valueOf(markType.toUpperCase()));
         return items.stream()
             .mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0)
             .sum();

@@ -8,7 +8,6 @@ export default function LecturerDashboard() {
     const navigate = useNavigate();
     const [modules, setModules] = useState([]);
     const [selectedModule, setSelectedModule] = useState(null);
-    const [modulePanelMode, setModulePanelMode] = useState('default');
     const [activeModuleMenuId, setActiveModuleMenuId] = useState(null);
     const [los, setLos] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -16,191 +15,94 @@ export default function LecturerDashboard() {
     const [showEditLoDialog, setShowEditLoDialog] = useState(false);
     const [editingLo, setEditingLo] = useState(null);
 
-    const [loData, setLoData] = useState({
-        loNumber: '',
-        description: ''
-    });
+    const [loData, setLoData] = useState({ loNumber: '', description: '' });
 
     const extractDisplayLoNumber = (loId) => {
         if (!loId) return '';
-        const normalized = String(loId).trim();
-        const parts = normalized.split(' ');
-        return parts.length > 1 ? parts[parts.length - 1] : normalized;
+        const parts = String(loId).trim().split(' ');
+        return parts.length > 1 ? parts[parts.length - 1] : String(loId).trim();
     };
 
     const getStatusForLo = (loId) => {
-        const relevantMappings = los.find(lo => lo.id === loId)?.mappings;
-        if (!relevantMappings || relevantMappings.length === 0) {
-            return { status: 'UNMAPPED', badge: 'bg-gray-100 text-gray-800 border-gray-200' };
-        }
-        if (relevantMappings.some(m => m.status === 'PENDING')) {
-            return { status: 'PENDING', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
-        }
-        if (relevantMappings.every(m => m.status === 'APPROVED')) {
-            return { status: 'APPROVED', badge: 'bg-green-100 text-green-800 border-green-200' };
-        }
-        if (relevantMappings.some(m => m.status === 'REJECTED')) {
-            return { status: 'REJECTED', badge: 'bg-red-100 text-red-800 border-red-200' };
-        }
+        const mappings = los.find(lo => lo.id === loId)?.mappings;
+        if (!mappings || mappings.length === 0) return { status: 'UNMAPPED', badge: 'bg-gray-100 text-gray-800 border-gray-200' };
+        if (mappings.some(m => m.status === 'PENDING')) return { status: 'PENDING', badge: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+        if (mappings.every(m => m.status === 'APPROVED')) return { status: 'APPROVED', badge: 'bg-green-100 text-green-800 border-green-200' };
+        if (mappings.some(m => m.status === 'REJECTED')) return { status: 'REJECTED', badge: 'bg-red-100 text-red-800 border-red-200' };
         return { status: 'MIXED', badge: 'bg-blue-100 text-blue-800 border-blue-200' };
     };
 
-    const getRejectedFeedbackForLo = (loId) => {
-        const relevantMappings = los.find(lo => lo.id === loId)?.mappings || [];
-        const rejected = relevantMappings.filter(m => m.status === 'REJECTED');
-
-        return {
-            count: rejected.length,
-            firstMessage: rejected.find(m => (m.adminRemarks || '').trim())?.adminRemarks || ''
-        };
+    const getRejectedFeedback = (loId) => {
+        const rejected = (los.find(lo => lo.id === loId)?.mappings || []).filter(m => m.status === 'REJECTED');
+        return { count: rejected.length, firstMessage: rejected.find(m => (m.adminRemarks || '').trim())?.adminRemarks || '' };
     };
 
-    // Fetch modules on mount
-    useEffect(() => {
-        fetchModules();
-    }, []);
+    useEffect(() => { fetchModules(); }, []);
 
-    // Fetch LOs when a module is selected
     useEffect(() => {
-        if (selectedModule) {
-            fetchLosForModule(selectedModule.moduleId);
-        }
+        if (selectedModule) fetchLosForModule(selectedModule.moduleId);
     }, [selectedModule]);
 
     useEffect(() => {
         if (!activeModuleMenuId) return;
-
-        const handleGlobalClick = (event) => {
-            if (!event.target.closest('[data-module-action-menu]')) {
-                setActiveModuleMenuId(null);
-            }
-        };
-
-        const handleEscape = (event) => {
-            if (event.key === 'Escape') {
-                setActiveModuleMenuId(null);
-            }
-        };
-
-        document.addEventListener('click', handleGlobalClick);
-        document.addEventListener('keydown', handleEscape);
-
-        return () => {
-            document.removeEventListener('click', handleGlobalClick);
-            document.removeEventListener('keydown', handleEscape);
-        };
+        const handleClick = (e) => { if (!e.target.closest('[data-module-action-menu]')) setActiveModuleMenuId(null); };
+        const handleEsc = (e) => { if (e.key === 'Escape') setActiveModuleMenuId(null); };
+        document.addEventListener('click', handleClick);
+        document.addEventListener('keydown', handleEsc);
+        return () => { document.removeEventListener('click', handleClick); document.removeEventListener('keydown', handleEsc); };
     }, [activeModuleMenuId]);
 
     const fetchModules = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/modules/all', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            // Backend returns {message, data, status} format
+            const res = await axios.get('http://localhost:8080/api/modules/all', { headers: { Authorization: `Bearer ${token}` } });
             setModules(res.data.data || []);
-        } catch (err) {
-            console.error('Failed to fetch modules:', err);
-            setModules([]);
-        }
+        } catch { setModules([]); }
     };
 
     const fetchLosForModule = async (moduleId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/module/${moduleId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            // Backend returns {message, data, count, status} format
+            const res = await axios.get(`http://localhost:8080/api/lospos/module/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } });
             setLos(res.data.data || []);
-        } catch (err) {
-            console.error('Failed to fetch LOs:', err);
-            setLos([]);
-        }
+        } catch { setLos([]); }
     };
 
-    const openLoCreationInNewWindow = (moduleId) => {
-        const targetUrl = `${window.location.origin}/create-lo-mapping/${moduleId}`;
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    const openLoCreation = (moduleId) => {
+        navigate(`/create-lo-mapping/${moduleId}`);
     };
 
-    const toggleModuleActionMenu = (moduleId) => {
-        setActiveModuleMenuId((prev) => (prev === moduleId ? null : moduleId));
-    };
-
-    const handleCreateLoClick = (moduleId) => {
-        openLoCreationInNewWindow(moduleId);
-        setActiveModuleMenuId(null);
-    };
-
-    const handleViewMappingsClick = () => {
-        setActiveModuleMenuId(null);
-        navigate('/lo-po-mappings');
-    };
-
-    const handleViewLOsClick = (module) => {
-        setActiveModuleMenuId(null);
-        setSelectedModule(module);
-        setModulePanelMode('default');
-    };
-
-    const handleAddMarksClick = (module) => {
-        setActiveModuleMenuId(null);
-        setSelectedModule(module);
-        setModulePanelMode('analysis');
-        setMessage({ type: 'success', text: 'Select a Learning Outcome below to upload student marks.' });
-    };
+    const toggleModuleMenu = (moduleId) => setActiveModuleMenuId(prev => prev === moduleId ? null : moduleId);
 
     const handleEditLo = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setMessage({ type: '', text: '' });
-
         try {
             const token = localStorage.getItem('token');
             await axios.put(
                 `http://localhost:8080/api/lospos/${editingLo.id}`,
-                {
-                    id: loData.loNumber,
-                    name: `LO ${loData.loNumber}`,
-                    description: loData.description
-                },
-                {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }
+                { id: loData.loNumber, name: `LO ${loData.loNumber}`, description: loData.description },
+                { headers: { Authorization: `Bearer ${token}` } }
             );
-
             setMessage({ type: 'success', text: 'LO updated successfully!' });
             setShowEditLoDialog(false);
             setEditingLo(null);
             setLoData({ loNumber: '', description: '' });
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {
-            setMessage({
-                type: 'error',
-                text: err.response?.data || 'Failed to update LO'
-            });
-        } finally {
-            setLoading(false);
-        }
+            setMessage({ type: 'error', text: err.response?.data || 'Failed to update LO' });
+        } finally { setLoading(false); }
     };
 
     const handleDeleteLo = async (loId) => {
         if (!window.confirm('Are you sure you want to delete this LO?')) return;
-
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/lospos/${loId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
+            await axios.delete(`http://localhost:8080/api/lospos/${loId}`, { headers: { Authorization: `Bearer ${token}` } });
             setMessage({ type: 'success', text: 'LO deleted successfully!' });
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {
-            setMessage({
-                type: 'error',
-                text: err.response?.data || 'Failed to delete LO'
-            });
+            setMessage({ type: 'error', text: err.response?.data || 'Failed to delete LO' });
         }
     };
 
@@ -212,7 +114,6 @@ export default function LecturerDashboard() {
 
     const closeModulePanel = () => {
         setSelectedModule(null);
-        setModulePanelMode('default');
         setLos([]);
         setShowEditLoDialog(false);
         setMessage({ type: '', text: '' });
@@ -221,8 +122,6 @@ export default function LecturerDashboard() {
     return (
         <div className="min-h-screen bg-[#f8fafc] flex flex-col relative overflow-hidden">
             <Header />
-
-            {/* Background Decorations */}
             <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
 
@@ -239,10 +138,9 @@ export default function LecturerDashboard() {
                 </div>
 
                 {message.text && (
-                    <div className={`mb-8 flex items-center gap-3 p-4 rounded-2xl text-sm font-bold animate-in slide-in-from-top-4 duration-300
-                        ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+                    <div className={`mb-8 flex items-center gap-3 p-4 rounded-2xl text-sm font-bold animate-in slide-in-from-top-4 duration-300 ${message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
                         <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={message.type === 'success' ? "M5 13l4 4L19 7" : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"} />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={message.type === 'success' ? 'M5 13l4 4L19 7' : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'} />
                         </svg>
                         {message.text}
                     </div>
@@ -252,7 +150,7 @@ export default function LecturerDashboard() {
                 <div className="space-y-8">
                     <div className="flex items-center gap-4">
                         <h2 className="heading-lg text-slate-800">Your Assigned Modules</h2>
-                        <div className="h-px flex-1 bg-slate-100"></div>
+                        <div className="h-px flex-1 bg-slate-100" />
                         <span className="bg-slate-100 px-3 py-1 rounded-lg text-[10px] font-black text-slate-400 uppercase tracking-widest">
                             {modules.length} Total
                         </span>
@@ -272,7 +170,7 @@ export default function LecturerDashboard() {
                             {modules.map((module) => (
                                 <div
                                     key={module.moduleId}
-                                    onClick={() => toggleModuleActionMenu(module.moduleId)}
+                                    onClick={() => toggleModuleMenu(module.moduleId)}
                                     className="relative glass-card group rounded-[2.5rem] p-8 cursor-pointer transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 hover:border-indigo-200 bg-white/40"
                                     data-module-action-menu
                                 >
@@ -302,14 +200,15 @@ export default function LecturerDashboard() {
                                         </div>
                                     </div>
 
+                                    {/* Action Menu Dropdown */}
                                     {activeModuleMenuId === module.moduleId && (
                                         <div
                                             className="absolute left-8 right-8 top-[92px] z-20 bg-white border border-slate-200 rounded-2xl shadow-2xl shadow-slate-900/10 p-3 space-y-2 animate-in fade-in zoom-in-95 duration-200"
-                                            onClick={(e) => e.stopPropagation()}
+                                            onClick={e => e.stopPropagation()}
                                         >
                                             <button
                                                 type="button"
-                                                onClick={() => handleCreateLoClick(module.moduleId)}
+                                                onClick={() => { openLoCreation(module.moduleId); setActiveModuleMenuId(null); }}
                                                 className="w-full text-left px-4 py-3 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-3"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,7 +222,7 @@ export default function LecturerDashboard() {
 
                                             <button
                                                 type="button"
-                                                onClick={() => handleViewLOsClick(module)}
+                                                onClick={() => { setActiveModuleMenuId(null); setSelectedModule(module); }}
                                                 className="w-full text-left px-4 py-3 rounded-xl bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors flex items-center gap-3"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,13 +231,13 @@ export default function LecturerDashboard() {
                                                 </svg>
                                                 <div>
                                                     <p className="text-sm font-semibold">View / Manage LOs</p>
-                                                    <p className="text-[11px] text-sky-700/80">View existing LOs or edit them</p>
+                                                    <p className="text-[11px] text-sky-700/80">View existing LOs, edit or delete them</p>
                                                 </div>
                                             </button>
 
                                             <button
                                                 type="button"
-                                                onClick={handleViewMappingsClick}
+                                                onClick={() => { setActiveModuleMenuId(null); navigate('/lo-po-mappings'); }}
                                                 className="w-full text-left px-4 py-3 rounded-xl bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors flex items-center gap-3"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,18 +251,15 @@ export default function LecturerDashboard() {
 
                                             <button
                                                 type="button"
-                                                onClick={() => {
-                                                    setActiveModuleMenuId(null);
-                                                    navigate(`/marks-workbench/${module.moduleId}`);
-                                                }}
-                                                className="w-full text-left px-4 py-3 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors flex items-center gap-3"
+                                                onClick={() => { setActiveModuleMenuId(null); navigate(`/marks-workbench/${module.moduleId}`); }}
+                                                className="w-full text-left px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors flex items-center gap-3"
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M3 7h18M3 12h18M3 17h18" />
                                                 </svg>
                                                 <div>
-                                                    <p className="text-sm font-semibold">Bulk Marks Workflow</p>
-                                                    <p className="text-[11px] text-indigo-700/80">Template download, export report, and bulk upload</p>
+                                                    <p className="text-sm font-semibold">Marks &amp; Analytics</p>
+                                                    <p className="text-[11px] text-emerald-700/80">Bulk upload, analytics charts, PO attainment</p>
                                                 </div>
                                             </button>
                                         </div>
@@ -378,10 +274,9 @@ export default function LecturerDashboard() {
             {/* Module Detail Panel */}
             {selectedModule && (
                 <>
-                    <div
-                        className="fixed top-0 right-0 h-full w-full md:w-[600px] glass-card-dark text-white shadow-[-20px_0_60px_rgba(0,0,0,0.2)] transform transition-transform duration-500 ease-out z-[60] flex flex-col"
-                        style={{ borderLeft: '1px solid rgba(255,255,255,0.05)' }}
-                    >
+                    <div className="fixed top-0 right-0 h-full w-full md:w-[600px] glass-card-dark text-white shadow-[-20px_0_60px_rgba(0,0,0,0.2)] transition-transform duration-500 ease-out z-[60] flex flex-col"
+                        style={{ borderLeft: '1px solid rgba(255,255,255,0.05)' }}>
+
                         {/* Panel Header */}
                         <div className="p-8 pb-6 border-b border-white/5 space-y-6">
                             <div className="flex justify-between items-start">
@@ -390,187 +285,141 @@ export default function LecturerDashboard() {
                                     <h2 className="text-3xl font-black tracking-tight">{selectedModule.moduleName}</h2>
                                     <p className="text-indigo-300 text-xs font-bold uppercase tracking-widest">Code: {selectedModule.moduleId}</p>
                                 </div>
-                                <button
-                                    onClick={closeModulePanel}
-                                    className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/50 hover:text-white"
-                                >
+                                <button onClick={closeModulePanel} className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/50 hover:text-white">
                                     <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
                             </div>
 
-                            {/* Panel Actions */}
-                            <div className="pt-2">
-                                <div className="space-y-3">
-                                    {modulePanelMode === 'analysis' ? (
-                                        <>
-                                            <button
-                                                onClick={() => navigate(`/marks-workbench/${selectedModule.moduleId}`)}
-                                                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 7h18M3 12h18M3 17h18" />
-                                                </svg>
-                                                Open Bulk Workflow
-                                            </button>
+                            {/* Panel quick actions */}
+                            <div className="space-y-3 pt-2">
+                                <button
+                                    onClick={() => navigate(`/marks-workbench/${selectedModule.moduleId}`)}
+                                    className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-emerald-500/10"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 7h18M3 12h18M3 17h18" />
+                                    </svg>
+                                    Marks &amp; Analytics
+                                </button>
 
-                                            <button
-                                                onClick={() => setMessage({ type: 'success', text: 'Click an LO card below to open the single-LO upload flow.' })}
-                                                className="w-full flex items-center justify-center gap-3 py-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-emerald-400/20"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                </svg>
-                                                Single LO Upload
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={() => openLoCreationInNewWindow(selectedModule.moduleId)}
-                                                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 shadow-xl shadow-indigo-500/10 transform active:scale-[0.98]"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m-6-8h6m3 10H6a2 2 0 01-2-2V8a2 2 0 012-2h3.172a2 2 0 001.414-.586l.828-.828A2 2 0 0112.828 4H18a2 2 0 012 2v10a2 2 0 01-2 2z" />
-                                                </svg>
-                                                Create LO + PO Mapping
-                                            </button>
+                                <button
+                                    onClick={() => openLoCreation(selectedModule.moduleId)}
+                                    className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m-6-8h6m3 10H6a2 2 0 01-2-2V8a2 2 0 012-2h3.172a2 2 0 001.414-.586l.828-.828A2 2 0 0112.828 4H18a2 2 0 012 2v10a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Create LO + PO Mapping
+                                </button>
 
-                                            <button
-                                                onClick={() => navigate('/lo-po-mappings')}
-                                                className="w-full flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-white/10"
-                                            >
-                                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                                </svg>
-                                                Review Mapping Status
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
+                                <button
+                                    onClick={() => navigate('/lo-po-mappings')}
+                                    className="w-full flex items-center justify-center gap-3 py-4 bg-white/10 hover:bg-white/15 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all duration-300 border border-white/10"
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    Review Mapping Status
+                                </button>
                             </div>
                         </div>
 
-                        {/* LOs List Area */}
+                        {/* LOs list */}
                         <div className="flex-1 overflow-y-auto p-8 space-y-6 scrollbar-thin scrollbar-thumb-white/10">
                             <div className="flex items-center gap-4 text-white/30 mb-8">
                                 <span className="text-[10px] font-black uppercase tracking-[0.3em]">Module Learning Outcomes</span>
-                                <div className="h-px flex-1 bg-white/5"></div>
+                                <div className="h-px flex-1 bg-white/5" />
                             </div>
 
                             {los.length === 0 ? (
                                 <div className="text-center py-20 px-10 glass-card bg-white/5 border-white/5 rounded-[2rem]">
-                                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-6 text-white/20">
-                                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
                                     <p className="text-white/40 text-sm font-medium leading-relaxed">
-                                        No Learning Outcomes (LOs) defined for this module. Start by adding your first educational objective.
+                                        No Learning Outcomes defined yet. Create your first LO using the button above.
                                     </p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 gap-5">
-                                    {los.map((lo) => (
-                                        <div
-                                            key={lo.id}
-                                            className="group relative bg-white/5 border border-white/5 rounded-3xl p-6 transition-all duration-300 hover:bg-white/10 hover:border-white/10 cursor-pointer"
-                                            onClick={() => {
-                                                const loNum = extractDisplayLoNumber(lo.id);
-                                                sessionStorage.setItem('currentLoNumber', loNum);
-                                                if (modulePanelMode === 'analysis') {
-                                                    navigate(`/lo-detail/${lo.id}/add-results`);
-                                                } else {
-                                                    navigate(`/lo-detail/${lo.id}`);
-                                                }
-                                            }}
-                                        >
-                                            <div className="flex justify-between items-start gap-4">
-                                                <div className="space-y-4 flex-1">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="px-4 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                                                            {`LO ${extractDisplayLoNumber(lo.id)}`}
-                                                        </span>
-                                                        <div className="h-px w-8 bg-white/5"></div>
-                                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${getStatusForLo(lo.id).badge}`}>
-                                                            {getStatusForLo(lo.id).status}
-                                                        </span>
-                                                        {getRejectedFeedbackForLo(lo.id).count > 0 && (
-                                                            <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-red-500/20 text-red-300 border-red-500/30">
-                                                                {getRejectedFeedbackForLo(lo.id).count} Rejected
+                                    {los.map((lo) => {
+                                        const { status, badge } = getStatusForLo(lo.id);
+                                        const { count: rejCount, firstMessage } = getRejectedFeedback(lo.id);
+                                        return (
+                                            <div
+                                                key={lo.id}
+                                                className="group relative bg-white/5 border border-white/5 rounded-3xl p-6 transition-all duration-300 hover:bg-white/10 hover:border-white/10 cursor-pointer"
+                                                onClick={() => navigate(`/lo-detail/${lo.id}/comparisons`)}
+                                            >
+                                                <div className="flex justify-between items-start gap-4">
+                                                    <div className="space-y-4 flex-1">
+                                                        <div className="flex items-center gap-3 flex-wrap">
+                                                            <span className="px-4 py-1.5 bg-indigo-500/20 text-indigo-300 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
+                                                                LO {extractDisplayLoNumber(lo.id)}
                                                             </span>
+                                                            <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${badge}`}>
+                                                                {status}
+                                                            </span>
+                                                            {rejCount > 0 && (
+                                                                <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-red-500/20 text-red-300 border-red-500/30">
+                                                                    {rejCount} Rejected
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-lg font-bold text-white/90 leading-snug group-hover:text-white transition-colors">
+                                                            {lo.description || lo.name}
+                                                        </p>
+                                                        {rejCount > 0 && (
+                                                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-red-300 mb-2">Admin feedback</p>
+                                                                <p className="text-sm text-red-100/90 leading-relaxed">
+                                                                    {firstMessage || 'One or more mappings were rejected. View comparisons for details.'}
+                                                                </p>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                    <p className="text-lg font-bold text-white/90 leading-snug group-hover:text-white transition-colors">
-                                                        {lo.description || lo.name}
-                                                    </p>
 
-                                                    {getRejectedFeedbackForLo(lo.id).count > 0 && (
-                                                        <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
-                                                            <p className="text-[10px] font-black uppercase tracking-widest text-red-300 mb-2">Admin feedback</p>
-                                                            <p className="text-sm text-red-100/90 leading-relaxed">
-                                                                {getRejectedFeedbackForLo(lo.id).firstMessage || 'One or more mappings were rejected. Open LO details to view the full review message.'}
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            navigate(`/lo-detail/${lo.id}/add-results`);
-                                                        }}
-                                                        className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-emerald-500 hover:text-white rounded-xl transition-all duration-300"
-                                                        title="Add marks"
-                                                    >
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                                        </svg>
-                                                    </button>
-                                                    {modulePanelMode !== 'analysis' && getStatusForLo(lo.id).status !== 'APPROVED' && (
-                                                        <>
+                                                    {/* Edit / Delete — only when not APPROVED */}
+                                                    {status !== 'APPROVED' && (
+                                                        <div className="flex gap-2">
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); openEditDialog(lo); }}
+                                                                onClick={e => { e.stopPropagation(); openEditDialog(lo); }}
                                                                 className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-indigo-500 hover:text-white rounded-xl transition-all duration-300"
+                                                                title="Edit LO"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                                 </svg>
                                                             </button>
                                                             <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteLo(lo.id); }}
+                                                                onClick={e => { e.stopPropagation(); handleDeleteLo(lo.id); }}
                                                                 className="w-10 h-10 flex items-center justify-center bg-white/5 text-white/40 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-300"
+                                                                title="Delete LO"
                                                             >
                                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                                 </svg>
                                                             </button>
-                                                        </>
+                                                        </div>
                                                     )}
                                                 </div>
-                                            </div>
 
-                                            <div className="mt-6 flex items-center gap-3 text-white/20 text-[10px] font-black uppercase tracking-widest">
-                                                <span>{modulePanelMode === 'analysis' ? 'Open add marks upload' : 'View detailed metrics'}</span>
-                                                <div className="h-px flex-1 bg-white/5"></div>
-                                                <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                                                </svg>
+                                                <div className="mt-6 flex items-center gap-3 text-white/20 text-[10px] font-black uppercase tracking-widest">
+                                                    <span>View trend analytics</span>
+                                                    <div className="h-px flex-1 bg-white/5" />
+                                                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                                                    </svg>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
                     </div>
 
                     {/* Overlay */}
-                    <div
-                        onClick={closeModulePanel}
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[55] animate-in fade-in duration-500"
-                    />
+                    <div onClick={closeModulePanel} className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[55] animate-in fade-in duration-500" />
                 </>
             )}
 
@@ -600,24 +449,22 @@ export default function LecturerDashboard() {
                                     <input
                                         type="text"
                                         value={loData.loNumber}
-                                        onChange={(e) => setLoData({ ...loData, loNumber: e.target.value })}
+                                        onChange={e => setLoData({ ...loData, loNumber: e.target.value })}
                                         className="input-field py-4 text-xl font-black text-indigo-600"
                                         placeholder="e.g. 01"
                                         required
                                     />
                                 </div>
-
                                 <div className="space-y-3">
                                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">Competency Description</label>
                                     <textarea
                                         value={loData.description}
-                                        onChange={(e) => setLoData({ ...loData, description: e.target.value })}
+                                        onChange={e => setLoData({ ...loData, description: e.target.value })}
                                         className="input-field min-h-[160px] resize-none leading-relaxed"
                                         placeholder="Enter updated LO description..."
                                         required
                                     />
                                 </div>
-
                                 <div className="pt-4 flex gap-4">
                                     <button
                                         type="button"
@@ -631,7 +478,7 @@ export default function LecturerDashboard() {
                                         disabled={loading}
                                         className="btn-primary flex-1 py-4 font-black uppercase text-xs tracking-widest shadow-xl shadow-indigo-500/20"
                                     >
-                                        {loading ? 'Refining...' : 'Update LO'}
+                                        {loading ? 'Saving...' : 'Update LO'}
                                     </button>
                                 </div>
                             </form>

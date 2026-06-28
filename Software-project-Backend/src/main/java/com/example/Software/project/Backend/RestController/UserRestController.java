@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.ModuleService;
 import com.example.Software.project.Backend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -14,8 +15,10 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,6 +27,9 @@ public class UserRestController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private ModuleService moduleService;
 
     @Autowired
     private AuthenticationManager authenticationManager;
@@ -159,6 +165,85 @@ public class UserRestController {
             errorResponse.put("message", "Failed to add lecturer: " + e.getMessage());
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    // List lecturers, with their current module assignments, for admin CRUD + the module-assignment picker
+    @GetMapping("/lecturers")
+    public ResponseEntity<?> getAllLecturers(@RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can view lecturers", "status", "ERROR"));
+        }
+
+        List<Map<String, Object>> lecturers = userService.findAllLecturers().stream()
+            .map(u -> Map.of(
+                "username", u.getUserID(),
+                "email", u.getEmail(),
+                "assignedModuleIds", moduleService.getModuleIdsAssignedTo(u.getUserID())
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Lecturers retrieved successfully",
+            "data", lecturers,
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Update a lecturer's email/password (Admin/Superadmin only)
+    @PutMapping("/lecturers/{username}")
+    public ResponseEntity<?> updateLecturer(@PathVariable String username, @RequestBody Map<String, String> body,
+                                             @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can update lecturers", "status", "ERROR"));
+        }
+        try {
+            User updated = userService.updateLecturer(username, body.get("email"), body.get("password"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Lecturer updated successfully",
+                "data", Map.of("username", updated.getUserID(), "email", updated.getEmail()),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Delete a lecturer (Admin/Superadmin only)
+    @DeleteMapping("/lecturers/{username}")
+    public ResponseEntity<?> deleteLecturer(@PathVariable String username, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can delete lecturers", "status", "ERROR"));
+        }
+        try {
+            userService.deleteLecturer(username);
+            return ResponseEntity.ok(Map.of("message", "Lecturer deleted successfully", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Set exactly which modules a lecturer is assigned to (Admin/Superadmin only) -
+    // the reverse direction of PUT /api/modules/{id}'s assignedLecturerUsernames.
+    @PutMapping("/lecturers/{username}/modules")
+    public ResponseEntity<?> setLecturerModules(@PathVariable String username, @RequestBody Map<String, List<String>> body,
+                                                 @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can assign modules", "status", "ERROR"));
+        }
+        try {
+            moduleService.setModulesForLecturer(username, body.get("moduleIds"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Lecturer's module assignments updated successfully",
+                "data", moduleService.getModuleIdsAssignedTo(username),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
         }
     }
 

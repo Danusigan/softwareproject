@@ -155,7 +155,7 @@ class POAttainmentServiceTest {
             .thenReturn(Optional.of(los1));
 
         // Mock assessment items with max marks (this is the key to normalization)
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
             .thenReturn(Arrays.asList(item1, item2)); // Total max = 20
 
         // EXECUTE
@@ -227,7 +227,7 @@ class POAttainmentServiceTest {
             .thenReturn(Optional.of(los1));
 
         // Mock assessment items: total max = 10
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
@@ -295,7 +295,7 @@ class POAttainmentServiceTest {
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
 
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
@@ -367,7 +367,7 @@ class POAttainmentServiceTest {
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
 
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
@@ -435,7 +435,7 @@ class POAttainmentServiceTest {
             .thenReturn(Optional.of(los1));
 
         // NO assessment items found → uses legacy behavior
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
             .thenReturn(Collections.emptyList());
 
         // EXECUTE

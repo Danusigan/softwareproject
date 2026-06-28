@@ -7,8 +7,6 @@ import AdminDashboard from './pages/admindashboard'
 import SuperAdminDashboard from './pages/superadmindashboard'
 import LecturerDashboard from './pages/lecturerdashboard'
 import ModulesPage from './pages/modulespage'
-import LODetailPage from './pages/LODetailPage'
-import AddResultsPage from './pages/AddResultsPage'
 import ComparisonPage from './pages/ComparisonPage'
 import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
@@ -62,22 +60,6 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ModulesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/lo-detail/:loId"
-        element={
-          <ProtectedRoute>
-            <LODetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/lo-detail/:loId/add-results"
-        element={
-          <ProtectedRoute>
-            <AddResultsPage />
           </ProtectedRoute>
         }
       />
