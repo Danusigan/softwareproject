@@ -30,12 +30,19 @@ export default function AdminDashboard() {
     const [showEditLecturerDialog, setShowEditLecturerDialog] = useState(false);
     const [editingLecturer, setEditingLecturer] = useState(null);
     const [lecturerEditData, setLecturerEditData] = useState({ email: '', assignedModuleIds: [] });
+    const [lecturerFilter, setLecturerFilter] = useState('');
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
     const lecturerOptions = lecturers.map(l => ({ value: l.username, label: l.username, sublabel: l.email }));
     const moduleOptions = modules.map(m => ({ value: m.moduleId, label: m.moduleName, sublabel: m.moduleId }));
+
+    const filteredLecturers = lecturers.filter(l => {
+        const q = lecturerFilter.trim().toLowerCase();
+        if (!q) return true;
+        return l.username.toLowerCase().includes(q) || l.email.toLowerCase().includes(q);
+    });
 
     // Verify user is admin on mount
     useEffect(() => {
@@ -377,80 +384,95 @@ export default function AdminDashboard() {
 
                 {/* Lecturers Management Section */}
                 <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Manage Lecturers</h2>
+                    <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
+                        <h2 className="text-2xl font-bold text-gray-800">Manage Lecturers</h2>
+                        <button
+                            onClick={() => setSidePanelOpen('teacher')}
+                            className="px-5 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Lecturer
+                        </button>
+                    </div>
+
+                    <div className="mb-4">
+                        <div className="relative max-w-sm">
+                            <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <input
+                                type="text"
+                                value={lecturerFilter}
+                                onChange={(e) => setLecturerFilter(e.target.value)}
+                                placeholder="Filter by username or email..."
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+
                     {lecturers.length === 0 ? (
                         <div className="bg-white rounded-xl shadow-lg p-8 text-center text-gray-500">
-                            No lecturers available. Add one using the "Add a Teacher" card below.
+                            No lecturers available. Click "Add Lecturer" above to add one.
+                        </div>
+                    ) : filteredLecturers.length === 0 ? (
+                        <div className="bg-white rounded-xl shadow-lg p-8 text-center text-gray-500">
+                            No lecturers match "{lecturerFilter}".
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            {lecturers.map((lecturer) => (
-                                <div
-                                    key={lecturer.username}
-                                    className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-200 hover:border-blue-400 transition-all"
-                                >
-                                    <div className="flex items-center justify-center mb-4">
-                                        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                            </svg>
-                                        </div>
-                                    </div>
-                                    <h3 className="text-xl font-bold text-center text-gray-800 mb-2">
-                                        {lecturer.username}
-                                    </h3>
-                                    <p className="text-center text-gray-600 text-sm mb-4">
-                                        {lecturer.email}
-                                    </p>
-                                    <p className="text-center text-xs text-gray-500 mb-4">
-                                        {lecturer.assignedModuleIds?.length
-                                            ? `Modules: ${lecturer.assignedModuleIds.join(', ')}`
-                                            : 'No modules assigned'}
-                                    </p>
-                                    <div className="flex justify-center gap-2 mt-4">
-                                        <button
-                                            onClick={() => openEditLecturerDialog(lecturer)}
-                                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                            title="Edit Lecturer"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteLecturer(lecturer.username)}
-                                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                            title="Delete Lecturer"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Username</th>
+                                        <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Modules</th>
+                                        <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredLecturers.map((lecturer) => (
+                                        <tr key={lecturer.username} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 font-medium text-gray-800">{lecturer.username}</td>
+                                            <td className="px-6 py-4 text-gray-600">{lecturer.email}</td>
+                                            <td className="px-6 py-4 text-gray-500 text-sm">
+                                                {lecturer.assignedModuleIds?.length
+                                                    ? lecturer.assignedModuleIds.join(', ')
+                                                    : 'No modules assigned'}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button
+                                                        onClick={() => openEditLecturerDialog(lecturer)}
+                                                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                        title="Edit Lecturer"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteLecturer(lecturer.username)}
+                                                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                        title="Delete Lecturer"
+                                                    >
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     )}
                 </div>
 
                 {/* Modern Cards with Hover Effects */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12">
-                    {/* Add Teacher Card */}
-                    <div
-                        onClick={() => setSidePanelOpen('teacher')}
-                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-blue-500"
-                    >
-                        <div className="flex items-center justify-center mb-4">
-                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Add a Teacher</h2>
-                        <p className="text-center text-gray-600">Click to add a new teacher to the system</p>
-                    </div>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-12">
                     {/* Create Module Card */}
                     <div
                         onClick={() => setSidePanelOpen('module')}
