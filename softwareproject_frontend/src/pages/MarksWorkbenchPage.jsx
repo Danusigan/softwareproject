@@ -4,12 +4,21 @@ import Header from '../components/header'
 import Footer from '../components/footer'
 import authService from '../services/authService'
 import marksService from '../services/marksService'
+import cqiService from '../services/cqiService'
 
 const markTypeOptions = [
   { value: 'FINAL_EXAM', label: 'Final Exam' },
   { value: 'ASSIGNMENT', label: 'Assignment' },
 ]
 const batchOptions = ['20', '21', '22', '23', '24', '25', '26']
+
+const cqiActionTypeOptions = [
+  { value: 'ADD_LAB_SESSION', label: 'Add Lab Session' },
+  { value: 'REVISE_ASSESSMENT', label: 'Revise Assessment' },
+  { value: 'CHANGE_TEACHING_METHOD', label: 'Change Teaching Method' },
+  { value: 'ADD_RESOURCE', label: 'Add Resource' },
+  { value: 'REDESIGN_LO', label: 'Redesign LO' },
+]
 
 const parseFilename = (cd, fallback) => {
   if (!cd) return fallback
@@ -80,6 +89,11 @@ export default function MarksWorkbenchPage() {
   const [analyticsMarkType, setAnalyticsMarkType] = useState('FINAL_EXAM')
   const [poAttainment, setPOAttainment] = useState(null)
 
+  // ── CQI state ──────────────────────────────────────────────────────────
+  const [cqiHistory, setCqiHistory] = useState([])
+  const [cqiFormDrafts, setCqiFormDrafts] = useState({}) // { [actionId]: { rootCause, actionPlan, actionType, targetAttainment, deadline } }
+  const [showCqiHistory, setShowCqiHistory] = useState(false)
+
   // ── UI feedback ───────────────────────────────────────────────────────
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState({ type: '', text: '' })
@@ -93,6 +107,13 @@ export default function MarksWorkbenchPage() {
       })
       const json = await res.json()
       setAvailableMarks(json.data || [])
+    } catch { /* non-critical */ }
+  }
+
+  const loadCqiHistory = async () => {
+    try {
+      const r = await cqiService.getModuleHistory(moduleId, { headers: authHeaders() })
+      setCqiHistory(r.data?.data || [])
     } catch { /* non-critical */ }
   }
 
@@ -113,6 +134,7 @@ export default function MarksWorkbenchPage() {
         setSelectedLosIds(losArr.map(lo => lo.id))
         setAnalyticsLosIds(losArr.map(lo => lo.id))
         await loadAvailableMarks()
+        await loadCqiHistory()
       } catch (e) {
         setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to load module.' })
       } finally { setLoading(false) }
@@ -312,6 +334,43 @@ export default function MarksWorkbenchPage() {
     finally { setBusyAction('') }
   }
 
+  // ── CQI ────────────────────────────────────────────────────────────────
+  const handleFinalizeCqi = async () => {
+    try {
+      setBusyAction('cqi-finalize'); setMessage({ type: '', text: '' })
+      const r = await cqiService.finalize({ moduleId, batch: activeBatch }, { headers: authHeaders() })
+      const count = r.data?.data?.triggeredCount || 0
+      setMessage({ type: 'success', text: count > 0 ? `Attainment finalized — ${count} new CQI action(s) triggered.` : 'Attainment finalized — no new CQI actions needed.' })
+      await loadCqiHistory()
+    } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to finalize attainment.' }) }
+    finally { setBusyAction('') }
+  }
+
+  const cqiDraftFor = id => cqiFormDrafts[id] || { rootCause: '', actionPlan: '', actionType: cqiActionTypeOptions[0].value, targetAttainment: '', deadline: '' }
+  const updateCqiDraft = (id, field, value) =>
+    setCqiFormDrafts(prev => ({ ...prev, [id]: { ...cqiDraftFor(id), [field]: value } }))
+
+  const handleSubmitCqiPlan = async actionId => {
+    const draft = cqiDraftFor(actionId)
+    if (!draft.rootCause.trim() || !draft.actionPlan.trim() || !draft.targetAttainment || !draft.deadline) {
+      setMessage({ type: 'error', text: 'Fill in root cause, action plan, target attainment and deadline.' }); return
+    }
+    try {
+      setBusyAction(`cqi-submit-${actionId}`); setMessage({ type: '', text: '' })
+      await cqiService.submitPlan(actionId, {
+        rootCause: draft.rootCause.trim(),
+        actionPlan: draft.actionPlan.trim(),
+        actionType: draft.actionType,
+        targetAttainment: Number(draft.targetAttainment),
+        deadline: draft.deadline,
+      }, { headers: authHeaders() })
+      setMessage({ type: 'success', text: 'CQI plan submitted for admin review.' })
+      setCqiFormDrafts(prev => { const next = { ...prev }; delete next[actionId]; return next })
+      await loadCqiHistory()
+    } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to submit CQI plan.' }) }
+    finally { setBusyAction('') }
+  }
+
   // ── derived data ──────────────────────────────────────────────────────
   const batchAssignments = useMemo(() => availableMarks.filter(m => String(m.batch) === String(activeBatch)), [availableMarks, activeBatch])
   const marksByBatch = useMemo(() => availableMarks.reduce((acc, m) => {
@@ -319,6 +378,10 @@ export default function MarksWorkbenchPage() {
   }, {}), [availableMarks])
 
   const moduleTitle = moduleData?.moduleName || moduleData?.name || 'Marks Workflow'
+  const pendingCqiForBatch = useMemo(
+    () => cqiHistory.filter(a => a.status === 'PLANNED' && !a.submitted && String(a.batch) === String(activeBatch)),
+    [cqiHistory, activeBatch]
+  )
 
   // ═══════════════════════════════════════════════════════════════════════
   return (
@@ -459,8 +522,76 @@ export default function MarksWorkbenchPage() {
                   onChange={e => saveThreshold(activeBatch, e.target.value)}
                   className="w-20 text-center text-sm font-black border border-indigo-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 <span className="text-xs text-slate-400">%</span>
+                <button type="button" onClick={handleFinalizeCqi} disabled={busyAction==='cqi-finalize'}
+                  title="Recompute each LO's attainment against its stored threshold and trigger CQI actions where needed"
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors ${busyAction==='cqi-finalize'?'bg-slate-200 text-slate-400 cursor-not-allowed':'bg-amber-500 text-white hover:bg-amber-600'}`}>
+                  {busyAction==='cqi-finalize' && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                  Finalize &amp; Check CQI
+                </button>
               </div>
             </div>
+
+            {/* CQI Alerts — LOs that fell below their threshold and need a corrective action plan */}
+            {pendingCqiForBatch.length > 0 && (
+              <div className="space-y-5">
+                {pendingCqiForBatch.map(action => {
+                  const draft = cqiDraftFor(action.id)
+                  const submitKey = `cqi-submit-${action.id}`
+                  return (
+                    <div key={action.id} className="rounded-[2rem] border-2 border-red-200 bg-red-50/60 overflow-hidden">
+                      <div className="p-5 flex items-start gap-4 bg-red-100/70 border-b border-red-200">
+                        <svg className="w-6 h-6 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <div>
+                          <h3 className="font-black text-red-800">{action.losId} — {action.losName || 'Learning Outcome'} fell below threshold</h3>
+                          <p className="text-sm text-red-700 mt-1">
+                            Achieved <strong>{Number(action.attainmentScore).toFixed(1)}%</strong> against a threshold of <strong>{Number(action.targetScore).toFixed(1)}%</strong> for batch {action.batch}. Submit a corrective action plan below.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Root cause</label>
+                            <textarea value={draft.rootCause} onChange={e => updateCqiDraft(action.id, 'rootCause', e.target.value)}
+                              rows={3} className="input-field bg-white" placeholder="Why did this LO underperform?" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Action plan</label>
+                            <textarea value={draft.actionPlan} onChange={e => updateCqiDraft(action.id, 'actionPlan', e.target.value)}
+                              rows={3} className="input-field bg-white" placeholder="What will you do differently next semester?" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Action type</label>
+                            <select value={draft.actionType} onChange={e => updateCqiDraft(action.id, 'actionType', e.target.value)} className="input-field bg-white">
+                              {cqiActionTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Target attainment (%)</label>
+                            <input type="number" min="0" max="100" value={draft.targetAttainment}
+                              onChange={e => updateCqiDraft(action.id, 'targetAttainment', e.target.value)} className="input-field bg-white" placeholder="e.g. 60" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Deadline</label>
+                            <input type="date" value={draft.deadline}
+                              onChange={e => updateCqiDraft(action.id, 'deadline', e.target.value)} className="input-field bg-white" />
+                          </div>
+                        </div>
+                        <button type="button" onClick={() => handleSubmitCqiPlan(action.id)} disabled={busyAction===submitKey}
+                          className={`px-6 py-3 rounded-2xl font-bold transition-all flex items-center gap-3 ${busyAction===submitKey?'bg-slate-200 text-slate-400 cursor-not-allowed':'bg-red-600 text-white hover:bg-red-700 shadow-lg shadow-red-600/20'}`}>
+                          {busyAction===submitKey && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                          Submit CQI Plan
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-8 items-start">
               {/* Left — assignment list */}
@@ -662,6 +793,57 @@ export default function MarksWorkbenchPage() {
                 </div>
               </section>
             )}
+
+            {/* CQI History — accreditation evidence for this module */}
+            <section className="glass-card rounded-[2.5rem] p-8 border-slate-100 space-y-5">
+              <button type="button" onClick={() => setShowCqiHistory(v => !v)} className="w-full flex items-center justify-between text-left">
+                <div>
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-[0.2em] mb-2 block">Accreditation Evidence</span>
+                  <h2 className="heading-lg">CQI History ({cqiHistory.length})</h2>
+                </div>
+                <svg className={`w-5 h-5 text-slate-400 transition-transform ${showCqiHistory ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showCqiHistory && (
+                cqiHistory.length === 0 ? (
+                  <p className="text-sm text-slate-500">No CQI actions recorded for this module yet.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-800 text-white">
+                          <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">Batch</th>
+                          <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">LO</th>
+                          <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Attainment</th>
+                          <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Threshold</th>
+                          <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">Action Taken</th>
+                          <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Status</th>
+                          <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Next-Sem Attainment</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cqiHistory.map((a, idx) => (
+                          <tr key={a.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                            <td className="px-4 py-3 font-semibold text-slate-800 border-r border-slate-100">{a.batch}</td>
+                            <td className="px-4 py-3 text-slate-700 border-r border-slate-100">{a.losId}{a.losName ? ` — ${a.losName}` : ''}</td>
+                            <td className="px-4 py-3 text-center border-r border-slate-100">{a.attainmentScore != null ? `${Number(a.attainmentScore).toFixed(1)}%` : '—'}</td>
+                            <td className="px-4 py-3 text-center border-r border-slate-100">{a.targetScore != null ? `${Number(a.targetScore).toFixed(1)}%` : '—'}</td>
+                            <td className="px-4 py-3 text-slate-600 border-r border-slate-100">{a.actionPlan || (a.submitted ? '—' : 'Pending lecturer submission')}</td>
+                            <td className="px-4 py-3 text-center border-r border-slate-100">
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest ${a.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600' : a.status === 'IN_PROGRESS' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
+                                {a.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">{a.nextSemAttainment != null ? `${Number(a.nextSemAttainment).toFixed(1)}%` : '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </section>
           </div>
 
         ) : (

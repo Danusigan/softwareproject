@@ -12,6 +12,8 @@ import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
+import CqiReviewPage from './pages/CqiReviewPage'
+import MyCqiPlansPage from './pages/MyCqiPlansPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { setupAxiosInterceptors } from './services/axiosSetup'
 
@@ -100,6 +102,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <LOPOMappingManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cqi-review"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <CqiReviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-cqi-plans"
+        element={
+          <ProtectedRoute requiredRole="lecture">
+            <MyCqiPlansPage />
           </ProtectedRoute>
         }
       />
