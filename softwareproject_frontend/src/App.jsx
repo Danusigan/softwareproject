@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-route
 import LandingPage from './pages/landingpage'
 import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
+import ResetPasswordPage from './pages/resetpassword'
 import AdminDashboard from './pages/admindashboard'
 import SuperAdminDashboard from './pages/superadmindashboard'
 import LecturerDashboard from './pages/lecturerdashboard'
@@ -128,7 +129,23 @@ function AppRoutes() {
 function App() {
   return (
     <Router>
+<<<<<<< Updated upstream
       <AppRoutes />
+=======
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/loginpage" element={<LoginPage />} />
+        <Route path="/forgottenpassword" element={<ForgotPasswordPage />} />
+        <Route path="/resetpassword" element={<ResetPasswordPage />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/super-admin-dashboard" element={<SuperAdminDashboard />} />
+        <Route path="/lecturer-dashboard" element={<LecturerDashboard />} />
+        <Route path="/modules" element={<ModulesPage />} />
+        <Route path="/lo-detail/:loId" element={<LODetailPage />} />
+        <Route path="/lo-detail/:loId/add-results" element={<AddResultsPage />} />
+        <Route path="/lo-detail/:loId/comparisons" element={<ComparisonPage />} />
+      </Routes>
+>>>>>>> Stashed changes
     </Router>
   )
 }
