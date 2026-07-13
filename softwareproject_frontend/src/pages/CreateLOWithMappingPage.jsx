@@ -62,7 +62,7 @@ export default function CreateLOWithMappingPage() {
             const token = localStorage.getItem('token');
             
             // Get form data with suggestions
-            const response = await axios.get(`http://localhost:8080/api/los-with-mapping/form-data/${moduleId}`, {
+            const response = await axios.get(`/api/los-with-mapping/form-data/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -76,7 +76,7 @@ export default function CreateLOWithMappingPage() {
             }
 
             // Get module details
-            const moduleResponse = await axios.get(`http://localhost:8080/api/modules/${moduleId}`, {
+            const moduleResponse = await axios.get(`/api/modules/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
@@ -107,7 +107,7 @@ export default function CreateLOWithMappingPage() {
     const getSuggestedMappingsForDescription = async (description) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.get(`http://localhost:8080/api/lo-po-mapping/suggestions`, {
+            const response = await axios.get(`/api/lo-po-mapping/suggestions`, {
                 headers: { 'Authorization': `Bearer ${token}` },
                 params: { moduleId, loDescription: description }
             });
@@ -208,7 +208,7 @@ export default function CreateLOWithMappingPage() {
                 mappingRemarks
             };
 
-            const response = await axios.post('http://localhost:8080/api/los-with-mapping/create', requestData, {
+            const response = await axios.post('/api/los-with-mapping/create', requestData, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

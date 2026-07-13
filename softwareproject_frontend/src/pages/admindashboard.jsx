@@ -67,7 +67,7 @@ export default function AdminDashboard() {
     const fetchModules = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/modules/all', {
+            const res = await axios.get('/api/modules/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             // Backend returns {message, data, status} format
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
     const fetchLecturers = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/auth/lecturers', {
+            const res = await axios.get('/api/auth/lecturers', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setLecturers(res.data.data || []);
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post(
-                'http://localhost:8080/api/auth/add-user',
+                '/api/auth/add-user',
                 {
                     userID: teacherData.username,
                     email: teacherData.email,
@@ -144,7 +144,7 @@ export default function AdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post(
-                'http://localhost:8080/api/modules/create',
+                '/api/modules/create',
                 moduleData,
                 {
                     headers: {
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/modules/${editingModule.moduleId}`,
+                `/api/modules/${editingModule.moduleId}`,
                 {
                     moduleId: moduleData.moduleId,
                     moduleName: moduleData.moduleName,
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/modules/${moduleId}`, {
+            await axios.delete(`/api/modules/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -253,12 +253,12 @@ export default function AdminDashboard() {
             const headers = { 'Authorization': `Bearer ${token}` };
 
             await axios.put(
-                `http://localhost:8080/api/auth/lecturers/${editingLecturer.username}`,
+                `/api/auth/lecturers/${editingLecturer.username}`,
                 { email: lecturerEditData.email },
                 { headers }
             );
             await axios.put(
-                `http://localhost:8080/api/auth/lecturers/${editingLecturer.username}/modules`,
+                `/api/auth/lecturers/${editingLecturer.username}/modules`,
                 { moduleIds: lecturerEditData.assignedModuleIds },
                 { headers }
             );
@@ -283,7 +283,7 @@ export default function AdminDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/auth/lecturers/${username}`, {
+            await axios.delete(`/api/auth/lecturers/${username}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

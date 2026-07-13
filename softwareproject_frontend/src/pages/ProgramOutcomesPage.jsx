@@ -61,7 +61,7 @@ export default function ProgramOutcomesPage() {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const response = await axios.get('http://localhost:8080/api/program-outcomes/all-including-inactive', {
+            const response = await axios.get('/api/program-outcomes/all-including-inactive', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             
@@ -157,11 +157,11 @@ export default function ProgramOutcomesPage() {
 
             let response;
             if (modalType === 'create') {
-                response = await axios.post('http://localhost:8080/api/program-outcomes/create', submitData, {
+                response = await axios.post('/api/program-outcomes/create', submitData, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             } else if (modalType === 'edit') {
-                response = await axios.put(`http://localhost:8080/api/program-outcomes/${normalizedPoId || selectedPO.poId}`, submitData, {
+                response = await axios.put(`/api/program-outcomes/${normalizedPoId || selectedPO.poId}`, submitData, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             }
@@ -180,7 +180,7 @@ export default function ProgramOutcomesPage() {
     const handleDelete = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.delete(`http://localhost:8080/api/program-outcomes/${selectedPO.poId}`, {
+            const response = await axios.delete(`/api/program-outcomes/${selectedPO.poId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -198,7 +198,7 @@ export default function ProgramOutcomesPage() {
     const handleRestore = async (po) => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.put(`http://localhost:8080/api/program-outcomes/${po.poId}/restore`, {}, {
+            const response = await axios.put(`/api/program-outcomes/${po.poId}/restore`, {}, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -215,7 +215,7 @@ export default function ProgramOutcomesPage() {
     const initializeDefaults = async () => {
         try {
             const token = localStorage.getItem('token');
-            const response = await axios.post('http://localhost:8080/api/program-outcomes/initialize-defaults', {}, {
+            const response = await axios.post('/api/program-outcomes/initialize-defaults', {}, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

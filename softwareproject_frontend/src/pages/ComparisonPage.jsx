@@ -221,7 +221,7 @@ export default function ComparisonPage() {
 
                 // 1. Fetch LO details
                 const loRes = await axios.get(
-                    `http://localhost:8080/api/lospos/${encodeURIComponent(loId)}`,
+                    `/api/lospos/${encodeURIComponent(loId)}`,
                     { headers: hdrs }
                 );
                 const lo = loRes.data.data || loRes.data;
@@ -234,9 +234,9 @@ export default function ComparisonPage() {
 
                 // 2. Fetch trend, pass-rate, and available marks for this LO in parallel
                 const [trendRes, passRes, marksRes] = await Promise.all([
-                    axios.get(`http://localhost:8080/api/obe/analysis/trend/lo/${modId}`, { headers: hdrs }),
-                    axios.get(`http://localhost:8080/api/obe/analysis/pass-rate/lo/${modId}?threshold=50`, { headers: hdrs }),
-                    axios.get(`http://localhost:8080/api/obe/marks/available/lo/${encodeURIComponent(loId)}`, { headers: hdrs }),
+                    axios.get(`/api/obe/analysis/trend/lo/${modId}`, { headers: hdrs }),
+                    axios.get(`/api/obe/analysis/pass-rate/lo/${modId}?threshold=50`, { headers: hdrs }),
+                    axios.get(`/api/obe/marks/available/lo/${encodeURIComponent(loId)}`, { headers: hdrs }),
                 ]);
 
                 setAllTrendData(trendRes.data || {});
@@ -304,7 +304,7 @@ export default function ComparisonPage() {
         try {
             const token = localStorage.getItem('token');
             const res = await fetch(
-                `http://localhost:8080/api/obe/marks/export/module/${moduleId}?batch=${batchVal}&markType=${markTypeVal}&threshold=50`,
+                `/api/obe/marks/export/module/${moduleId}?batch=${batchVal}&markType=${markTypeVal}&threshold=50`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             if (!res.ok) return;

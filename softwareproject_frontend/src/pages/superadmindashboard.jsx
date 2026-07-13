@@ -40,7 +40,7 @@ export default function SuperAdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post(
-                'http://localhost:8080/api/auth/add-user',
+                '/api/auth/add-user',
                 {
                     userID: adminData.username,
                     email: adminData.email,
