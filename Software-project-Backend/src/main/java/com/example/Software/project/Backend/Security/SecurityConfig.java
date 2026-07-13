@@ -37,6 +37,7 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck
                 .requestMatchers("/api/auth/login").permitAll() // Allow login without token
                 .requestMatchers("/api/auth/create-test-user").permitAll() // Allow test user creation without token
                 .requestMatchers("/api/auth/**").permitAll() // Allow all auth endpoints without token (if needed)

@@ -11,7 +11,7 @@ services:
       MYSQL_USER: ${DB_USERNAME:-appuser}
       MYSQL_PASSWORD: ${DB_PASSWORD:-password}
     ports:
-      - "3306:3306"
+      - "${DB_HOST_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -29,7 +29,7 @@ services:
       dockerfile: Dockerfile
     container_name: softwareproject-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-softwareproject}?useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-softwareproject}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-appuser}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-password}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
@@ -42,7 +42,7 @@ services:
       - softwareproject
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,7 +62,7 @@ services:
       - softwareproject
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
