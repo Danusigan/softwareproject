@@ -182,7 +182,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./Software-project-Backend
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
@@ -192,7 +192,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./softwareproject_frontend
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest

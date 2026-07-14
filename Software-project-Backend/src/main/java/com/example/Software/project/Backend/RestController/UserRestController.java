@@ -247,6 +247,63 @@ public class UserRestController {
         }
     }
 
+    // List admins, for the superadmin's Manage Admins page (Superadmin only)
+    @GetMapping("/admins")
+    public ResponseEntity<?> getAllAdmins(@RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can view admins", "status", "ERROR"));
+        }
+
+        List<Map<String, Object>> admins = userService.findAllAdmins().stream()
+            .map(u -> Map.<String, Object>of(
+                "username", u.getUserID(),
+                "email", u.getEmail()
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Admins retrieved successfully",
+            "data", admins,
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Update an admin's email/password (Superadmin only)
+    @PutMapping("/admins/{username}")
+    public ResponseEntity<?> updateAdmin(@PathVariable String username, @RequestBody Map<String, String> body,
+                                          @RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can update admins", "status", "ERROR"));
+        }
+        try {
+            User updated = userService.updateAdmin(username, body.get("email"), body.get("password"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Admin updated successfully",
+                "data", Map.of("username", updated.getUserID(), "email", updated.getEmail()),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Delete an admin (Superadmin only)
+    @DeleteMapping("/admins/{username}")
+    public ResponseEntity<?> deleteAdmin(@PathVariable String username, @RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can delete admins", "status", "ERROR"));
+        }
+        try {
+            userService.deleteAdmin(username);
+            return ResponseEntity.ok(Map.of("message", "Admin deleted successfully", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
     @PostMapping("/add-user")
     public ResponseEntity<?> addUser(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {

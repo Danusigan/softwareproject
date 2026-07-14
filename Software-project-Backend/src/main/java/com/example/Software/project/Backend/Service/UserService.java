@@ -103,6 +103,43 @@ public class UserService {
     }
 
     /**
+     * Lists all admins, for the superadmin's Manage Admins page.
+     */
+    public List<User> findAllAdmins() {
+        return userRepository.findAllByUsertype("admin");
+    }
+
+    /**
+     * Updates an admin's email (and password, if provided). Username/usertype are fixed.
+     */
+    public User updateAdmin(String username, String email, String password) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Admin not found: " + username));
+        if (!"admin".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not an admin");
+        }
+        if (email != null && !email.isBlank()) {
+            user.setEmail(email);
+        }
+        if (password != null && !password.isBlank()) {
+            user.setPassword(password);
+        }
+        return userRepository.save(user);
+    }
+
+    /**
+     * Deletes an admin account.
+     */
+    public void deleteAdmin(String username) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Admin not found: " + username));
+        if (!"admin".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not an admin");
+        }
+        userRepository.delete(user);
+    }
+
+    /**
      * Adds a new user based on the creator's role.
      * Superadmin can add Admin.
      * Admin can add Lecture.
