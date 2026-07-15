@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
@@ -35,6 +36,9 @@ public class UserRestController {
 
     @Autowired
     private Environment environment;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
@@ -78,6 +82,7 @@ public class UserRestController {
                 }
 
                 String token = jwtUtil.generateToken(user.getUserID(), userType);
+                auditLogService.log(user.getUserID(), "LOGIN", user.getUserID(), "SUCCESS", null);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Login successful");
@@ -93,12 +98,14 @@ public class UserRestController {
             }
 
         } catch (org.springframework.security.authentication.LockedException e) {
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "account locked");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
         } catch (Exception e) {
             userService.recordFailedLogin(loginUser.getUserID());
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "invalid credentials");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
@@ -126,6 +133,7 @@ public class UserRestController {
             String creatorUsername = authentication.getName();
 
             User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=admin");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Admin user added successfully");
             response.put("userId", createdUser.getUserID());
@@ -161,6 +169,7 @@ public class UserRestController {
             String creatorUsername = authentication.getName();
 
             User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=lecture");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Lecturer user added successfully");
             response.put("userId", createdUser.getUserID());

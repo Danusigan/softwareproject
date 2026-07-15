@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ProgramOutcomeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,9 @@ public class ProgramOutcomeRestController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     // Helper method to validate admin access
     private boolean isAdmin(String token) {
@@ -70,6 +74,7 @@ public class ProgramOutcomeRestController {
             po.setCreatedBy(username);
             
             ProgramOutcome createdPO = poService.createPO(po);
+            auditLogService.log(username, "PO_CREATE", createdPO.getPoId(), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome created successfully", createdPO));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -87,6 +92,7 @@ public class ProgramOutcomeRestController {
             }
             
             ProgramOutcome updatedPO = poService.updatePO(poId, poDetails);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_UPDATE", poId, "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome updated successfully", updatedPO));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -106,6 +112,7 @@ public class ProgramOutcomeRestController {
             }
             
             poService.softDeletePO(poId);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "soft delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome deactivated successfully", null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -126,6 +133,7 @@ public class ProgramOutcomeRestController {
             }
             
             poService.hardDeletePO(poId);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "permanent delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome permanently deleted", null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));

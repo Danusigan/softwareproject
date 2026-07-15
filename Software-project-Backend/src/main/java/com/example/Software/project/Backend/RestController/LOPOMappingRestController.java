@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.LOPOMappingService;
 import com.example.Software.project.Backend.Service.ProgramOutcomeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ public class LOPOMappingRestController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     private String normalizeRole(String role) {
         if (role == null) return "";
@@ -307,6 +311,7 @@ public class LOPOMappingRestController {
             String adminRemarks = request != null ? request.getOrDefault("adminRemarks", "") : "";
 
             OutcomeMapping approvedMapping = mappingService.approveMapping(mappingId, username, adminRemarks);
+            auditLogService.log(username, "MAPPING_APPROVE", String.valueOf(mappingId), "SUCCESS", adminRemarks);
             return ResponseEntity.ok(createSuccessResponse("Mapping approved successfully", approvedMapping));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error approving mapping: " + e.getMessage()));
@@ -332,6 +337,7 @@ public class LOPOMappingRestController {
             }
 
             OutcomeMapping rejectedMapping = mappingService.rejectMapping(mappingId, username, adminRemarks);
+            auditLogService.log(username, "MAPPING_REJECT", String.valueOf(mappingId), "SUCCESS", adminRemarks);
             return ResponseEntity.ok(createSuccessResponse("Mapping rejected", rejectedMapping));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error rejecting mapping: " + e.getMessage()));

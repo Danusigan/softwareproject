@@ -33,8 +33,18 @@ Turn OBQA into a professionally secured web application and produce documented p
 | 2 | Security Architecture Review | `06-architecture-review.md` | **Complete** |
 | 3 | Threat Modeling | `07-threat-model.md` | **Complete** |
 | 4 | Secure Design Review | `08-secure-design-review.md` | **Complete** |
-| 5 | Security Implementation | Code changes (RBAC, BCrypt, validation, headers, rate limiting, audit log, secrets externalized) | Pending |
+| 5 | Security Implementation | Code changes (RBAC, BCrypt, validation, headers, rate limiting, audit log, secrets externalized) | **In progress** |
 | 6 | Code Security Review | `09-code-security-review.md` | Pending |
+
+## Phase 5 progress log
+
+Fixed so far: BCrypt password hashing (+ re-seed), RBAC gap closure (`debug/user`, `create-test-user`, PO catalog — see correction note in `06-architecture-review.md`), secrets externalized to env vars (DB password + JWT secret no longer hardcoded), login lockout (5 failed attempts → 15 min lock), Excel file upload validation (extension/content-type/size, 5MB cap), and a global exception handler (prevents raw exception/stack-trace leakage and a pre-existing bug where uncaught exceptions produced a confusing opaque 403 instead of a real error).
+
+### Major non-security bug found and fixed: `OBEController` was completely unreachable
+
+While testing file upload validation, discovered that `OBEController` (`/api/obe/**` — 23+ endpoints: all Program Outcome CRUD under `/po/*`, all marks upload/export, attainment calculation, trend analysis, reports) had the wrong package declaration: `package com.example.Software.project.BackendRestController;` instead of `com.example.Software.project.Backend.RestController;` (missing dot — a sibling package, not a sub-package of the main app's `com.example.Software.project.Backend`). Spring Boot's default component scan only covers sub-packages of the main application class's package, so **this controller was never registered as a Spring bean and none of its endpoints were ever reachable** — every request to `/api/obe/**` silently 404'd (masked as a confusing error until the exception handler fix above made it visible). This is a pure functional bug, not introduced by this security work, and predates it. Fixed by correcting the package declaration; verified `/api/obe/po/all` and the marks upload endpoints now respond correctly.
+
+**Practical implication:** this also means the Phase 2/3 analysis of `OBEController`'s authorization (which assumed its manual `isAdmin`/`isLecture` checks were live, reachable security controls) was analyzing code that couldn't actually be hit over HTTP. Now that it's reachable, those same manual checks are real and active — re-verified working correctly in this session's testing (e.g., `isLecture` gate on marks upload).
 
 ## Phase 1 environment setup — done
 
