@@ -15,6 +15,10 @@ public class UserService {
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MINUTES = 15;
 
+    // Min 8 chars, at least one lowercase, one uppercase, one digit — per Phase 4 decision.
+    private static final java.util.regex.Pattern PASSWORD_POLICY =
+            java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
+
     // Ensure the UserRepository has the findByUsername method:
     // Optional<User> findByUsername(String username);
     @Autowired
@@ -120,6 +124,10 @@ public class UserService {
         }
         if (userRepository.findByEmail(newUser.getEmail()).isPresent()) {
             throw new Exception("Email already exists");
+        }
+
+        if (newUser.getPassword() == null || !PASSWORD_POLICY.matcher(newUser.getPassword()).matches()) {
+            throw new Exception("Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number");
         }
 
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));

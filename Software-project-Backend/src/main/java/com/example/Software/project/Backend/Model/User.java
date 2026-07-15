@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
 import java.time.LocalDateTime;
 
@@ -13,12 +15,20 @@ public class User {
 
     @Id
     @Column(name = "User_ID")
+    @NotBlank(message = "Username is required")
     private String  username;
 
     @Column(name = "email", unique = true, nullable = false)
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be a valid address")
     private String email;
 
+    // No @Pattern/complexity constraint here deliberately — this field stores the BCrypt hash
+    // once persisted, not the raw password, so entity-level validation would run against the
+    // hash on every save. Password strength is enforced explicitly in UserService.addUser()
+    // against the raw value, before it's hashed.
     @Column(name = "password", nullable = false)
+    @NotBlank(message = "Password is required")
     private String password;
 
     @Column(name = "user_type")

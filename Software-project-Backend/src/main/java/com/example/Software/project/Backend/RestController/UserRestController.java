@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -113,7 +114,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-admin")
-    public ResponseEntity<?> addAdmin(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addAdmin(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only superadmin can add admins
             if (!isSuperAdmin(token)) {
@@ -149,7 +150,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-lecture")
-    public ResponseEntity<?> addLecture(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addLecture(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only admin/superadmin can add lectures
             if (!isAdmin(token)) {
@@ -185,7 +186,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-user")
-    public ResponseEntity<?> addUser(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addUser(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             String requestedType = newUser.getUsertype() == null ? "" : newUser.getUsertype().toLowerCase().trim();
 
