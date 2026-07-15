@@ -26,6 +26,7 @@ public class OBEController {
     @Autowired private POAttainmentService poAttainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired private FileValidationService fileValidationService;
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
@@ -168,6 +169,7 @@ public class OBEController {
     public ResponseEntity<?> uploadMarks(@PathVariable String losId, @RequestParam("file") MultipartFile file, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
+            fileValidationService.validateExcelFile(file);
             excelService.importMarks(file, losId);
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
@@ -189,6 +191,7 @@ public class OBEController {
         }
 
         try {
+            fileValidationService.validateExcelFile(file);
             String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
             return ResponseEntity.ok(Map.of(
                 "message", result,
@@ -391,6 +394,8 @@ public class OBEController {
         }
 
         try {
+            fileValidationService.validateExcelFile(file);
+
             // Parse losIds from comma-separated string
             String[] losIds = losIdsParam.split(",");
 

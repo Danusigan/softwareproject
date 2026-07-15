@@ -5,6 +5,7 @@ import com.example.Software.project.Backend.Model.StudentMark;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Repository.StudentMarkRepository;
 import com.example.Software.project.Backend.Service.ExcelImportService;
+import com.example.Software.project.Backend.Service.FileValidationService;
 import com.example.Software.project.Backend.Service.LosService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -43,6 +44,9 @@ public class LosRestController {
 
     @Autowired
     private StudentMarkRepository studentMarkRepository;
+
+    @Autowired
+    private FileValidationService fileValidationService;
 
     // Create (Lecture Only) - Add to Module
     @PostMapping("/{moduleId}/add")
@@ -185,23 +189,7 @@ public class LosRestController {
                         ));
             }
 
-            if (excelFile == null || excelFile.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of(
-                            "message", "Error: Excel file is required",
-                            "status", "ERROR"
-                        ));
-            }
-
-            String originalName = excelFile.getOriginalFilename();
-            String normalizedName = originalName == null ? "" : originalName.toLowerCase();
-            if (!(normalizedName.endsWith(".xlsx") || normalizedName.endsWith(".xls"))) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of(
-                                "message", "Only Excel files (.xlsx, .xls) are supported for LO marks upload",
-                                "status", "ERROR"
-                        ));
-            }
+            fileValidationService.validateExcelFile(excelFile);
 
             // Only batch is required now (no academicYear)
             // Verify Los exists
