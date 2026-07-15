@@ -33,8 +33,7 @@ public class UserService {
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
-            // Check if the provided password matches the stored password
-            if (user.getPassword().equals(password)) {
+            if (passwordEncoder.matches(password, user.getPassword())) {
                 return Optional.of(user);
             }
         }
@@ -91,8 +90,7 @@ public class UserService {
             throw new Exception("Email already exists");
         }
 
-        // Store password as plain text (for development only)
-        // newUser.setPassword(passwordEncoder.encode(newUser.getPassword())); // Commented out for plain text
+        newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
 
         return userRepository.save(newUser);
     }
@@ -111,7 +109,7 @@ public class UserService {
         
         User testUser = new User();
         testUser.setUserID(username);
-        testUser.setPassword(password); // Plain text password for now
+        testUser.setPassword(passwordEncoder.encode(password));
         testUser.setEmail(email);
         testUser.setUsertype(userType);
         

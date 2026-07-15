@@ -14,8 +14,11 @@ DB_PASS="${DB_PASSWORD:-test_password}"
 DB_NAME="${DB_NAME:-test_db}"
 
 echo "== Seeding SuperAdmin (direct SQL insert; no REST endpoint creates this role) =="
+# Password is BCrypt-hashed (backend uses BCryptPasswordEncoder since Phase 5) —
+# hash below is for 'SuperAdminTest123!', generated via: python3 -c "import bcrypt; print(bcrypt.hashpw(b'SuperAdminTest123!', bcrypt.gensalt()).decode())"
+SUPERADMIN_HASH='$2b$12$04XibJToJEgJB13D5sbEkOU0ucaWrGeWft9RF.isu7X.EQ6hH6tFq'
 docker exec "$DB_CONTAINER" mysql -u"$DB_USER" -p"$DB_PASS" "$DB_NAME" -e \
-  "INSERT INTO User (User_ID, email, password, user_type) VALUES ('superadmin_test', 'superadmin@test.local', 'SuperAdminTest123!', 'superadmin');" \
+  "INSERT INTO User (User_ID, email, password, user_type) VALUES ('superadmin_test', 'superadmin@test.local', '$SUPERADMIN_HASH', 'superadmin');" \
   2>/dev/null || echo "  (already exists, skipping)"
 
 echo "== Seeding Admin (via built-in /api/auth/create-test-user) =="
