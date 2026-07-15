@@ -44,6 +44,9 @@ public class UserRestController {
                     new UsernamePasswordAuthenticationToken(loginUser.getUserID(), loginUser.getPassword())
             );
 
+            // Successful authentication clears any prior failed-attempt count/lockout
+            userService.resetFailedLogins(loginUser.getUserID());
+
             // If authentication is successful, generate JWT
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             Optional<User> userOptional = userService.findByUserId(userDetails.getUsername());
@@ -89,7 +92,13 @@ public class UserRestController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User not found"));
             }
 
+        } catch (org.springframework.security.authentication.LockedException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
         } catch (Exception e) {
+            userService.recordFailedLogin(loginUser.getUserID());
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");

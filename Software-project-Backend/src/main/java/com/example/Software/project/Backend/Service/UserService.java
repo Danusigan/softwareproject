@@ -6,18 +6,50 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
 public class UserService {
 
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MINUTES = 15;
+
     // Ensure the UserRepository has the findByUsername method:
     // Optional<User> findByUsername(String username);
     @Autowired
     private UserRepository userRepository;
-    
+
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    /**
+     * Records a failed login attempt; locks the account for 15 minutes after 5 consecutive failures.
+     * No-op if the username doesn't exist (avoids revealing account existence via lockout side-effects).
+     */
+    public void recordFailedLogin(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_DURATION_MINUTES));
+            }
+            userRepository.save(user);
+        });
+    }
+
+    /**
+     * Clears failed-attempt state on successful login.
+     */
+    public void resetFailedLogins(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+                user.setFailedLoginAttempts(0);
+                user.setLockedUntil(null);
+                userRepository.save(user);
+            }
+        });
+    }
 
     /**
      * Authenticates a user using their username and password.
