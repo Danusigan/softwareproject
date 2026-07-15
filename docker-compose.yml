@@ -33,6 +33,9 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-appuser}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-password}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
+      # Env var takes precedence over the dev-profile's own local fallback secret — always
+      # supply a real one via .env; there is no safe default here.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env, see .env.example}
     ports:
       - "8080:8080"
     depends_on:
