@@ -1,6 +1,6 @@
 # OBQA Security Program — Master Plan (Phases 1–6)
 
-Status: **Phase 2 complete, Phase 3 next**. This document is the living index for the whole security program; each phase updates its status here as it completes.
+Status: **Phase 3 complete, awaiting your risk-priority sign-off before Phase 4**. This document is the living index for the whole security program; each phase updates its status here as it completes.
 
 ## Goal
 
@@ -31,7 +31,7 @@ Turn OBQA into a professionally secured web application and produce documented p
 |---|---|---|---|
 | 1 | Planning & Preparation | `01-system-review.md`, `02-asset-inventory.md`, `03-security-objectives.md`, `04-security-requirements.md`, `05-scope-and-rules-of-engagement.md` + working Docker Compose test environment | **Complete** |
 | 2 | Security Architecture Review | `06-architecture-review.md` | **Complete** |
-| 3 | Threat Modeling | `07-threat-model.md` | Pending |
+| 3 | Threat Modeling | `07-threat-model.md` | **Complete** |
 | 4 | Secure Design Review | `08-secure-design-review.md` | Pending |
 | 5 | Security Implementation | Code changes (RBAC, BCrypt, validation, headers, rate limiting, audit log, secrets externalized) | Pending |
 | 6 | Code Security Review | `09-code-security-review.md` | Pending |
