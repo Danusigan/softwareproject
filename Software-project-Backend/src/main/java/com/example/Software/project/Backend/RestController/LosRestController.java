@@ -30,7 +30,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/lospos") // Kept as requested
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class LosRestController {
 
     @Autowired

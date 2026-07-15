@@ -46,6 +46,14 @@ While testing file upload validation, discovered that `OBEController` (`/api/obe
 
 **Practical implication:** this also means the Phase 2/3 analysis of `OBEController`'s authorization (which assumed its manual `isAdmin`/`isLecture` checks were live, reachable security controls) was analyzing code that couldn't actually be hit over HTTP. Now that it's reachable, those same manual checks are real and active — re-verified working correctly in this session's testing (e.g., `isLecture` gate on marks upload).
 
+Also added: audit logging (`AuditLog` entity/table, `AuditLogService`, 90-day retention via a daily `@Scheduled` purge) wired into login success/failure, account-lockout events, user creation (`add-admin`/`add-lecture`), Program Outcome create/update/delete/permanent-delete, and LO/PO mapping approve/reject — verified end-to-end.
+
+### Security headers + CORS review
+
+Backend response headers were already reasonable by default — Spring Security's `HeaderWriterFilter` adds `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` automatically with no explicit config needed; verified via a live response. CSP/HSTS weren't added to the API itself (CSP is meaningful for HTML-rendering contexts — the frontend's nginx config already sets one; HSTS needs HTTPS, deferred per Phase 4). No further backend header changes made.
+
+**CORS: found and fixed another real, pre-existing bug.** `SecurityConfig`'s CORS bean only allowed origin `http://localhost:5173` (the Vite dev server) — but the actual Dockerized frontend is served from `http://localhost` (port 80). Verified via a simulated preflight: a browser loading the Dockerized frontend and calling the backend would get a hard CORS rejection on every API call, making the containerized deployment unusable from a real browser (curl-based testing throughout this whole session never hit this, since curl doesn't enforce CORS). Additionally, **every one of the 8 REST controllers had its own identical `@CrossOrigin(origins = "http://localhost:5173", ...)` annotation**, which overrides the global CORS bean per-controller — so fixing only `SecurityConfig` would not have been sufficient. Fixed by adding `http://localhost` to the global CORS origins list and removing all 8 redundant per-controller `@CrossOrigin` annotations (consolidating on the single global source, closing the Phase 2-flagged duplication risk in the same pass). Verified preflight requests now succeed from both origins.
+
 ## Phase 1 environment setup — done
 
 Docker Desktop 29.6.1 installed by the user. Stack is up via `docker-compose.yml` (MySQL 8.0 + Spring Boot backend + nginx/React frontend), isolated from the user's real local MySQL (`LOPOmapping` on port 3306 — deliberately left untouched; the containerized MySQL uses host port 3307 instead, see below).

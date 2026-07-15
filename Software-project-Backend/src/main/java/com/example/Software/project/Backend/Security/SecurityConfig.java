@@ -58,7 +58,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        // :5173 = Vite dev server; :80 (plain http://localhost) = the nginx-served Docker
+        // Compose frontend. Both are real origins this app is actually accessed from locally.
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
