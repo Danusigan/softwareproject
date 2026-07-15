@@ -6,6 +6,7 @@ import com.example.Software.project.Backend.Service.ProgramOutcomeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -115,8 +116,9 @@ public class ProgramOutcomeRestController {
         }
     }
 
-    // Hard delete PO (Admin only)
+    // Hard delete PO (SuperAdmin only — irreversible, more destructive than the other admin-level actions here)
     @DeleteMapping("/{poId}/permanent")
+    @PreAuthorize("hasAuthority('superadmin')")
     public ResponseEntity<?> hardDeletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -186,6 +188,7 @@ public class ProgramOutcomeRestController {
 
     // Get all active POs
     @GetMapping("/all")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getAllActivePOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> pos = poService.getAllActivePOs();
@@ -212,6 +215,7 @@ public class ProgramOutcomeRestController {
 
     // Get PO by ID
     @GetMapping("/{poId}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             Optional<ProgramOutcome> po = poService.getPOById(poId);
@@ -227,6 +231,7 @@ public class ProgramOutcomeRestController {
 
     // Get default Washington Accord POs
     @GetMapping("/defaults")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getDefaultPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
@@ -238,6 +243,7 @@ public class ProgramOutcomeRestController {
 
     // Get custom POs
     @GetMapping("/custom")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getCustomPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> customPOs = poService.getCustomPOs();
@@ -249,6 +255,7 @@ public class ProgramOutcomeRestController {
 
     // Get POs by category
     @GetMapping("/by-category/{category}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getPOsByCategory(@PathVariable String category, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             // This would require a new method in service

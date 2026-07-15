@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -39,9 +41,10 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck
                 .requestMatchers("/api/auth/login").permitAll() // Allow login without token
-                .requestMatchers("/api/auth/create-test-user").permitAll() // Allow test user creation without token
-                .requestMatchers("/api/auth/**").permitAll() // Allow all auth endpoints without token (if needed)
-                .anyRequest().authenticated() // All other requests need token
+                // create-test-user stays reachable without a token (used to bootstrap the first
+                // test account) but is gated to the dev profile in the controller itself.
+                .requestMatchers("/api/auth/create-test-user").permitAll()
+                .anyRequest().authenticated() // Everything else, including other /api/auth/** endpoints, needs a valid token
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

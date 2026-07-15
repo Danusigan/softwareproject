@@ -2,6 +2,8 @@
 
 Built on the asset inventory (`02-asset-inventory.md`) and architecture review (`06-architecture-review.md`). Covers data flows, entry points, attack surfaces, STRIDE analysis, and a prioritized risk register.
 
+> **Correction (Phase 5):** this document's original authorization analysis overstated the RBAC gap — it assumed "no `@PreAuthorize` found" meant "no role checks exist," but most controllers already implement equivalent checks manually (per-controller `isAdmin(token)`/`isLecturer(token)` helpers). The `/admin/...`-named LO/PO mapping endpoints, in particular, **do** already enforce admin-only access — the DFD #3 note below claiming otherwise is wrong. Also, **`/api/cqi` does not exist as a live endpoint** (no controller implemented, only a data model) — DFD #4 and all `/api/cqi` references below describe a feature that isn't built yet, not a real attack surface. See `06-architecture-review.md`'s Authorization architecture section for the corrected picture, and the risk register's per-row status notes for what Phase 5 actually found and fixed. Left otherwise unedited as a historical record of the Phase 3 analysis.
+
 ## Data Flow Diagrams
 
 ### 1. Login flow
@@ -118,18 +120,19 @@ sequenceDiagram
 
 ## Prioritized risk register
 
-| # | Risk | STRIDE category | Likelihood | Impact | Priority | Traces to |
-|---|---|---|---|---|---|---|
-| 1 | Any authenticated user (any role) can perform admin-level actions on modules, marks, PO/LO mappings, CQI actions — no server-side RBAC | Elevation of Privilege | High (trivial — just log in as any role) | Critical (data integrity + accreditation validity) | **Critical** | REQ-AC-01, REQ-AC-02 (`04-security-requirements.md`) |
-| 2 | Passwords stored and compared in plaintext | Information Disclosure | Medium (requires DB access) | Critical (full credential compromise on any leak) | **Critical** | REQ-CRYPTO-01 |
-| 3 | Unauthenticated user enumeration via `/api/auth/debug/user/{username}` | Information Disclosure | High (no auth needed, trivially scriptable) | Medium (email/role leak, aids further attacks) | **High** | REQ-AC-03 |
-| 4 | JWT secret and DB password hardcoded in source (and likely in git history) | Information Disclosure / Spoofing | High (anyone with repo access) | Critical (forge tokens / direct DB access) | **Critical** | REQ-CRYPTO-02 |
-| 5 | No rate limiting/lockout on login | Denial of Service / Spoofing | Medium | High (enables credential stuffing) | **High** | REQ-AUTH-02 |
-| 6 | Excel upload endpoints accept unvalidated files | Tampering / Denial of Service | Medium | Medium-High | **High** | REQ-FILE-01 |
-| 7 | No audit log for privileged actions (mapping approval, marks edits, login) | Repudiation | High (guaranteed gap, not probabilistic) | Medium (forensics/accreditation trust gap) | **High** | REQ-LOG-01 |
-| 8 | No JWT revocation; stolen token valid full 2h regardless of logout | Spoofing | Low-Medium | Medium | **Medium** | (new — add to requirements in Phase 4) |
-| 9 | `create-test-user` / `debug/user` endpoints reachable in any environment, not gated to dev/test profile | Elevation of Privilege / Info Disclosure | Medium (depends on deployment) | Medium | **Medium** | REQ-AC-03 |
-| 10 | `ddl-auto=update` with no migration history | Tampering (accidental) | Low | Medium (schema drift risk, not attacker-driven) | **Low-Medium** | (Phase 1 finding) |
-| 11 | CodeQL doesn't cover the Java backend | (enables all of the above to go undetected) | High (currently true) | Medium (detection gap, not a direct vuln) | **Medium** | (Phase 2 finding) |
+| # | Risk | STRIDE category | Likelihood | Impact | Priority | Traces to | Phase 5 status |
+|---|---|---|---|---|---|---|---|
+| 1 | Any authenticated user (any role) can perform admin-level actions on modules, marks, PO/LO mappings — no server-side RBAC | Elevation of Privilege | ~~High~~ Overstated — see correction note above | Critical (data integrity + accreditation validity) | **Critical** | REQ-AC-01, REQ-AC-02 (`04-security-requirements.md`) | **Revised & partially fixed.** Most write endpoints already had manual role checks (not a real bypass). Genuine gaps found and fixed: PO catalog GETs tightened to admin/superadmin, PO hard-delete tightened to superadmin-only. Remaining: object-level (cross-module) checks, deferred per Phase 4. |
+| 2 | Passwords stored and compared in plaintext | Information Disclosure | Medium (requires DB access) | Critical (full credential compromise on any leak) | **Critical** | REQ-CRYPTO-01 | **Fixed.** `BCryptPasswordEncoder` now in use; `UserService.addUser`/`createTestUser` encode on write; test accounts re-seeded with real hashes. |
+| 3 | Unauthenticated user enumeration via `/api/auth/debug/user/{username}` | Information Disclosure | High (no auth needed, trivially scriptable) | Medium (email/role leak, aids further attacks) | **High** | REQ-AC-03 | **Fixed.** Now requires `admin`/`superadmin` via `@PreAuthorize`. |
+| 4 | JWT secret and DB password hardcoded in source (and likely in git history) | Information Disclosure / Spoofing | High (anyone with repo access) | Critical (forge tokens / direct DB access) | **Critical** | REQ-CRYPTO-02 | Not yet fixed — pending. |
+| 5 | No rate limiting/lockout on login | Denial of Service / Spoofing | Medium | High (enables credential stuffing) | **High** | REQ-AUTH-02 | Not yet fixed — pending. |
+| 6 | Excel upload endpoints accept unvalidated files | Tampering / Denial of Service | Medium | Medium-High | **High** | REQ-FILE-01 | Not yet fixed — pending. |
+| 7 | No audit log for privileged actions (mapping approval, marks edits, login) | Repudiation | High (guaranteed gap, not probabilistic) | Medium (forensics/accreditation trust gap) | **High** | REQ-LOG-01 | Not yet fixed — pending. |
+| 8 | No JWT revocation; stolen token valid full 2h regardless of logout | Spoofing | Low-Medium | Medium | **Medium** | (new — add to requirements in Phase 4) | Accepted residual risk per Phase 4 decision — not implemented. |
+| 9 | `create-test-user` / `debug/user` endpoints reachable in any environment, not gated to dev/test profile | Elevation of Privilege / Info Disclosure | Medium (depends on deployment) | Medium | **Medium** | REQ-AC-03 | **Fixed.** `create-test-user` gated to `dev` Spring profile; `debug/user` requires admin/superadmin auth. |
+| 10 | `ddl-auto=update` with no migration history | Tampering (accidental) | Low | Medium (schema drift risk, not attacker-driven) | **Low-Medium** | (Phase 1 finding) | Accepted residual risk per Phase 4 decision — not implemented. |
+| 11 | CodeQL doesn't cover the Java backend | (enables all of the above to go undetected) | High (currently true) | Medium (detection gap, not a direct vuln) | **Medium** | (Phase 2 finding) | Not yet fixed — pending (CI/CD change, outside app code). |
+| — | `/api/cqi` referenced as a live unprotected endpoint | — | — | — | **Removed** | — | **Correction:** controller doesn't exist; not a real attack surface. See note above. |
 
-**Priority order for Phase 5 remediation**: #1, #2, #4 (Critical) → #3, #5, #6, #7 (High) → #8, #9 (Medium) → #10, #11 (Low-Medium, opportunistic).
+**Priority order for Phase 5 remediation**: #1, #2, #4 (Critical) → #3, #5, #6, #7 (High) → #8, #9 (Medium) → #10, #11 (Low-Medium, opportunistic). Progress so far: #2, #3, #9 fixed; #1 revised and partially fixed; #4, #5, #6, #7, #11 still pending.

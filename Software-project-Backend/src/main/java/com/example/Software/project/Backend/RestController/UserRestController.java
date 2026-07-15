@@ -4,8 +4,10 @@ import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -30,6 +32,9 @@ public class UserRestController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private Environment environment;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
@@ -203,6 +208,7 @@ public class UserRestController {
     }
 
     @GetMapping("/debug/user/{username}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> debugGetUser(@PathVariable String username) {
         try {
             Optional<User> userOptional = userService.findByUserId(username);
@@ -225,6 +231,12 @@ public class UserRestController {
 
     @PostMapping("/create-test-user")
     public ResponseEntity<?> createTestUser() {
+        // Dev/test bootstrap helper only — must never be reachable in a non-dev deployment,
+        // since it creates a known-credential admin account with no authentication required.
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("dev"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
+        }
         try {
             User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();

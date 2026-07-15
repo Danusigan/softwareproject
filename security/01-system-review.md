@@ -38,7 +38,7 @@ flowchart LR
 | `ModuleRestController` | `/api/modules` | |
 | `OBEController` | `/api/obe` | Marks export/template/bulk-upload |
 | `AssessmentController` | `/api/obe/assessment` | |
-| `CqiActionController` | `/api/cqi` | |
+| ~~`CqiActionController`~~ | ~~`/api/cqi`~~ | **Correction (Phase 5): this controller does not exist.** Only a `CqiAction`/`CqiStatus` model+repository exist; there is no REST controller and no frontend integration (`CqiReviewPage.jsx`/`MyCqiPlansPage.jsx` referenced in earlier planning don't exist in `src/pages/`). Not a live endpoint — remove from attack surface until built. |
 | `IntegratedLORestController` | `/api/los-with-mapping` | |
 | `LOPOMappingRestController` | `/api/lo-po-mapping` | |
 | `ProgramOutcomeRestController` | `/api/program-outcomes` | |
@@ -57,7 +57,7 @@ The 6 stub controllers are dead code today (no live attack surface) but are trac
 1. **Login**: `POST /api/auth/login` → `CustomUserDetailsService` loads user → password compared via `NoOpPasswordEncoder` (plaintext) → `JwtUtil` issues HS256 JWT (2h expiry) → returned to client, stored in `localStorage`.
 2. **Bulk marks upload/export**: Lecturer → `/marks-workbench/:moduleId` → downloads Excel template (`POST /api/obe/template/marks`) → fills it → uploads (`POST /api/obe/marks/upload-bulk`, parsed via Apache POI) → exports pass/fail report (`POST /api/obe/export/marks`).
 3. **PO/LO mapping approval**: Lecturer creates mapping → Admin approves via `/lo-po-mappings`.
-4. **CQI workflow**: gap review → action plan → tracked via `/api/cqi`.
+4. **CQI workflow**: gap review → action plan — data model exists (`CqiAction`) but no backend controller or frontend pages implement it yet; not a live feature.
 
 ## Confirmed discrepancies / dead surfaces to keep in mind for scope
 
