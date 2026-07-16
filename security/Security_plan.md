@@ -1,6 +1,6 @@
 # OBQA Security Program — Master Plan (Phases 1–6)
 
-Status: **Phase 4 complete, Phase 5 (implementation) next**. This document is the living index for the whole security program; each phase updates its status here as it completes.
+Status: **All 6 phases complete.** Program moves to Phase 7+ (active testing) if/when you choose to proceed. This document is the living index for the whole security program; each phase updates its status here as it completes.
 
 ## Goal
 
@@ -33,8 +33,8 @@ Turn OBQA into a professionally secured web application and produce documented p
 | 2 | Security Architecture Review | `06-architecture-review.md` | **Complete** |
 | 3 | Threat Modeling | `07-threat-model.md` | **Complete** |
 | 4 | Secure Design Review | `08-secure-design-review.md` | **Complete** |
-| 5 | Security Implementation | Code changes (RBAC, BCrypt, validation, headers, rate limiting, audit log, secrets externalized) | **In progress** |
-| 6 | Code Security Review | `09-code-security-review.md` | Pending |
+| 5 | Security Implementation | Code changes (RBAC, BCrypt, validation, headers, rate limiting, audit log, secrets externalized) | **Complete** |
+| 6 | Code Security Review | `09-code-security-review.md` | **Complete** |
 
 ## Phase 5 progress log
 
@@ -53,6 +53,37 @@ Also added: audit logging (`AuditLog` entity/table, `AuditLogService`, 90-day re
 Backend response headers were already reasonable by default — Spring Security's `HeaderWriterFilter` adds `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY` automatically with no explicit config needed; verified via a live response. CSP/HSTS weren't added to the API itself (CSP is meaningful for HTML-rendering contexts — the frontend's nginx config already sets one; HSTS needs HTTPS, deferred per Phase 4). No further backend header changes made.
 
 **CORS: found and fixed another real, pre-existing bug.** `SecurityConfig`'s CORS bean only allowed origin `http://localhost:5173` (the Vite dev server) — but the actual Dockerized frontend is served from `http://localhost` (port 80). Verified via a simulated preflight: a browser loading the Dockerized frontend and calling the backend would get a hard CORS rejection on every API call, making the containerized deployment unusable from a real browser (curl-based testing throughout this whole session never hit this, since curl doesn't enforce CORS). Additionally, **every one of the 8 REST controllers had its own identical `@CrossOrigin(origins = "http://localhost:5173", ...)` annotation**, which overrides the global CORS bean per-controller — so fixing only `SecurityConfig` would not have been sufficient. Fixed by adding `http://localhost` to the global CORS origins list and removing all 8 redundant per-controller `@CrossOrigin` annotations (consolidating on the single global source, closing the Phase 2-flagged duplication risk in the same pass). Verified preflight requests now succeed from both origins.
+
+### Input validation
+
+Added `spring-boot-starter-validation`. `User.username`/`email` get `@NotBlank`/`@Email`; `@Valid` added to `add-admin`/`add-lecture`/`add-user` (deliberately **not** to login — a password-policy check must never reject an existing, previously-valid credential at sign-in time). Password strength (min 8 chars, upper+lower+digit, per the Phase 4 decision) is enforced explicitly in `UserService.addUser()` against the raw password before hashing, rather than as a Bean Validation annotation on the entity — the `password` field stores the BCrypt hash once persisted, so an entity-level `@Pattern` constraint would incorrectly re-validate the hash on every save. Verified: invalid email, blank email, and weak password all return clean 400s with field-specific messages; valid data still succeeds; login is unaffected.
+
+### Regression caught and fixed during final re-verification
+
+Adding the global exception handler's catch-all `@ExceptionHandler(Exception.class)` (added earlier in this phase) had an unintended side effect: it was catching `AccessDeniedException` — the exception `@PreAuthorize` denials throw — **before** Spring Security's own filter chain could translate it into a proper 403, producing a 500 instead. Caught this in the final full-stack re-verification pass (a lecturer token hitting the admin-only PO catalog got 500, not the expected 403). Fixed by adding explicit `AccessDeniedException` → 403 and `AuthenticationException` → 401 handlers ahead of the generic catch-all. Re-verified: all RBAC checks now return the correct status codes again.
+
+Also fixed during re-verification: the `failed_login_attempts` column (added for login lockout) is `NOT NULL` with no DB-level default, which broke the seed script's raw SQL insert for the SuperAdmin test account (Java's `= 0` field initializer only applies when creating objects through JPA, not raw SQL). Fixed both the entity (`columnDefinition = "INT DEFAULT 0"`) and the seed script (explicit column in the INSERT).
+
+### Final full-stack verification (clean reset)
+
+Ran a complete `docker compose down -v && up` + re-seed + verification pass as the last step: all 3 role logins, RBAC (lecturer blocked from admin endpoints, admin blocked from superadmin-only permanent-delete, unauthenticated requests properly rejected), file upload validation, CORS from both real origins, login lockout (5 failures → 423 on the 6th), and audit log population (19 entries across LOGIN/CREATE_USER events) — all confirmed working together from a clean state, not just individually.
+
+## Deferred to Phase 6 / not done in this pass
+
+- Git history still contains the old exposed DB password — rotation vs. history rewrite is still your call (see Phase 1 notes).
+- JWT revocation/refresh, DB least-privilege user, Flyway/Liquibase migrations, automated backups, encryption at rest, API versioning — all explicitly deferred per the Phase 4 design decisions as accepted residual risk, not oversights.
+- CodeQL still doesn't cover the Java backend (CI/CD config change, outside application code).
+- `.env.example`'s `DB_USERNAME` and the port-conflict/JDBC fixes from Phase 1 are already corrected in the repo; not revisited here.
+
+## Phase 6 summary
+
+Full detail in `security/09-code-security-review.md`. Headlines:
+
+- Re-reviewed all Phase 5 security code (auth, authz, validation, error handling, file upload) — confirmed consistent, found one pre-existing low-severity edge case (`JwtRequestFilter` doesn't catch `UsernameNotFoundException` for a deleted user with a still-valid token — fails safe, just an ugly error instead of a clean 401).
+- **`npm audit`**: found 13 frontend dependency vulnerabilities (5 high, 7 moderate) including in `axios` (SSRF, auth bypass) and `react-router` (open redirect) — both production dependencies. Fixed 11/13 via `npm audit fix`; verified the build still works. 2 remaining need a breaking Vite major-version upgrade (dev-server-only impact) — deliberately deferred to a dedicated, separately-tested task rather than force-upgrading during this pass.
+- **Backend dependency scan**: OWASP Dependency-Check could not complete in this session (NVD database download got stuck in this environment, compounded by a stale lock from an interrupted attempt — cleaned up). Did a manual, appropriately-hedged review of pinned versions instead (Spring Boot 3.2.2 is dated; jjwt 0.11.5 and Apache POI 5.2.4 are functionally fine as used but could be bumped). Recommend running the automated scan yourself with more time or an NVD API key, or wiring it into CI.
+- Secrets sweep: clean, no live secrets found. One stale doc (`POSTMAN_TESTING_GUIDE.md`) still shows the old hardcoded JWT secret as troubleshooting text — harmless now, just outdated.
+- Per your instruction: the 6 empty stub controllers and the dead `src/src/` frontend tree were **not deleted**, only re-flagged for visibility.
 
 ## Phase 1 environment setup — done
 

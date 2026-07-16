@@ -34,7 +34,7 @@ public class User {
     @Column(name = "user_type")
     private String usertype;
 
-    @Column(name = "failed_login_attempts", nullable = false)
+    @Column(name = "failed_login_attempts", nullable = false, columnDefinition = "INT DEFAULT 0")
     private int failedLoginAttempts = 0;
 
     @Column(name = "locked_until")
