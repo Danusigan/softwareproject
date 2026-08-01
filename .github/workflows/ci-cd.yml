@@ -129,8 +129,7 @@ jobs:
       - name: Run Tests
         run: |
           cd softwareproject_frontend
-          npm test 2>/dev/null || echo "Tests not configured"
-        continue-on-error: true
+          npm test
 
   # Final Status Check
   ci-status:

@@ -251,6 +251,7 @@ public class OutcomeMapping {
     }
 
     public String getWeightDescription() {
+        if (weight == null) return "Unknown";
         switch (weight) {
             case 0: return "No Correlation";
             case 1: return "Low Correlation";
