@@ -8,8 +8,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ${{ github.repository }}/backend
-  FRONTEND_IMAGE: ${{ github.repository }}/frontend
 
 jobs:
   # Code Quality & Security Scanning
@@ -177,6 +175,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Normalize image repository name
+        run: echo "IMAGE_REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
       - name: Build & push backend
         uses: docker/build-push-action@v5
         with:
@@ -184,8 +185,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:latest
-            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/backend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/backend:${{ github.sha }}
 
       - name: Build & push frontend
         uses: docker/build-push-action@v5
@@ -194,8 +195,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/frontend:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_REPOSITORY }}/frontend:${{ github.sha }}
 
   # Deploy to Oracle Cloud VM via SSH
   deploy:
