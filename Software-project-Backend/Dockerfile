@@ -1,22 +1,21 @@
 # Multi-stage build for Spring Boot application
 # Stage 1: Build
-FROM eclipse-temurin:17-jdk-alpine AS builder
+FROM maven:3.9.9-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
 COPY pom.xml .
 COPY src ./src
 
-RUN apk add --no-cache maven && \
-    mvn clean package -DskipTests -q
+RUN mvn clean package -DskipTests -q
 
 # Stage 2: Runtime
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
 # Security: Run as non-root user
-RUN addgroup -g 1001 app && adduser -D -u 1001 -G app app
+RUN groupadd --gid 1001 app && useradd --uid 1001 --gid app --create-home app
 
 COPY --from=builder --chown=app:app /app/target/*.jar app.jar
 
