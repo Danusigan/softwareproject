@@ -84,13 +84,13 @@ export default function LOPOMappingManagementPage() {
 
             // Keep partial successes if one endpoint fails.
             const [mappingsRes, modulesRes, statsRes] = await Promise.allSettled([
-                axios.get('http://localhost:8080/api/lo-po-mapping/all', {
+                axios.get('/api/lo-po-mapping/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:8080/api/modules/all', {
+                axios.get('/api/modules/all', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }),
-                axios.get('http://localhost:8080/api/lo-po-mapping/statistics', {
+                axios.get('/api/lo-po-mapping/statistics', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 })
             ]);
@@ -125,7 +125,7 @@ export default function LOPOMappingManagementPage() {
     const fetchMappings = async () => {
         try {
             const token = localStorage.getItem('token');
-            let url = 'http://localhost:8080/api/lo-po-mapping/all';
+            let url = '/api/lo-po-mapping/all';
             
             // Add filters
             const params = new URLSearchParams();
@@ -179,7 +179,7 @@ export default function LOPOMappingManagementPage() {
             const mappingIdentifier = selectedMapping.mappingId || selectedMapping.id;
 
             await axios.put(
-                `http://localhost:8080/api/lo-po-mapping/admin/${mappingIdentifier}/${actionEndpoint}`,
+                `/api/lo-po-mapping/admin/${mappingIdentifier}/${actionEndpoint}`,
                 { adminRemarks: approvalForm.remarks },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -213,7 +213,7 @@ export default function LOPOMappingManagementPage() {
             const mappingIdentifier = selectedEditableMapping.mappingId || selectedEditableMapping.id;
 
             await axios.put(
-                `http://localhost:8080/api/lo-po-mapping/${mappingIdentifier}`,
+                `/api/lo-po-mapping/${mappingIdentifier}`,
                 {
                     weight: Number(editMappingForm.weight),
                     lecturerRemarks: editMappingForm.lecturerRemarks
@@ -241,7 +241,7 @@ export default function LOPOMappingManagementPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/lo-po-mapping/${mappingIdentifier}`, {
+            await axios.delete(`/api/lo-po-mapping/${mappingIdentifier}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 

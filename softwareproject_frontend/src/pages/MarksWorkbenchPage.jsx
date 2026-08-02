@@ -102,7 +102,7 @@ export default function MarksWorkbenchPage() {
   const loadAvailableMarks = async () => {
     try {
       const token = authService.getToken()
-      const res = await fetch(`http://localhost:8080/api/obe/marks/available/module/${moduleId}`, {
+      const res = await fetch(`/api/obe/marks/available/module/${moduleId}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const json = await res.json()
@@ -302,7 +302,7 @@ export default function MarksWorkbenchPage() {
       setBusyAction(`dl-${batchVal}-${markTypeVal}`)
       const token = authService.getToken()
       const res = await fetch(
-        `http://localhost:8080/api/obe/marks/export/module/${moduleId}?batch=${batchVal}&markType=${markTypeVal}&threshold=${getThreshold(batchVal)}`,
+        `/api/obe/marks/export/module/${moduleId}?batch=${batchVal}&markType=${markTypeVal}&threshold=${getThreshold(batchVal)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       )
       if (!res.ok) throw new Error('Download failed')

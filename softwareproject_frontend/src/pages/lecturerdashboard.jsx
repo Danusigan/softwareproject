@@ -55,7 +55,7 @@ export default function LecturerDashboard() {
     const fetchModules = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/modules/all', { headers: { Authorization: `Bearer ${token}` } });
+            const res = await axios.get('/api/modules/all', { headers: { Authorization: `Bearer ${token}` } });
             setModules(res.data.data || []);
         } catch { setModules([]); }
     };
@@ -63,7 +63,7 @@ export default function LecturerDashboard() {
     const fetchLosForModule = async (moduleId) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/module/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await axios.get(`/api/lospos/module/${moduleId}`, { headers: { Authorization: `Bearer ${token}` } });
             setLos(res.data.data || []);
         } catch { setLos([]); }
     };
@@ -80,7 +80,7 @@ export default function LecturerDashboard() {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/lospos/${editingLo.id}`,
+                `/api/lospos/${editingLo.id}`,
                 { id: loData.loNumber, name: `LO ${loData.loNumber}`, description: loData.description },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -98,7 +98,7 @@ export default function LecturerDashboard() {
         if (!window.confirm('Are you sure you want to delete this LO?')) return;
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/lospos/${loId}`, { headers: { Authorization: `Bearer ${token}` } });
+            await axios.delete(`/api/lospos/${loId}`, { headers: { Authorization: `Bearer ${token}` } });
             setMessage({ type: 'success', text: 'LO deleted successfully!' });
             fetchLosForModule(selectedModule.moduleId);
         } catch (err) {

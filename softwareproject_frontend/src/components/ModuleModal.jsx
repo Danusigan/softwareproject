@@ -11,7 +11,7 @@ const ModuleModal = ({ module, onClose }) => {
         const fetchLOs = async () => {
             try {
                 const token = localStorage.getItem('token');
-                const response = await axios.get(`http://localhost:8080/api/lospos/module/${module.moduleId}`, {
+                const response = await axios.get(`/api/lospos/module/${module.moduleId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const payload = response?.data;

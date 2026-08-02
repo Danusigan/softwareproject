@@ -16,7 +16,9 @@ export default function MultiSelectAutocomplete({ options, selectedValues, onCha
         const q = query.trim().toLowerCase();
         return options
             .filter(o => !selectedValues.includes(o.value))
-            .filter(o => !q || o.label.toLowerCase().startsWith(q))
+            .filter(o => !q
+                || o.label.toLowerCase().includes(q)
+                || (o.sublabel && o.sublabel.toLowerCase().includes(q)))
             .slice(0, 8);
     }, [options, selectedValues, query]);
 
@@ -64,7 +66,7 @@ export default function MultiSelectAutocomplete({ options, selectedValues, onCha
                         <li key={opt.value}>
                             <button
                                 type="button"
-                                onClick={() => addValue(opt.value)}
+                                onMouseDown={(e) => { e.preventDefault(); addValue(opt.value); }}
                                 className="w-full text-left px-4 py-2 hover:bg-blue-50 text-sm"
                             >
                                 <span className="font-medium">{opt.label}</span>
