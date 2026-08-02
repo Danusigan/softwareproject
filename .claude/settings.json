@@ -14,7 +14,9 @@
       "Bash(npx eslint *)",
       "Bash(npx vite *)",
       "Skill(run)",
-      "Skill(run:*)"
+      "Skill(run:*)",
+      "Bash(./mvnw -Dtest=OutcomeMappingTest test)",
+      "Bash(git add *)"
     ]
   }
 }
