@@ -41,6 +41,8 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
 
     List<StudentMark> findByLos_IdAndBatch(String losId, String batch);
 
+    List<StudentMark> findByLos_Module_ModuleId(String moduleId);
+
     long countByLos_IdAndBatch(String losId, String batch);
 
     @Modifying

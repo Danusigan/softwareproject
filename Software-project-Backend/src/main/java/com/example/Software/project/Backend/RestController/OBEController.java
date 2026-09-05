@@ -233,6 +233,46 @@ public class OBEController {
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
     }
 
+    // --- ANALYSIS: LO pass rate by batch ---
+    @GetMapping("/analysis/pass-rate/lo/{moduleId}")
+    public ResponseEntity<?> getLoPassRate(
+            @PathVariable String moduleId,
+            @RequestParam(defaultValue = "50") double threshold,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- GRAPH GENERATION: Filtered university QA dashboard data ---
+    @GetMapping("/graphs/dashboard/{moduleId}")
+    public ResponseEntity<?> getDashboardGraphs(
+            @PathVariable String moduleId,
+            @RequestParam(required = false) String batch,
+            @RequestParam(required = false) String markType,
+            @RequestParam(required = false) String loId,
+            @RequestParam(defaultValue = "50") double threshold,
+            @RequestParam(defaultValue = "60") double target,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            MarkType parsedMarkType = null;
+            if (markType != null && !markType.isBlank()) {
+                parsedMarkType = MarkType.valueOf(markType.trim().toUpperCase(Locale.ROOT));
+            }
+            return ResponseEntity.ok(trendService.getDashboardGraphs(
+                moduleId, batch, parsedMarkType, threshold, target, loId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "message", "Invalid graph filter: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
     // --- EXPORT: Generate Excel with selected LOs and mark type ---
     @PostMapping("/export/marks")
     public ResponseEntity<?> exportMarks(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
