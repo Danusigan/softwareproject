@@ -5,6 +5,8 @@ import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.ModuleService;
 import com.example.Software.project.Backend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -22,7 +24,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class UserRestController {
 
     @Autowired
@@ -36,6 +37,9 @@ public class UserRestController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private Environment environment;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
@@ -367,6 +371,10 @@ public class UserRestController {
 
     @PostMapping("/create-test-user")
     public ResponseEntity<?> createTestUser() {
+        if (!environment.acceptsProfiles(Profiles.of("dev"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
+        }
         try {
             User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();

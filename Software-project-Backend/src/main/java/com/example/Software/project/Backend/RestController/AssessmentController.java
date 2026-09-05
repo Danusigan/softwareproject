@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/obe/assessment")
-@CrossOrigin(origins = "http://localhost:5173")
 public class AssessmentController {
 
     @Autowired

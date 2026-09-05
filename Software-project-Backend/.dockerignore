@@ -1,0 +1,10 @@
+target/
+.git/
+.github/
+.idea/
+.vscode/
+*.log
+
+# Local-only configuration can contain developer credentials and must never
+# become part of the production image.
+src/main/resources/application-dev.properties
