@@ -6,8 +6,8 @@ services:
     region: singapore
     branch: deployment_1
     rootDir: Software-project-Backend
-    dockerfilePath: ./Software-project-Backend/Dockerfile
-    dockerContext: ./Software-project-Backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /actuator/health
     autoDeployTrigger: commit
     envVars:
