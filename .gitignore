@@ -62,3 +62,7 @@ Thumbs.db
 # Cache
 .cache/
 .vite/
+
+# Test coverage & SonarQube scanner work dir
+coverage/
+.scannerwork/
