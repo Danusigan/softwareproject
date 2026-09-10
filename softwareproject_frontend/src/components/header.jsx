@@ -64,6 +64,7 @@ export default function Header() {
             </Link>
 
             {user && <Link to="/student-reports" className="text-sm font-bold hover:text-blue-200">Student reports</Link>}
+            {user && <Link to="/batch-reports" className="text-sm font-bold hover:text-blue-200">Batch reports</Link>}
             {user ? (
               /* Logged in user */
               <div className="flex items-center gap-6 pl-8 border-l border-white/20">
