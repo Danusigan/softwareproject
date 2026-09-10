@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import StudentReportsPage from './pages/StudentReportsPage'
 import LandingPage from './pages/landingpage'
 import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
@@ -30,6 +31,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/student-reports" element={<ProtectedRoute><StudentReportsPage /></ProtectedRoute>} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/loginpage" element={<LoginPage />} />
       <Route path="/forgottenpassword" element={<ForgotPasswordPage />} />

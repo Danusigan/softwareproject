@@ -113,7 +113,13 @@
 			<artifactId>poi-scratchpad</artifactId>
 			<version>5.2.4</version>
 		</dependency>
-	</dependencies>
+	        <!-- PDF export for the isolated student-report feature -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>1.3.43</version>
+        </dependency>
+</dependencies>
 
 	<build>
 		<plugins>

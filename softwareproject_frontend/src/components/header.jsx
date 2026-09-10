@@ -63,6 +63,7 @@ export default function Header() {
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-blue-300 group-hover/link:w-full transition-all duration-300"></span>
             </Link>
 
+            {user && <Link to="/student-reports" className="text-sm font-bold hover:text-blue-200">Student reports</Link>}
             {user ? (
               /* Logged in user */
               <div className="flex items-center gap-6 pl-8 border-l border-white/20">
