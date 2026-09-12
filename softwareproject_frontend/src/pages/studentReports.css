@@ -1,1 +1,373 @@
-.student-reports{background:#f4f7fb;min-height:100vh;color:#172b46}.report-shell{max-width:1160px;margin:auto;padding:40px 24px 70px}.report-shell h1{font-size:32px;font-weight:750;margin:8px 0}.report-shell h2{font-size:26px;font-weight:700}.report-shell h3{font-size:21px;font-weight:700}.report-shell h4{font-size:17px;font-weight:650}.report-eyebrow{text-transform:uppercase;letter-spacing:.12em;font-size:11px;font-weight:700;color:#436083}.report-intro{color:#52647a;margin-bottom:24px}.report-controls,.report-preview{background:white;border:1px solid #dbe3ed;border-radius:16px;padding:24px;margin:20px 0}.report-controls form{display:flex;align-items:end;flex-wrap:wrap;gap:12px;margin-bottom:14px}.report-controls label{font-weight:600;font-size:14px;align-self:center}.report-controls input,.report-controls select{border:1px solid #99abc0;border-radius:7px;padding:10px;background:white;max-width:100%}.report-controls input[type=number]{width:100px}.report-shell button{background:#1e40af;color:white;border-radius:8px;padding:11px 18px;font-weight:650}.report-shell button:disabled{opacity:.55;cursor:not-allowed}.report-shell :focus-visible{outline:3px solid #60a5fa;outline-offset:3px}.report-help{font-size:13px;color:#52647a;margin:8px 0}.report-error{background:#fff1f2;color:#9f1239;border:1px solid #fda4af;padding:14px;border-radius:8px}.report-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.report-metadata,.report-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin:22px 0}.report-metadata dt{font-size:12px;color:#52647a}.report-metadata dd{overflow-wrap:anywhere}.report-stats>div{background:#eff5fc;border-radius:10px;padding:16px}.report-stats strong{display:block;font-size:28px}.report-stats span{font-size:13px}.report-module{border-top:2px solid #dbe3ed;margin-top:30px;padding-top:22px}.report-lo{margin:24px 0}.report-status{font-size:12px;border-radius:20px;padding:5px 12px;font-weight:700}.report-status.achieved{background:#dcfce7;color:#166534}.report-status.below{background:#fee2e2;color:#991b1b}.report-status.pending{background:#fef3c7;color:#92400e}.report-bar{height:18px;background:#e7edf5;position:relative;border-radius:3px;margin:16px 2px 10px}.report-bar span{display:block;height:100%;border-radius:3px}.report-bar i{position:absolute;top:-4px;bottom:-4px;width:2px;background:#172b46}.report-table-scroll{overflow-x:auto;margin-top:14px}.report-shell table{width:100%;border-collapse:collapse;font-size:13px}.report-shell caption{text-align:left;font-weight:600;padding:8px 0}.report-shell th{background:#edf2f8;text-align:left;padding:10px}.report-shell td{padding:10px;border-bottom:1px solid #e2e8f0;vertical-align:top}.report-shell td small{display:block;color:#52647a}.report-notes{background:#f8fafc;padding:20px;border-radius:10px;margin-top:28px;font-size:13px}.report-notes ul{list-style:disc;padding-left:20px}.report-notes li{margin:8px 0}@media(max-width:700px){.report-metadata,.report-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.report-shell{padding:24px 12px}.report-preview,.report-controls{padding:16px}.report-controls form{align-items:stretch;flex-direction:column}.report-controls label{align-self:flex-start}}
+.student-reports {
+  background: #f4f7fb;
+  min-height: 100vh;
+  color: #172b46;
+}
+.report-shell {
+  max-width: 1160px;
+  margin: auto;
+  padding: 40px 24px 70px;
+}
+.report-shell h1 {
+  font-size: 32px;
+  font-weight: 750;
+  margin: 8px 0;
+}
+.report-shell h2 {
+  font-size: 26px;
+  font-weight: 700;
+}
+.report-shell h3 {
+  font-size: 21px;
+  font-weight: 700;
+}
+.report-shell h4 {
+  font-size: 17px;
+  font-weight: 650;
+}
+.report-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 700;
+  color: #436083;
+}
+.report-intro {
+  color: #52647a;
+  margin-bottom: 24px;
+}
+.report-controls,
+.report-preview {
+  background: white;
+  border: 1px solid #dbe3ed;
+  border-radius: 16px;
+  padding: 24px;
+  margin: 20px 0;
+}
+.report-controls form {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.report-controls label {
+  font-weight: 600;
+  font-size: 14px;
+  align-self: center;
+}
+.report-controls input,
+.report-controls select {
+  border: 1px solid #99abc0;
+  border-radius: 7px;
+  padding: 10px;
+  background: white;
+  max-width: 100%;
+}
+.report-controls input[type='number'] {
+  width: 100px;
+}
+.report-shell button {
+  background: #1e40af;
+  color: white;
+  border-radius: 8px;
+  padding: 11px 18px;
+  font-weight: 650;
+}
+.report-shell button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.report-shell :focus-visible {
+  outline: 3px solid #60a5fa;
+  outline-offset: 3px;
+}
+.report-help {
+  font-size: 13px;
+  color: #52647a;
+  margin: 8px 0;
+}
+.report-error {
+  background: #fff1f2;
+  color: #9f1239;
+  border: 1px solid #fda4af;
+  padding: 14px;
+  border-radius: 8px;
+}
+.report-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.report-metadata,
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+.report-metadata dt {
+  font-size: 12px;
+  color: #52647a;
+}
+.report-metadata dd {
+  overflow-wrap: anywhere;
+}
+.report-stats > div {
+  background: #eff5fc;
+  border-radius: 10px;
+  padding: 16px;
+}
+.report-stats strong {
+  display: block;
+  font-size: 28px;
+}
+.report-stats span {
+  font-size: 13px;
+}
+.report-module {
+  border-top: 2px solid #dbe3ed;
+  margin-top: 30px;
+  padding-top: 22px;
+}
+.report-lo {
+  margin: 24px 0;
+}
+.report-status {
+  font-size: 12px;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-weight: 700;
+}
+.report-status.achieved {
+  background: #dcfce7;
+  color: #166534;
+}
+.report-status.below {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.report-status.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+.report-bar {
+  height: 18px;
+  background: #e7edf5;
+  position: relative;
+  border-radius: 3px;
+  margin: 16px 2px 10px;
+}
+.report-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.report-bar i {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  background: #172b46;
+}
+.report-table-scroll {
+  overflow-x: auto;
+  margin-top: 14px;
+}
+.report-shell table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.report-shell caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.report-shell th {
+  background: #edf2f8;
+  text-align: left;
+  padding: 10px;
+}
+.report-shell td {
+  padding: 10px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+.report-shell td small {
+  display: block;
+  color: #52647a;
+}
+.report-notes {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 10px;
+  margin-top: 28px;
+  font-size: 13px;
+}
+.report-notes ul {
+  list-style: disc;
+  padding-left: 20px;
+}
+.report-notes li {
+  margin: 8px 0;
+}
+@media (max-width: 700px) {
+  .report-metadata,
+  .report-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-shell {
+    padding: 24px 12px;
+  }
+  .report-preview,
+  .report-controls {
+    padding: 16px;
+  }
+  .report-controls form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .report-controls label {
+    align-self: flex-start;
+  }
+}
+.report-status.status-achieved,
+.report-status.status-requirements_met {
+  background: #dcfce7;
+  color: #166534;
+}
+.report-status.status-not_achieved,
+.report-status.status-requirements_not_met {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.report-status.status-in_progress,
+.report-status.status-policy_not_configured {
+  background: #fef3c7;
+  color: #92400e;
+}
+.report-status.status-insufficient_evidence {
+  background: #e5e7eb;
+  color: #374151;
+}
+.report-preview > p {
+  margin: 12px 0;
+}
+.report-shell summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 12px 0;
+}
+.report-shell details section {
+  padding: 12px;
+  border-left: 3px solid #dbe3ed;
+  margin: 12px 0;
+}
+.report-filters {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+.report-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 100px;
+  max-width: 100%;
+}
+.configuration-panel form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 16px;
+}
+.configuration-panel textarea {
+  font-family: monospace;
+  border: 1px solid #99abc0;
+  border-radius: 6px;
+  padding: 12px;
+  width: 100%;
+}
+.configuration-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 400px;
+  overflow: auto;
+  padding: 16px;
+  background: #f8fafc;
+}
+.configuration-panel p {
+  margin: 12px 0;
+}
+.report-shell th {
+  white-space: normal;
+  min-width: 90px;
+  overflow-wrap: normal;
+}
+.report-shell td details {
+  min-width: 150px;
+}
+.report-shell td details[open] {
+  min-width: 380px;
+}
+@media print {
+  .student-reports {
+    background: white;
+  }
+  .student-reports header,
+  .student-reports footer,
+  .report-controls,
+  .report-shell button,
+  .report-intro {
+    display: none !important;
+  }
+  .report-shell {
+    max-width: none;
+    padding: 0;
+  }
+  .report-preview {
+    border: 0;
+    padding: 0;
+  }
+  .report-table-scroll {
+    overflow: visible;
+  }
+  .report-shell table {
+    font-size: 9px;
+  }
+  .report-shell th,
+  .report-shell td {
+    padding: 4px;
+    min-width: 0;
+  }
+  .report-shell tr {
+    break-inside: avoid;
+  }
+  .report-shell thead {
+    display: table-header-group;
+  }
+  .report-notes {
+    break-inside: avoid;
+  }
+  .report-metadata,
+  .report-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .report-status {
+    padding: 2px;
+    font-size: 9px;
+  }
+  .report-shell details > summary {
+    display: none;
+  }
+  .report-shell details > * {
+    display: block !important;
+  }
+  .report-shell td details {
+    min-width: 0 !important;
+  }
+}

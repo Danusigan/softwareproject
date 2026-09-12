@@ -1,4 +1,6 @@
-# Individual student reports
+# Legacy individual student reports
+
+The `/student-reports` page has been replaced by the versioned academic-progress module. See [STUDENT_PROGRESS_REPORTS.md](STUDENT_PROGRESS_REPORTS.md) for its setup, migrations, APIs and tests. The following describes the retained legacy API only.
 
 This feature adds read-only student reporting. It does not change marks, imports,
 existing attainment calculations, database tables, or saved thresholds.
@@ -66,3 +68,6 @@ Frontend production build: npm run build
 The backend tests use fixtures and an isolated in-memory database, never live
 student data. A synthetic multi-page sample is written to
 target/report-samples/student-report-sample.pdf by the PDF test.
+# Current student academic progress reports
+
+The individual report page now uses the versioned academic-progress module. See [STUDENT_PROGRESS_REPORTS.md](STUDENT_PROGRESS_REPORTS.md) for configuration, APIs, migrations and tests. The documentation below describes the retained legacy analysis endpoints, not the new graduation-progress report.
