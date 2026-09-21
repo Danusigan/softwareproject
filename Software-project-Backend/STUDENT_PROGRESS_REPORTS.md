@@ -1,6 +1,6 @@
 # Student academic progress and Programme Outcome reports
 
-Open `/student-reports` in the React application. This page replaces the former batch-scoped individual report UI. It searches by student index or name, includes students without marks, and produces an immutable academic-history snapshot with a matching PDF. Batch reports and their existing calculations remain available. The legacy `/api/reports/students` analysis endpoints are retained for compatibility; they are not used by this page and must not be treated as graduation reports.
+Open `/student-reports` in the React application. This page replaces the former batch-scoped individual report UI. It searches by student index or name, includes students without marks, and produces an immutable academic-history snapshot with a matching PDF. Batch reports and their existing calculations remain available. The legacy `/api/reports/students` analysis endpoints have been removed; the frontend had already fully migrated away from them, and the one shared calculation they used was extracted to `Reporting/LoAttainmentCalculator` before deletion (`BatchReportService` still uses it).
 
 ## Architecture and changed files
 
@@ -15,7 +15,6 @@ New backend files are in `src/main/java/com/example/Software/project/Backend/Rep
 - `ProgressService` / `ProgressReport`: bulk evidence loading, academic and outcome decisions, immutable JSON snapshots and audit records.
 - `ProgressController`: report/configuration APIs. The response contains overview, chronological attempts, LO results, PO results and detailed evidence together, avoiding additional evidence requests.
 - `ProgressPdf`: formats the saved backend result; it does not recalculate attainment.
-- `ProgressMigrations`: runs the versioned reporting migrations after the existing Hibernate schema bootstrap.
 
 Frontend changes: `src/pages/StudentReportsPage.jsx`, its tests and CSS, plus `src/components/ProgressConfigurationPanel.jsx`. Existing authentication, header, footer, routing and Axios conventions are reused. The QA administration panel provides validated configuration templates and an existing-code catalogue. Normal report users do not edit thresholds.
 
@@ -23,17 +22,19 @@ Frontend changes: `src/pages/StudentReportsPage.jsx`, its tests and CSS, plus `s
 
 ## Migration and historical data
 
-Flyway 10.10.0 is added for version-controlled migrations. `src/main/resources/db/progress/V1__student_progress.sql` creates:
+Flyway 10.10.0 manages the full schema via Spring Boot's native autoconfiguration (`spring.flyway.enabled=true`, default location `src/main/resources/db/migration`). This replaced an earlier hand-rolled runner (`ProgressMigrations`) that ran its own separate `Flyway` instance against `db/progress` to avoid colliding with Hibernate's `ddl-auto=update` — that split has been consolidated:
 
-- `qa_programme`, `qa_curriculum`, `qa_curriculum_module`
-- `qa_curriculum_lo`, `qa_curriculum_po`, `qa_curriculum_mapping`
-- `qa_student_programme`, `qa_academic_period`, `qa_module_offering`
-- `qa_offering_assessment`, `qa_offering_item`, `qa_module_enrolment`
-- `qa_report_snapshot`, `qa_report_audit`
+- `V1__baseline_legacy_schema.sql` creates the 13 tables that were previously auto-managed by Hibernate (`ddl-auto=update`), captured from a live database Hibernate itself created from the current entity mappings, so it matches exactly what `ddl-auto=validate` expects.
+- `V2__student_progress.sql` (the original reporting migration, renumbered) creates the 14 `qa_*` reporting tables:
+  - `qa_programme`, `qa_curriculum`, `qa_curriculum_module`
+  - `qa_curriculum_lo`, `qa_curriculum_po`, `qa_curriculum_mapping`
+  - `qa_student_programme`, `qa_academic_period`, `qa_module_offering`
+  - `qa_offering_assessment`, `qa_offering_item`, `qa_module_enrolment`
+  - `qa_report_snapshot`, `qa_report_audit`
 
-These tables reference existing students, modules, LOs, POs, templates and assessment items; they do not duplicate marks or recreate the original catalogue. Versioned LO/PO definitions are intentional historical revisions. Credit/threshold/weight columns use DECIMAL; keys, unique constraints, checks and indexes are included. Existing score columns remain unchanged to preserve import compatibility.
+These reporting tables reference the legacy tables (students, modules, LOs, POs, templates and assessment items) via foreign keys, which is why V2 must run after V1. They do not duplicate marks or recreate the original catalogue. Versioned LO/PO definitions are intentional historical revisions. Credit/threshold/weight columns use DECIMAL; keys, unique constraints, checks and indexes are included. Existing score columns remain unchanged to preserve import compatibility.
 
-The existing project manages its original schema with Hibernate `ddl-auto=update`. Reporting tables are not JPA entities and are managed only by Flyway. The custom migrator uses `progress_schema_history`, baselines the legacy schema at version 0, and applies V1 without replacing existing tables. Keep `spring.flyway.enabled=false`: this disables Spring's early automatic migrator, not the custom reporting migrator. Do not enable both. No manual SQL changes are necessary.
+`spring.jpa.hibernate.ddl-auto=validate` everywhere now — Hibernate only checks its entity mappings against what Flyway created; it no longer creates or alters schema itself. For a database that already has both the legacy tables (from the old `ddl-auto=update` regime) and the `qa_*` tables (from the old `ProgressMigrations` runner, schema history table `progress_schema_history` instead of Flyway's default `flyway_schema_history`), set `spring.flyway.baseline-on-migrate=true` and `spring.flyway.baseline-version=2` for the first startup only, so Flyway records the existing schema as already fully at V2 and runs nothing. **Baseline version 2, not 1** — the database already has both migrations' worth of tables, not just the first one. Verified against a real MySQL instance (a scratch database seeded via the old regime, then started once with these two properties): Flyway baselined at v2, reported "up to date, no migration necessary", and `ddl-auto=validate` passed against the live schema with no mismatches.
 
 Run the backend normally against your configured development database:
 
@@ -43,7 +44,7 @@ cd Software-project-Backend
 .\mvnw.cmd spring-boot:run
 ```
 
-The migrator executes before report services become available and fails startup on a migration failure. Back up a deployed database using the university's usual release process before applying schema changes. The migration has been exercised on isolated H2 in MySQL compatibility mode; the live MySQL database was not modified during verification.
+Flyway executes before report services become available and fails startup on a migration failure. Back up a deployed database using the university's usual release process before applying schema changes. The migration has been exercised on isolated H2 in MySQL compatibility mode and against a scratch MySQL database created solely for this purpose; no shared/deployed database was modified during verification.
 
 Publishing a curriculum copies the selected source definitions and **approved positive** LO-to-PO mappings. Later edits to the source catalogue do not change these records. Duplicate approved mappings are rejected. Create a new curriculum code/version for changed thresholds or mappings. The student batch must match the curriculum cohort. Student curriculum reassignment is deliberately rejected and requires a reviewed data migration.
 

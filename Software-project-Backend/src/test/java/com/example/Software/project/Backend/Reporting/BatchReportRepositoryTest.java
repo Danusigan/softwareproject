@@ -12,7 +12,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+// Flyway migrations are MySQL-flavored (ENGINE=InnoDB etc.) and not meant for this
+// lightweight repository test's plain embedded H2 - disable Flyway and let Hibernate
+// build only the entities this test actually touches.
 @DataJpaTest(properties={"spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+        "spring.flyway.enabled=false","spring.jpa.hibernate.ddl-auto=create-drop",
         "logging.level.org.springframework=WARN","logging.level.org.hibernate=WARN"},showSql=false)
 @Import(BatchReportRepository.class)
 class BatchReportRepositoryTest {

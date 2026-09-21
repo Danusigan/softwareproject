@@ -32,11 +32,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.*;
 
 @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
-@DataJpaTest(showSql=false,properties={"spring.flyway.enabled=false","spring.datasource.url=jdbc:h2:mem:progress;MODE=MySQL;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1","spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=","spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
+@DataJpaTest(showSql=false,properties={"spring.flyway.enabled=true","spring.datasource.url=jdbc:h2:mem:progress;MODE=MySQL;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1","spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=","spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl",
         "logging.level.org.springframework=WARN","logging.level.org.hibernate=WARN"})
-@Import({ProgressMigrations.class,ProgressStore.class,ProgressAccess.class,ProgressConfiguration.class,AttainmentCalculator.class,ProgressService.class,ProgressIntegrationTest.JsonConfig.class})
+@Import({ProgressStore.class,ProgressAccess.class,ProgressConfiguration.class,AttainmentCalculator.class,ProgressService.class,ProgressIntegrationTest.JsonConfig.class})
 class ProgressIntegrationTest {
     @TestConfiguration static class JsonConfig { @Bean ObjectMapper mapper(){return JsonMapper.builder().findAndAddModules().build();} }
     @Autowired EntityManager em;
@@ -143,7 +143,7 @@ class ProgressIntegrationTest {
                 .andExpect(status().isOk());
     }
     @Test void migrationConstraintsRejectInvalidThresholdAndDuplicateEnrolment() {
-        configure();assertFalse(store.rows("select * from \"progress_schema_history\"").isEmpty());
+        configure();assertFalse(store.rows("select * from \"flyway_schema_history\"").isEmpty());
         assertThrows(Exception.class,()->store.execute("update qa_curriculum_lo set threshold=101 where curriculum_code='C1'"));
     }
     @Test void inProgressAcademicStudyRemainsSeparateFromSuccessfulOutcomes() {

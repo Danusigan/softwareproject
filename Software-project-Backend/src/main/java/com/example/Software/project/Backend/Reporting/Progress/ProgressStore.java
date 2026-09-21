@@ -2,13 +2,13 @@ package com.example.Software.project.Backend.Reporting.Progress;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.util.*;
 
+// Flyway (Boot's native autoconfiguration) runs before the EntityManagerFactory
+// initializes, so no explicit @DependsOn is needed for migration ordering.
 @Repository
-@DependsOn("progressMigrations")
 public class ProgressStore {
     private final EntityManager em;
     public ProgressStore(EntityManager em) { this.em = em; }
