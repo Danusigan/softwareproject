@@ -1,18 +1,16 @@
 package com.example.Software.project.Backend.RestController;
 
-<<<<<<< HEAD
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
+import com.example.Software.project.Backend.Service.ModuleService;
 import com.example.Software.project.Backend.Service.UserService;
-=======
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
->>>>>>> origin/main
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -34,18 +32,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
-
-<<<<<<< HEAD
-import jakarta.validation.Valid;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-=======
-import com.example.Software.project.Backend.Model.User;
-import com.example.Software.project.Backend.Security.JwtUtil;
-import com.example.Software.project.Backend.Service.ModuleService;
-import com.example.Software.project.Backend.Service.UserService;
->>>>>>> origin/main
 
 @RestController
 @RequestMapping("/api/auth")

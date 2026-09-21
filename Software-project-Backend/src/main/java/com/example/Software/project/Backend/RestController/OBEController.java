@@ -25,13 +25,10 @@ public class OBEController {
     @Autowired private POAttainmentService poAttainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
-<<<<<<< HEAD
     @Autowired private FileValidationService fileValidationService;
-=======
     @Autowired private AssessmentTemplateRepository assessmentTemplateRepo;
     @Autowired private AssessmentItemRepository assessmentItemRepo;
     @Autowired private ModuleRepository moduleRepo;
->>>>>>> origin/main
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
@@ -259,9 +256,7 @@ public class OBEController {
         }
 
         try {
-<<<<<<< HEAD
             fileValidationService.validateExcelFile(file);
-=======
             // Read embedded metadata from the Excel file (batch, markType, templateId)
             Map<String, String> meta = excelService.readMetadata(file);
             if (meta.containsKey("TEMPLATE_ID") && !meta.get("TEMPLATE_ID").isEmpty()
@@ -279,7 +274,6 @@ public class OBEController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "templateId is required (or embed it in the template METADATA sheet)", "status", "ERROR"));
             }
->>>>>>> origin/main
             String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
             return ResponseEntity.ok(Map.of(
                 "message", result,
@@ -322,18 +316,13 @@ public class OBEController {
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
     }
 
-<<<<<<< HEAD
-    // --- ANALYSIS: LO pass rate by batch ---
-=======
     // --- ANALYSIS: LO Pass Rate by Batch ---
->>>>>>> origin/main
     @GetMapping("/analysis/pass-rate/lo/{moduleId}")
     public ResponseEntity<?> getLoPassRate(
             @PathVariable String moduleId,
             @RequestParam(defaultValue = "50") double threshold,
             @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
-<<<<<<< HEAD
         try {
             return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
         } catch (IllegalArgumentException e) {
@@ -365,9 +354,6 @@ public class OBEController {
                 "status", "ERROR"
             ));
         }
-=======
-        return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
->>>>>>> origin/main
     }
 
     // --- EXPORT: Generate Excel with selected LOs and mark type ---
@@ -556,19 +542,13 @@ public class OBEController {
         }
 
         try {
-<<<<<<< HEAD
             fileValidationService.validateExcelFile(file);
-
-            // Parse losIds from comma-separated string
-            String[] losIds = losIdsParam.split(",");
-=======
             // Read metadata from Excel first — overrides form params if present
             Map<String, String> meta = excelService.readMetadata(file);
             if (meta.containsKey("BATCH") && !meta.get("BATCH").isEmpty()) batch = meta.get("BATCH");
             if (meta.containsKey("MARK_TYPE") && !meta.get("MARK_TYPE").isEmpty()) markType = meta.get("MARK_TYPE");
             if (meta.containsKey("LO_IDS") && !meta.get("LO_IDS").isEmpty() && (losIdsParam == null || losIdsParam.isBlank()))
                 losIdsParam = meta.get("LO_IDS");
->>>>>>> origin/main
 
             if (losIdsParam == null || losIdsParam.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
