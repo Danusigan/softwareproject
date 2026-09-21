@@ -60,7 +60,7 @@ class TrendServiceTest {
         lo1Item.setMaxMarks(50.0);
         lenient().when(assessmentItemRepository
             .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(
-                "LO1", "24", "FINAL_EXAM"))
+                "LO1", "24", "FINAL_EXAM", MarkType.FINAL_EXAM))
             .thenReturn(List.of(lo1Item));
 
         ProgramOutcome po = new ProgramOutcome();

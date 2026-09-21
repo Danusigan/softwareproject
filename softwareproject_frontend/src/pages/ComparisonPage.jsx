@@ -301,7 +301,16 @@ export default function ComparisonPage() {
 
     useEffect(() => {
         const moduleId = loInfo?.moduleId;
-        if (!moduleId) return;
+        if (!moduleId) {
+            // loInfo resolved but has no moduleId (malformed/unexpected response) - without this,
+            // the spinner never clears: loInfo?.moduleId stays undefined before and after, so this
+            // effect wouldn't re-run again to notice, and loading was never set to false.
+            if (loInfo) {
+                setLoading(false);
+                setError('This learning outcome is missing its module reference and cannot be analyzed.');
+            }
+            return;
+        }
         let active = true;
         async function loadDashboard() {
             setRefreshing(Boolean(dashboard));
@@ -324,8 +333,11 @@ export default function ComparisonPage() {
         loadDashboard();
         return () => { active = false; };
         // dashboard is deliberately excluded so a completed request does not trigger itself.
+        // Depend on loInfo (not loInfo?.moduleId) so this effect re-runs once loInfo resolves
+        // even when moduleId is missing - a primitive-valued dependency wouldn't change value
+        // (undefined -> undefined) and the effect would silently never re-fire.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [loInfo?.moduleId, loId, appliedFilters]);
+    }, [loInfo, loId, appliedFilters]);
 
     const meta = dashboard?.meta || {};
     const summary = dashboard?.summary || {};

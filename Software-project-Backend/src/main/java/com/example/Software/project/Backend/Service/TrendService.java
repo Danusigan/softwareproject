@@ -181,7 +181,7 @@ public class TrendService {
         if ("Unspecified".equals(batch)) return 0.0;
         return sumMaxMarks(assessmentItemRepository
             .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(
-                loId, batch, markType.name()));
+                loId, batch, markType.name(), markType));
     }
 
     private double sumMaxMarks(Collection<AssessmentItem> items) {
@@ -535,15 +535,20 @@ public class TrendService {
         }
 
         private double maxMarks(String loId, String batch, List<StudentMark> groupMarks) {
-            String typeKey = selectedMarkType == null ? "ALL" : selectedMarkType.name();
+            if (selectedMarkType != null) {
+                String key = loId + "::" + batch + "::" + selectedMarkType.name();
+                return maxMarksCache.computeIfAbsent(key, ignored -> getMaxMarks(loId, batch, selectedMarkType));
+            }
+            // Cache key must include the group's actual present mark types, not just loId+batch:
+            // different students in the same LO+batch can have different recorded mark types
+            // (e.g. a missing quiz), and each distinct combination has its own max-marks total.
+            Set<MarkType> presentTypes = groupMarks.stream().map(StudentMark::getMarkType)
+                .filter(Objects::nonNull).collect(Collectors.toCollection(TreeSet::new));
+            if (presentTypes.isEmpty()) return 0.0;
+            String typeKey = presentTypes.stream().map(Enum::name).collect(Collectors.joining(","));
             String key = loId + "::" + batch + "::" + typeKey;
-            return maxMarksCache.computeIfAbsent(key, ignored -> {
-                if (selectedMarkType != null) return getMaxMarks(loId, batch, selectedMarkType);
-                Set<MarkType> presentTypes = groupMarks.stream().map(StudentMark::getMarkType)
-                    .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
-                if (presentTypes.isEmpty()) return 0.0;
-                return presentTypes.stream().mapToDouble(type -> getMaxMarks(loId, batch, type)).sum();
-            });
+            return maxMarksCache.computeIfAbsent(key, ignored ->
+                presentTypes.stream().mapToDouble(type -> getMaxMarks(loId, batch, type)).sum());
         }
     }
 }
