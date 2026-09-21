@@ -7,13 +7,15 @@ import AdminDashboard from './pages/admindashboard'
 import SuperAdminDashboard from './pages/superadmindashboard'
 import LecturerDashboard from './pages/lecturerdashboard'
 import ModulesPage from './pages/modulespage'
-import LODetailPage from './pages/LODetailPage'
-import AddResultsPage from './pages/AddResultsPage'
 import ComparisonPage from './pages/ComparisonPage'
 import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
+import CqiReviewPage from './pages/CqiReviewPage'
+import ManageLecturersPage from './pages/ManageLecturersPage'
+import ManageAdminsPage from './pages/ManageAdminsPage'
+import MyCqiPlansPage from './pages/MyCqiPlansPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { setupAxiosInterceptors } from './services/axiosSetup'
 
@@ -66,22 +68,6 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/lo-detail/:loId"
-        element={
-          <ProtectedRoute>
-            <LODetailPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/lo-detail/:loId/add-results"
-        element={
-          <ProtectedRoute>
-            <AddResultsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/lo-detail/:loId/comparisons"
         element={
           <ProtectedRoute>
@@ -118,6 +104,38 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <LOPOMappingManagementPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage-admins"
+        element={
+          <ProtectedRoute requiredRole="superadmin">
+            <ManageAdminsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage-lecturers"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <ManageLecturersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/cqi-review"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <CqiReviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-cqi-plans"
+        element={
+          <ProtectedRoute requiredRole="lecture">
+            <MyCqiPlansPage />
           </ProtectedRoute>
         }
       />

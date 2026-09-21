@@ -2,31 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/header';
 import Footer from '../components/footer';
+import MultiSelectAutocomplete from '../components/MultiSelectAutocomplete';
 import axios from 'axios';
 
 export default function AdminDashboard() {
-    const [sidePanelOpen, setSidePanelOpen] = useState(null); // 'teacher' or 'module'
+    const [sidePanelOpen, setSidePanelOpen] = useState(null); // 'module'
     const navigate = useNavigate();
     const [modules, setModules] = useState([]);
     const [showEditModuleDialog, setShowEditModuleDialog] = useState(false);
     const [editingModule, setEditingModule] = useState(null);
 
-    // Teacher form states
-    const [teacherData, setTeacherData] = useState({
-        username: '',
-        email: '',
-        password: '',
-        usertype: 'Lecture'
-    });
-
     // Module form states
     const [moduleData, setModuleData] = useState({
         moduleId: '',
-        moduleName: ''
+        moduleName: '',
+        assignedLecturerUsernames: []
     });
+    const [lecturers, setLecturers] = useState([]);
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+
+    const lecturerOptions = lecturers.map(l => ({ value: l.username, label: l.username, sublabel: l.email }));
 
     // Verify user is admin on mount
     useEffect(() => {
@@ -42,15 +39,16 @@ export default function AdminDashboard() {
         }
     }, [navigate]);
 
-    // Fetch modules on mount
+    // Fetch modules and lecturers on mount
     useEffect(() => {
         fetchModules();
+        fetchLecturers();
     }, []);
 
     const fetchModules = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:8080/api/modules/all', {
+            const res = await axios.get('/api/modules/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             // Backend returns {message, data, status} format
@@ -61,40 +59,16 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleTeacherSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setMessage({ type: '', text: '' });
-
+    const fetchLecturers = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.post(
-                'http://localhost:8080/api/auth/add-user',
-                {
-                    userID: teacherData.username,
-                    email: teacherData.email,
-                    password: teacherData.password,
-                    usertype: teacherData.usertype
-                },
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
-            );
-
-            if (res.data.status === 'SUCCESS') {
-                setMessage({ type: 'success', text: 'Teacher added successfully!' });
-                setTeacherData({ username: '', email: '', password: '', usertype: 'Lecture' });
-                setTimeout(() => setSidePanelOpen(null), 2000);
-            }
-        } catch (err) {
-            setMessage({
-                type: 'error',
-                text: err.response?.data?.message || 'Failed to add teacher'
+            const res = await axios.get('/api/auth/lecturers', {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-        } finally {
-            setLoading(false);
+            setLecturers(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to fetch lecturers:', err);
+            setLecturers([]);
         }
     };
 
@@ -113,7 +87,7 @@ export default function AdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             const res = await axios.post(
-                'http://localhost:8080/api/modules/create',
+                '/api/modules/create',
                 moduleData,
                 {
                     headers: {
@@ -123,13 +97,13 @@ export default function AdminDashboard() {
             );
 
             setMessage({ type: 'success', text: 'Module created successfully!' });
-            setModuleData({ moduleId: '', moduleName: '' });
+            setModuleData({ moduleId: '', moduleName: '', assignedLecturerUsernames: [] });
             fetchModules();
             setTimeout(() => setSidePanelOpen(null), 2000);
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to create module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to create module'
             });
         } finally {
             setLoading(false);
@@ -151,10 +125,11 @@ export default function AdminDashboard() {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/modules/${editingModule.moduleId}`,
+                `/api/modules/${editingModule.moduleId}`,
                 {
                     moduleId: moduleData.moduleId,
-                    moduleName: moduleData.moduleName
+                    moduleName: moduleData.moduleName,
+                    assignedLecturerUsernames: moduleData.assignedLecturerUsernames
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -164,12 +139,12 @@ export default function AdminDashboard() {
             setMessage({ type: 'success', text: 'Module updated successfully!' });
             setShowEditModuleDialog(false);
             setEditingModule(null);
-            setModuleData({ moduleId: '', moduleName: '' });
+            setModuleData({ moduleId: '', moduleName: '', assignedLecturerUsernames: [] });
             fetchModules();
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to update module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to update module'
             });
         } finally {
             setLoading(false);
@@ -181,7 +156,7 @@ export default function AdminDashboard() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/modules/${moduleId}`, {
+            await axios.delete(`/api/modules/${moduleId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -190,16 +165,21 @@ export default function AdminDashboard() {
         } catch (err) {
             setMessage({
                 type: 'error',
-                text: err.response?.data || 'Failed to delete module'
+                text: err.response?.data?.message || err.response?.data?.error || 'Failed to delete module'
             });
         }
     };
 
     const openEditModuleDialog = (module) => {
         setEditingModule(module);
-        setModuleData({ moduleId: module.moduleId, moduleName: module.moduleName });
+        setModuleData({
+            moduleId: module.moduleId,
+            moduleName: module.moduleName,
+            assignedLecturerUsernames: module.assignedLecturerUsernames || []
+        });
         setShowEditModuleDialog(true);
     };
+
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -252,6 +232,11 @@ export default function AdminDashboard() {
                                     <p className="text-center text-gray-600 text-sm mb-4">
                                         Module ID: {module.moduleId}
                                     </p>
+                                    <p className="text-center text-xs text-gray-500 mb-4">
+                                        {module.assignedLecturerUsernames?.length
+                                            ? `Assigned: ${module.assignedLecturerUsernames.join(', ')}`
+                                            : 'Visible to all lecturers'}
+                                    </p>
                                     <div className="flex justify-center gap-2 mt-4">
                                         {/* Edit Icon */}
                                         <button
@@ -280,24 +265,12 @@ export default function AdminDashboard() {
                     )}
                 </div>
 
-                {/* Modern Cards with Hover Effects */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mt-12">
-                    {/* Add Teacher Card */}
-                    <div
-                        onClick={() => setSidePanelOpen('teacher')}
-                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-blue-500"
-                    >
-                        <div className="flex items-center justify-center mb-4">
-                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                            </div>
-                        </div>
-                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Add a Teacher</h2>
-                        <p className="text-center text-gray-600">Click to add a new teacher to the system</p>
-                    </div>
-
+                {/* Quick Actions Section */}
+                <div className="mt-16 pt-10 border-t-2 border-gray-200">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">Quick Actions</h2>
+                    <p className="text-gray-500 mb-8">Create modules, manage users and review outcomes</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {/* Create Module Card */}
                     <div
                         onClick={() => setSidePanelOpen('module')}
@@ -312,6 +285,22 @@ export default function AdminDashboard() {
                         </div>
                         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Create the Module</h2>
                         <p className="text-center text-gray-600">Click to create a new course module</p>
+                    </div>
+
+                    {/* Manage Lecturers Card */}
+                    <div
+                        onClick={() => navigate('/manage-lecturers')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-blue-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6-4a4 4 0 11-1.33-2.98" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Manage Lecturers</h2>
+                        <p className="text-center text-gray-600">Add, edit & assign modules to lecturers</p>
                     </div>
 
                     {/* Program Outcomes Management Card */}
@@ -345,93 +334,22 @@ export default function AdminDashboard() {
                         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LO-PO Mappings</h2>
                         <p className="text-center text-gray-600">Manage & approve Learning Outcome mappings</p>
                     </div>
-                </div>
-            </div>
 
-            {/* Side Panel for Add Teacher */}
-            <div
-                className={`fixed top-0 right-0 h-full w-full md:w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out z-50 ${
-                    sidePanelOpen === 'teacher' ? 'translate-x-0' : 'translate-x-full'
-                }`}
-            >
-                <div className="p-6 h-full overflow-y-auto">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-800">Add a Teacher</h2>
-                        <button
-                            onClick={() => setSidePanelOpen(null)}
-                            className="text-gray-500 hover:text-gray-700"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
+                    {/* CQI Review Card */}
+                    <div
+                        onClick={() => navigate('/cqi-review')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-red-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">CQI Review</h2>
+                        <p className="text-center text-gray-600">Review & approve corrective action plans</p>
                     </div>
-
-                    {message.text && (
-                        <div className={`mb-4 p-3 rounded-lg ${
-                            message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                            {message.text}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleTeacherSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                            <input
-                                type="text"
-                                value={teacherData.username}
-                                onChange={(e) => setTeacherData({ ...teacherData, username: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter Username"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input
-                                type="email"
-                                value={teacherData.email}
-                                onChange={(e) => setTeacherData({ ...teacherData, email: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter Email"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                            <input
-                                type="password"
-                                value={teacherData.password}
-                                onChange={(e) => setTeacherData({ ...teacherData, password: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter Password"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">User Type</label>
-                            <select
-                                value={teacherData.usertype}
-                                onChange={(e) => setTeacherData({ ...teacherData, usertype: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value="Lecture">Lecture</option>
-                                <option value="Admin">Admin</option>
-                            </select>
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-8 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 max-w-xs mx-auto block"
-                        >
-                            {loading ? 'Adding...' : 'Add Teacher'}
-                        </button>
-                    </form>
                 </div>
             </div>
 
@@ -488,6 +406,17 @@ export default function AdminDashboard() {
                             <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
                         </div>
 
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Assign Lecturers</label>
+                            <MultiSelectAutocomplete
+                                options={lecturerOptions}
+                                selectedValues={moduleData.assignedLecturerUsernames}
+                                onChange={(usernames) => setModuleData({ ...moduleData, assignedLecturerUsernames: usernames })}
+                                placeholder="Type a lecturer's username..."
+                                emptyHint="Leave empty to keep this module visible to all lecturers."
+                            />
+                        </div>
+
                         <button
                             type="submit"
                             disabled={loading}
@@ -517,7 +446,7 @@ export default function AdminDashboard() {
                                 onClick={() => {
                                     setShowEditModuleDialog(false);
                                     setEditingModule(null);
-                                    setModuleData({ moduleId: '', moduleName: '' });
+                                    setModuleData({ moduleId: '', moduleName: '', assignedLecturerUsernames: [] });
                                 }}
                                 className="text-gray-500 hover:text-gray-700"
                             >
@@ -551,6 +480,17 @@ export default function AdminDashboard() {
                                     required
                                 />
                                 <p className="text-xs text-gray-500 mt-1">Only capital letters (A-Z) and digits (0-9) allowed</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Assign Lecturers</label>
+                                <MultiSelectAutocomplete
+                                    options={lecturerOptions}
+                                    selectedValues={moduleData.assignedLecturerUsernames}
+                                    onChange={(usernames) => setModuleData({ ...moduleData, assignedLecturerUsernames: usernames })}
+                                    placeholder="Type a lecturer's username..."
+                                    emptyHint="Leave empty to keep this module visible to all lecturers."
+                                />
                             </div>
 
                             <button

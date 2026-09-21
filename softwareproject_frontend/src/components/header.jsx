@@ -32,7 +32,7 @@ export default function Header() {
   };
 
   return (
-    <nav className="bg-[#1e40af] text-white shadow-lg sticky top-0 z-[100]">
+    <nav className="bg-[#1e40af] text-white shadow-lg sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-6 sm:px-10">
         <div className="flex justify-between items-center h-24">
           {/* Logo and Branding */}

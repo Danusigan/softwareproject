@@ -1,6 +1,7 @@
 package com.example.Software.project.Backend.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
@@ -9,6 +10,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "los") // Renamed table
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Los {
 
     @Id
@@ -23,6 +25,9 @@ public class Los {
 
     @Column(name = "batch")
     private String batch; // e.g., "24", "25" (batch year for marks)
+
+    @Column(name = "attainment_threshold")
+    private Double attainmentThreshold = 50.0; // % below which this LO triggers a CQI action
 
     // Storing the marks file content inside the DB
     @Lob
@@ -89,6 +94,9 @@ public class Los {
 
     public String getBatch() { return batch; }
     public void setBatch(String batch) { this.batch = batch; }
+
+    public Double getAttainmentThreshold() { return attainmentThreshold; }
+    public void setAttainmentThreshold(Double attainmentThreshold) { this.attainmentThreshold = attainmentThreshold; }
 
     public byte[] getMarksCsvFile() { return marksCsvFile; }
     public void setMarksCsvFile(byte[] marksCsvFile) { this.marksCsvFile = marksCsvFile; }

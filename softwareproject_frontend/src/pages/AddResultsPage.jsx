@@ -86,7 +86,7 @@ export default function AddResultsPage() {
             if (isEditMode && !file) {
                 // Update batch for existing records
                 await axios.put(
-                    `http://localhost:8080/api/lospos/${loId}/batch/update`,
+                    `/api/lospos/${loId}/batch/update`,
                     { oldBatch: location.state.batch, newBatch: batch },
                     {
                         headers: {
@@ -115,7 +115,7 @@ export default function AddResultsPage() {
             // If editing with new file, first delete old batch
             if (isEditMode && location.state.batch) {
                 await axios.delete(
-                    `http://localhost:8080/api/lospos/${loId}/batch/${location.state.batch}`,
+                    `/api/lospos/${loId}/batch/${location.state.batch}`,
                     {
                         headers: {
                             'Authorization': `Bearer ${token}`
@@ -126,7 +126,7 @@ export default function AddResultsPage() {
 
             // Import marks directly for the selected LO
             await axios.post(
-                `http://localhost:8080/api/lospos/${loId}/marks/import-obe`,
+                `/api/lospos/${loId}/marks/import-obe`,
                 formData,
                 {
                     headers: {

@@ -6,7 +6,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+<<<<<<< HEAD
 import java.time.LocalDateTime;
+=======
+import java.util.List;
+>>>>>>> origin/main
 import java.util.Optional;
 
 @Service
@@ -24,6 +28,12 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+<<<<<<< HEAD
+=======
+    @Autowired
+    private ModuleService moduleService;
+
+>>>>>>> origin/main
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -92,6 +102,82 @@ public class UserService {
      */
     public Optional<User> findByUsertype(String usertype) {
         return userRepository.findByUsertype(usertype);
+    }
+
+    /**
+     * Lists all lecturers, for admin module-assignment pickers.
+     */
+    public List<User> findAllLecturers() {
+        return userRepository.findAllByUsertype("lecture");
+    }
+
+    /**
+     * Updates a lecturer's email (and password, if provided). Username/usertype are fixed.
+     */
+    public User updateLecturer(String username, String email, String password) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+        if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not a lecturer");
+        }
+        if (email != null && !email.isBlank()) {
+            user.setEmail(email);
+        }
+        if (password != null && !password.isBlank()) {
+            user.setPassword(password);
+        }
+        return userRepository.save(user);
+    }
+
+    /**
+     * Deletes a lecturer. Clears their module assignments first so the
+     * module_lecturers foreign key doesn't block the delete.
+     */
+    public void deleteLecturer(String username) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+        if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not a lecturer");
+        }
+        moduleService.removeLecturerFromAllModules(username);
+        userRepository.delete(user);
+    }
+
+    /**
+     * Lists all admins, for the superadmin's Manage Admins page.
+     */
+    public List<User> findAllAdmins() {
+        return userRepository.findAllByUsertype("admin");
+    }
+
+    /**
+     * Updates an admin's email (and password, if provided). Username/usertype are fixed.
+     */
+    public User updateAdmin(String username, String email, String password) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Admin not found: " + username));
+        if (!"admin".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not an admin");
+        }
+        if (email != null && !email.isBlank()) {
+            user.setEmail(email);
+        }
+        if (password != null && !password.isBlank()) {
+            user.setPassword(password);
+        }
+        return userRepository.save(user);
+    }
+
+    /**
+     * Deletes an admin account.
+     */
+    public void deleteAdmin(String username) throws Exception {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new Exception("Admin not found: " + username));
+        if (!"admin".equalsIgnoreCase(user.getUsertype())) {
+            throw new Exception(username + " is not an admin");
+        }
+        userRepository.delete(user);
     }
 
     /**

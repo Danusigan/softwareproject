@@ -29,7 +29,7 @@ export default function LODetailPage() {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/${loId}`, {
+            const res = await axios.get(`/api/lospos/${loId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -58,7 +58,7 @@ export default function LODetailPage() {
         try {
             setBatchesLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches`, {
+            const res = await axios.get(`/api/lospos/${encodeURIComponent(loId)}/batches`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setBatches(res.data?.data || []);
@@ -73,7 +73,7 @@ export default function LODetailPage() {
     const fetchMappingsForLo = async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:8080/api/lo-po-mapping/lo/${encodeURIComponent(loId)}`, {
+            const res = await axios.get(`/api/lo-po-mapping/lo/${encodeURIComponent(loId)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setMappings(res.data?.data || []);
@@ -97,7 +97,7 @@ export default function LODetailPage() {
             const token = localStorage.getItem('token');
 
             await axios.put(
-                `http://localhost:8080/api/lospos/${encodeURIComponent(loId)}`,
+                `/api/lospos/${encodeURIComponent(loId)}`,
                 {
                     id: loForm.loNumber,
                     name: loForm.description,
@@ -125,7 +125,7 @@ export default function LODetailPage() {
         try {
             setSavingLo(true);
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}`, {
+            await axios.delete(`/api/lospos/${encodeURIComponent(loId)}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
@@ -145,7 +145,7 @@ export default function LODetailPage() {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:8080/api/lospos/${encodeURIComponent(loId)}/batches/${batch}`, {
+            await axios.delete(`/api/lospos/${encodeURIComponent(loId)}/batches/${batch}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             setMarkMessage({ type: 'success', text: `${batch}nd Batch deleted successfully.` });
