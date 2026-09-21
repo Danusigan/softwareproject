@@ -2,10 +2,12 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ProgramOutcomeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -15,7 +17,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/program-outcomes")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class ProgramOutcomeRestController {
 
     @Autowired
@@ -23,6 +24,9 @@ public class ProgramOutcomeRestController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     // Helper method to validate admin access
     private boolean isAdmin(String token) {
@@ -69,6 +73,7 @@ public class ProgramOutcomeRestController {
             po.setCreatedBy(username);
             
             ProgramOutcome createdPO = poService.createPO(po);
+            auditLogService.log(username, "PO_CREATE", createdPO.getPoId(), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome created successfully", createdPO));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -86,6 +91,7 @@ public class ProgramOutcomeRestController {
             }
             
             ProgramOutcome updatedPO = poService.updatePO(poId, poDetails);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_UPDATE", poId, "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome updated successfully", updatedPO));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -105,6 +111,7 @@ public class ProgramOutcomeRestController {
             }
             
             poService.softDeletePO(poId);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "soft delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome deactivated successfully", null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -115,8 +122,9 @@ public class ProgramOutcomeRestController {
         }
     }
 
-    // Hard delete PO (Admin only)
+    // Hard delete PO (SuperAdmin only — irreversible, more destructive than the other admin-level actions here)
     @DeleteMapping("/{poId}/permanent")
+    @PreAuthorize("hasAuthority('superadmin')")
     public ResponseEntity<?> hardDeletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -124,6 +132,7 @@ public class ProgramOutcomeRestController {
             }
             
             poService.hardDeletePO(poId);
+            auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "permanent delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome permanently deleted", null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
@@ -186,6 +195,7 @@ public class ProgramOutcomeRestController {
 
     // Get all active POs
     @GetMapping("/all")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getAllActivePOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> pos = poService.getAllActivePOs();
@@ -212,6 +222,7 @@ public class ProgramOutcomeRestController {
 
     // Get PO by ID
     @GetMapping("/{poId}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             Optional<ProgramOutcome> po = poService.getPOById(poId);
@@ -227,6 +238,7 @@ public class ProgramOutcomeRestController {
 
     // Get default Washington Accord POs
     @GetMapping("/defaults")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getDefaultPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
@@ -238,6 +250,7 @@ public class ProgramOutcomeRestController {
 
     // Get custom POs
     @GetMapping("/custom")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getCustomPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> customPOs = poService.getCustomPOs();
@@ -249,6 +262,7 @@ public class ProgramOutcomeRestController {
 
     // Get POs by category
     @GetMapping("/by-category/{category}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> getPOsByCategory(@PathVariable String category, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             // This would require a new method in service

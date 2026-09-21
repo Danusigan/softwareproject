@@ -9,6 +9,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -37,10 +39,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck
                 .requestMatchers("/api/auth/login").permitAll() // Allow login without token
-                .requestMatchers("/api/auth/create-test-user").permitAll() // Allow test user creation without token
-                .requestMatchers("/api/auth/**").permitAll() // Allow all auth endpoints without token (if needed)
-                .anyRequest().authenticated() // All other requests need token
+                // create-test-user stays reachable without a token (used to bootstrap the first
+                // test account) but is gated to the dev profile in the controller itself.
+                .requestMatchers("/api/auth/create-test-user").permitAll()
+                .anyRequest().authenticated() // Everything else, including other /api/auth/** endpoints, needs a valid token
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -54,7 +58,9 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
+        // :5173 = Vite dev server; :80 (plain http://localhost) = the nginx-served Docker
+        // Compose frontend. Both are real origins this app is actually accessed from locally.
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
@@ -69,14 +75,13 @@ public class SecurityConfig {
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
-        // WARNING: NoOpPasswordEncoder is insecure. Use BCryptPasswordEncoder in production.
         provider.setPasswordEncoder(passwordEncoder());
         return provider;
     }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance();
+        return new BCryptPasswordEncoder();
     }
 
     @Bean
