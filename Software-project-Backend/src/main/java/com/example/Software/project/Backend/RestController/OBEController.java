@@ -14,7 +14,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/obe")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class OBEController {
 
     @Autowired private ProgramOutcomeRepository poRepo;
@@ -26,6 +25,7 @@ public class OBEController {
     @Autowired private POAttainmentService poAttainmentService;
     @Autowired private TrendService trendService;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired private FileValidationService fileValidationService;
     @Autowired private AssessmentTemplateRepository assessmentTemplateRepo;
     @Autowired private AssessmentItemRepository assessmentItemRepo;
     @Autowired private ModuleRepository moduleRepo;
@@ -171,6 +171,7 @@ public class OBEController {
     public ResponseEntity<?> uploadMarks(@PathVariable String losId, @RequestParam("file") MultipartFile file, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
+            fileValidationService.validateExcelFile(file);
             excelService.importMarks(file, losId);
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
@@ -255,6 +256,7 @@ public class OBEController {
         }
 
         try {
+            fileValidationService.validateExcelFile(file);
             // Read embedded metadata from the Excel file (batch, markType, templateId)
             Map<String, String> meta = excelService.readMetadata(file);
             if (meta.containsKey("TEMPLATE_ID") && !meta.get("TEMPLATE_ID").isEmpty()
@@ -321,7 +323,37 @@ public class OBEController {
             @RequestParam(defaultValue = "50") double threshold,
             @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
-        return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
+        try {
+            return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- GRAPH GENERATION: Filtered university QA dashboard data ---
+    @GetMapping("/graphs/dashboard/{moduleId}")
+    public ResponseEntity<?> getDashboardGraphs(
+            @PathVariable String moduleId,
+            @RequestParam(required = false) String batch,
+            @RequestParam(required = false) String markType,
+            @RequestParam(required = false) String loId,
+            @RequestParam(defaultValue = "50") double threshold,
+            @RequestParam(defaultValue = "60") double target,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
+        try {
+            MarkType parsedMarkType = null;
+            if (markType != null && !markType.isBlank()) {
+                parsedMarkType = MarkType.valueOf(markType.trim().toUpperCase(Locale.ROOT));
+            }
+            return ResponseEntity.ok(trendService.getDashboardGraphs(
+                moduleId, batch, parsedMarkType, threshold, target, loId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "message", "Invalid graph filter: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
     }
 
     // --- EXPORT: Generate Excel with selected LOs and mark type ---
@@ -510,6 +542,7 @@ public class OBEController {
         }
 
         try {
+            fileValidationService.validateExcelFile(file);
             // Read metadata from Excel first — overrides form params if present
             Map<String, String> meta = excelService.readMetadata(file);
             if (meta.containsKey("BATCH") && !meta.get("BATCH").isEmpty()) batch = meta.get("BATCH");

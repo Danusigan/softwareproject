@@ -4,6 +4,10 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "User")
@@ -11,16 +15,30 @@ public class User {
 
     @Id
     @Column(name = "User_ID")
+    @NotBlank(message = "Username is required")
     private String  username;
 
     @Column(name = "email", unique = true, nullable = false)
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email must be a valid address")
     private String email;
 
+    // No @Pattern/complexity constraint here deliberately — this field stores the BCrypt hash
+    // once persisted, not the raw password, so entity-level validation would run against the
+    // hash on every save. Password strength is enforced explicitly in UserService.addUser()
+    // against the raw value, before it's hashed.
     @Column(name = "password", nullable = false)
+    @NotBlank(message = "Password is required")
     private String password;
 
     @Column(name = "user_type")
     private String usertype;
+
+    @Column(name = "failed_login_attempts", nullable = false, columnDefinition = "INT DEFAULT 0")
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 
     public User() {
     }
@@ -96,5 +114,25 @@ public class User {
      */
     public boolean isLecturer() {
         return this.usertype != null && this.usertype.equals("lecture");
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public void setFailedLoginAttempts(int failedLoginAttempts) {
+        this.failedLoginAttempts = failedLoginAttempts;
+    }
+
+    public LocalDateTime getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public void setLockedUntil(LocalDateTime lockedUntil) {
+        this.lockedUntil = lockedUntil;
+    }
+
+    public boolean isCurrentlyLocked() {
+        return lockedUntil != null && lockedUntil.isAfter(LocalDateTime.now());
     }
 }

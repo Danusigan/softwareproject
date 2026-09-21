@@ -1,14 +1,21 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Model.User;
+import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
+import com.example.Software.project.Backend.Service.ModuleService;
+import com.example.Software.project.Backend.Service.UserService;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -26,14 +33,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.Software.project.Backend.Model.User;
-import com.example.Software.project.Backend.Security.JwtUtil;
-import com.example.Software.project.Backend.Service.ModuleService;
-import com.example.Software.project.Backend.Service.UserService;
-
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class UserRestController {
 
     @Autowired
@@ -48,6 +49,12 @@ public class UserRestController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private Environment environment;
+
+    @Autowired
+    private AuditLogService auditLogService;
+
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
         try {
@@ -55,6 +62,9 @@ public class UserRestController {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginUser.getUserID(), loginUser.getPassword())
             );
+
+            // Successful authentication clears any prior failed-attempt count/lockout
+            userService.resetFailedLogins(loginUser.getUserID());
 
             // If authentication is successful, generate JWT
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
@@ -87,6 +97,7 @@ public class UserRestController {
                 }
 
                 String token = jwtUtil.generateToken(user.getUserID(), userType);
+                auditLogService.log(user.getUserID(), "LOGIN", user.getUserID(), "SUCCESS", null);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Login successful");
@@ -101,7 +112,15 @@ public class UserRestController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User not found"));
             }
 
+        } catch (org.springframework.security.authentication.LockedException e) {
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "account locked");
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
         } catch (Exception e) {
+            userService.recordFailedLogin(loginUser.getUserID());
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "invalid credentials");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
@@ -110,7 +129,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-admin")
-    public ResponseEntity<?> addAdmin(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addAdmin(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only superadmin can add admins
             if (!isSuperAdmin(token)) {
@@ -129,6 +148,7 @@ public class UserRestController {
             String creatorUsername = authentication.getName();
 
             User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=admin");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Admin user added successfully");
             response.put("userId", createdUser.getUserID());
@@ -145,7 +165,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-lecture")
-    public ResponseEntity<?> addLecture(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addLecture(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only admin/superadmin can add lectures
             if (!isAdmin(token)) {
@@ -164,6 +184,7 @@ public class UserRestController {
             String creatorUsername = authentication.getName();
 
             User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=lecture");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Lecturer user added successfully");
             response.put("userId", createdUser.getUserID());
@@ -316,7 +337,7 @@ public class UserRestController {
     }
 
     @PostMapping("/add-user")
-    public ResponseEntity<?> addUser(@RequestBody User newUser, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> addUser(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             String requestedType = newUser.getUsertype() == null ? "" : newUser.getUsertype().toLowerCase().trim();
 
@@ -356,6 +377,7 @@ public class UserRestController {
     }
 
     @GetMapping("/debug/user/{username}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> debugGetUser(@PathVariable String username) {
         try {
             Optional<User> userOptional = userService.findByUserId(username);
@@ -378,6 +400,12 @@ public class UserRestController {
 
     @PostMapping("/create-test-user")
     public ResponseEntity<?> createTestUser() {
+        // Dev/test bootstrap helper only — must never be reachable in a non-dev deployment,
+        // since it creates a known-credential admin account with no authentication required.
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("dev"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
+        }
         try {
             User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();

@@ -6,11 +6,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class UserService {
+
+    private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
+    private static final long LOCKOUT_DURATION_MINUTES = 15;
+
+    // Min 8 chars, at least one lowercase, one uppercase, one digit — per Phase 4 decision.
+    private static final java.util.regex.Pattern PASSWORD_POLICY =
+            java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
     // Ensure the UserRepository has the findByUsername method:
     // Optional<User> findByUsername(String username);
@@ -19,9 +27,36 @@ public class UserService {
 
     @Autowired
     private ModuleService moduleService;
-
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    /**
+     * Records a failed login attempt; locks the account for 15 minutes after 5 consecutive failures.
+     * No-op if the username doesn't exist (avoids revealing account existence via lockout side-effects).
+     */
+    public void recordFailedLogin(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_DURATION_MINUTES));
+            }
+            userRepository.save(user);
+        });
+    }
+
+    /**
+     * Clears failed-attempt state on successful login.
+     */
+    public void resetFailedLogins(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
+                user.setFailedLoginAttempts(0);
+                user.setLockedUntil(null);
+                userRepository.save(user);
+            }
+        });
+    }
 
     /**
      * Authenticates a user using their username and password.
@@ -37,8 +72,7 @@ public class UserService {
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
-            // Check if the provided password matches the stored password
-            if (user.getPassword().equals(password)) {
+            if (passwordEncoder.matches(password, user.getPassword())) {
                 return Optional.of(user);
             }
         }
@@ -171,8 +205,11 @@ public class UserService {
             throw new Exception("Email already exists");
         }
 
-        // Store password as plain text (for development only)
-        // newUser.setPassword(passwordEncoder.encode(newUser.getPassword())); // Commented out for plain text
+        if (newUser.getPassword() == null || !PASSWORD_POLICY.matcher(newUser.getPassword()).matches()) {
+            throw new Exception("Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number");
+        }
+
+        newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
 
         return userRepository.save(newUser);
     }
@@ -191,7 +228,7 @@ public class UserService {
         
         User testUser = new User();
         testUser.setUserID(username);
-        testUser.setPassword(password); // Plain text password for now
+        testUser.setPassword(passwordEncoder.encode(password));
         testUser.setEmail(email);
         testUser.setUsertype(userType);
         
