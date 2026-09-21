@@ -105,9 +105,9 @@ export default function StudentReportsPage() {
     setReport(null);
     try {
       const response = await axios.post(
-        `/api/reports/progress/students/${encodeURIComponent(studentId)}/snapshots`,
+        '/api/reports/progress/students/snapshots',
         {},
-        { headers: headers() }
+        { headers: headers(), params: { studentId } }
       );
       setReport(response.data);
       setFilters(emptyFilters);

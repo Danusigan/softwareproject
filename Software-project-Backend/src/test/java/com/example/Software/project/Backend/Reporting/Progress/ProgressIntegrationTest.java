@@ -127,11 +127,20 @@ class ProgressIntegrationTest {
     @Test void apiRejectsUnauthenticatedUnauthorizedAndInvalidInputAndDeliversPdf() throws Exception {
         configure();var mvc=MockMvcBuilders.standaloneSetup(new ProgressController(service,configuration,new ProgressPdf())).build();
         mvc.perform(get("/api/reports/progress/students")).andExpect(status().isUnauthorized());
-        mvc.perform(post("/api/reports/progress/students/S1/snapshots").principal(auth("other","student"))).andExpect(status().isForbidden());
+        mvc.perform(post("/api/reports/progress/students/snapshots").param("studentId","S1").principal(auth("other","student"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/reports/progress/configuration").principal(auth("teacher","lecture"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/reports/progress/students").param("q","x".repeat(101)).principal(admin)).andExpect(status().isBadRequest());
         var report=service.generate("S1",admin);
         mvc.perform(get("/api/reports/progress/snapshots/"+report.reference()+"/pdf").principal(admin)).andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(header().string("Cache-Control","no-store"));
+    }
+    @Test void studentIdsContainingSlashesAreAcceptedAsAQueryParameter() throws Exception {
+        // Real student IDs contain '/' (e.g. "EG/2022/4001"). Tomcat rejects an encoded slash
+        // inside a URL path segment, so studentId must travel as a query parameter, not a
+        // path variable. MockMvc's mock dispatcher would not have caught that regression.
+        Student slashId=new Student("EG/2022/4001","Slash Id",null);slashId.setBatch("22");em.persist(slashId);em.flush();
+        var mvc=MockMvcBuilders.standaloneSetup(new ProgressController(service,configuration,new ProgressPdf())).build();
+        mvc.perform(post("/api/reports/progress/students/snapshots").param("studentId","EG/2022/4001").principal(admin))
+                .andExpect(status().isOk());
     }
     @Test void migrationConstraintsRejectInvalidThresholdAndDuplicateEnrolment() {
         configure();assertFalse(store.rows("select * from \"progress_schema_history\"").isEmpty());

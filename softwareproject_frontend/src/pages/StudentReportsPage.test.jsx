@@ -128,9 +128,9 @@ describe('Student academic progress reports', () => {
       expect.objectContaining({ params: { q: 'Sample' } })
     );
     expect(axios.post).toHaveBeenCalledWith(
-      '/api/reports/progress/students/S1/snapshots',
+      '/api/reports/progress/students/snapshots',
       {},
-      expect.anything()
+      expect.objectContaining({ params: { studentId: 'S1' } })
     );
     expect(screen.getByText('Academic study is still in progress.')).toBeInTheDocument();
     expect(screen.getAllByText('INSUFFICIENT EVIDENCE').length).toBeGreaterThan(0);

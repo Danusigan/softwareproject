@@ -15,7 +15,9 @@ public class ProgressController {
     private final ProgressPdf pdf;
     public ProgressController(ProgressService service,ProgressConfiguration configuration,ProgressPdf pdf) {this.service=service;this.configuration=configuration;this.pdf=pdf;}
     @GetMapping("/students") public ResponseEntity<?> search(@RequestParam(defaultValue="") String q,Authentication auth) {return ok(service.search(q,auth));}
-    @PostMapping("/students/{studentId}/snapshots") public ResponseEntity<?> generate(@PathVariable String studentId,Authentication auth) {return ok(service.generate(studentId,auth));}
+    // studentId is a query parameter, not a path segment: student IDs contain slashes
+    // (e.g. "EG/2022/4001"), and Tomcat rejects an encoded slash inside a path segment.
+    @PostMapping("/students/snapshots") public ResponseEntity<?> generate(@RequestParam String studentId,Authentication auth) {return ok(service.generate(studentId,auth));}
     @GetMapping("/snapshots/{reference}") public ResponseEntity<?> snapshot(@PathVariable String reference,Authentication auth) {return ok(service.snapshot(reference,auth,"PREVIEW"));}
     @GetMapping("/snapshots/{reference}/pdf") public ResponseEntity<?> pdf(@PathVariable String reference,Authentication auth) {
         var report=service.snapshot(reference,auth,"DOWNLOAD_PDF");

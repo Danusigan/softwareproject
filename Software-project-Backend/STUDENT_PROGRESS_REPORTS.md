@@ -114,7 +114,7 @@ All routes below require the application's authenticated Spring Security princip
 | Method | Route | Purpose |
 |---|---|---|
 | GET | `/api/reports/progress/students?q=...` | Search index/name; at most 100 authorized results |
-| POST | `/api/reports/progress/students/{studentId}/snapshots` | Generate complete history, LO/PO calculations, warnings and audit snapshot |
+| POST | `/api/reports/progress/students/snapshots?studentId=...` | Generate complete history, LO/PO calculations, warnings and audit snapshot |
 | GET | `/api/reports/progress/snapshots/{reference}` | Read the same saved preview with current authorization |
 | GET | `/api/reports/progress/snapshots/{reference}/pdf` | Download the saved snapshot as PDF |
 | GET | `/api/reports/progress/configuration` | Administrator configuration catalogue |
@@ -122,6 +122,8 @@ All routes below require the application's authenticated Spring Security princip
 | PUT | `/api/reports/progress/configuration/student-programmes` | Assign curriculum/account or update academic status |
 | POST | `/api/reports/progress/configuration/offerings` | Publish period/offering and assessment definitions |
 | PUT | `/api/reports/progress/configuration/enrolments` | Create/update explicit attempt and official result |
+
+`studentId` is a query parameter, not a path segment, because real student IDs contain `/` (e.g. `EG/2022/4001`) and Tomcat rejects an encoded slash inside a URL path segment.
 
 Admin/superadmin can access all records. A lecturer needs access to **every module in the student's recorded history**, using existing module visibility rules. Partial lecturer access is rejected rather than presented as a complete graduation report. A student can access only the explicitly linked student profile. Every snapshot download rechecks authorization. UUID report references are not authorization tokens. Unsupported roles are denied. Raw database identity keys for assessment items are not exposed in reports.
 
