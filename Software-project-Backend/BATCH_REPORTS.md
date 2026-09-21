@@ -1,9 +1,9 @@
 # Batch attainment reports
 
-The second reporting feature is read-only and lives alongside individual student
-reports. No tables, saved policies, existing marks imports or existing attainment
-services are changed. It reuses StudentReportService.calculate so the individual
-and batch reports use the same evidence rules.
+This reporting feature is read-only. No tables, saved policies, existing marks
+imports or existing attainment services are changed. It uses the shared
+LoAttainmentCalculator.calculate so this and any other report needing per-LO
+attainment use the same evidence rules.
 
 ## Use
 
@@ -110,7 +110,7 @@ All endpoints require a valid Bearer token and staff access.
 ## Tests
 
 Backend:
-mvn -Dtest=BatchReportTest,BatchReportRepositoryTest,StudentReportTest,StudentReportRepositoryTest test
+mvn -Dtest=BatchReportTest,BatchReportRepositoryTest,LoAttainmentCalculatorTest test
 
 Frontend:
 npm test -- src/pages/BatchReportsPage.test.jsx src/pages/StudentReportsPage.test.jsx

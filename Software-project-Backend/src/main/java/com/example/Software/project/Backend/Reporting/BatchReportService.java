@@ -88,7 +88,7 @@ public class BatchReportService {
                 if (!module.moduleId().equals(lo.getModuleId())) continue;
                 int assessed = 0, achieved = 0;
                 for (String student : population) {
-                    var result = StudentReportService.calculate(lo, itemsByLo.getOrDefault(lo.getId(), List.of()),
+                    var result = LoAttainmentCalculator.calculate(lo, itemsByLo.getOrDefault(lo.getId(), List.of()),
                             scoresByLo.getOrDefault(lo.getId(), Map.of()).getOrDefault(student, List.of()),
                             legacyByLo.getOrDefault(lo.getId(), Map.of()).getOrDefault(student, List.of()), threshold);
                     if (result.percentage() != null) {

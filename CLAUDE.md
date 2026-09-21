@@ -8,13 +8,14 @@ Learning Outcome → Program Outcome attainment and accreditation-reporting syst
 - **Frontend**: `softwareproject_frontend/` — React 18 + Vite 5, react-router-dom 7, axios, TailwindCSS, plain JS/JSX. Dev server on `:5173`, backend on `:8080`.
 - **Roles**: `superadmin` (creates admins), `admin` (creates lecturers, CRUDs modules/POs, approves/rejects LO-PO mappings), `lecture` (CRUDs Learning Outcomes, uploads marks, proposes LO-PO mappings). Role lives on `User.usertype`, enforced server-side via Spring Security RBAC — this is the sole source of truth.
 
-## The three report subsystems
+## The two report subsystems
 
-Three report code paths coexist under `Reporting/`:
+Two report code paths coexist under `Reporting/`:
 
 1. **`Reporting/Progress/*`** (`ProgressController`, `ProgressService`, `AttainmentCalculator`, etc.) — the current, canonical individual-student report system. Curriculum-versioned, retake-policy-aware, produces immutable JSON snapshots + audit trail. Documented in `Software-project-Backend/STUDENT_PROGRESS_REPORTS.md`. **Requires curriculum/LO-PO mappings/enrolment data to already be configured** for a batch before it can produce anything — it has no "just works off recorded marks" fallback.
-2. **`StudentReportController`/`StudentReportService`/`StudentReportPdf`** — the legacy per-student report. The frontend no longer calls it (fully migrated to Progress), but **`BatchReportService` calls `StudentReportService.calculate()` directly** — so the service class is still a live dependency and can't be deleted without first extracting that method. The controller/PDF/routes are otherwise dead.
-3. **`BatchReportController`/`BatchReportService`/`BatchReportPdf`** — a separate, read-only, anonymized batch-level attainment report (no student names), documented in `Software-project-Backend/BATCH_REPORTS.md`. Distinct from both of the above; keep it in mind before assuming there's one "report system."
+2. **`BatchReportController`/`BatchReportService`/`BatchReportPdf`** — a separate, read-only, anonymized batch-level attainment report (no student names), documented in `Software-project-Backend/BATCH_REPORTS.md`. Distinct from Progress; keep it in mind before assuming there's one "report system."
+
+A third, legacy per-student report system (`StudentReportController`/`Service`/`Pdf`) existed but has been removed — Progress fully superseded it and the frontend had already migrated away. Its one shared piece, the per-LO attainment calculation, was extracted to `Reporting/LoAttainmentCalculator` before deletion, since `BatchReportService` depends on it too.
 
 ## Schema management (a known split, not yet consolidated)
 
