@@ -6,7 +6,7 @@ import authService from '../services/authService'
 import './studentReports.css'
 import './batchReports.css'
 
-const number = value => value == null ? 'â€”' : Number(value).toFixed(2)
+const number = value => value == null ? '—' : Number(value).toFixed(2)
 const statusClass = status => status === 'Achieved' ? 'achieved' : status === 'Below target' ? 'below' : 'pending'
 const headers = () => ({ Authorization: `Bearer ${authService.getToken()}` })
 const paramsFor = (batch, moduleIds, studentThreshold, loTarget, poTarget, format = 'json') => {
@@ -92,19 +92,19 @@ export default function BatchReportsPage() {
     <main className="report-shell">
       <p className="report-eyebrow">Department quality assurance</p>
       <h1>Batch attainment report</h1>
-      <p className="report-intro">Review LO achievement, module coverage and approved LOâ€“PO contributions for a batch.</p>
+      <p className="report-intro">Review LO achievement, module coverage and approved LO–PO contributions for a batch.</p>
       <section className="report-controls" aria-label="Batch report settings">
         <form onSubmit={loadModules}>
           <label htmlFor="batch-report-batch">Batch</label>
           <input id="batch-report-batch" required maxLength={50} value={batch} placeholder="e.g. 22" disabled={!!busy}
             onChange={event => { setBatch(event.target.value); setModules([]); setSelected([]); setReport(null); setSearched(false) }} />
-          <button disabled={!!busy || !batch.trim()}>{busy === 'modules' ? 'Loadingâ€¦' : 'Find modules'}</button>
+          <button disabled={!!busy || !batch.trim()}>{busy === 'modules' ? 'Loading…' : 'Find modules'}</button>
         </form>
         {!!modules.length && <form onSubmit={preview} className="batch-report-form">
           <fieldset className="batch-modules"><legend>Modules in report</legend>
             {modules.map(module => <label key={module.moduleId}>
               <input type="checkbox" checked={selected.includes(module.moduleId)} disabled={!!busy} onChange={() => toggleModule(module.moduleId)} />
-              {module.moduleId} â€” {module.moduleName}
+              {module.moduleId} — {module.moduleName}
             </label>)}
           </fieldset>
           <div className="batch-targets">
@@ -119,7 +119,7 @@ export default function BatchReportsPage() {
               <small>Required weighted LO achievement rate.</small></label>
           </div>
           <p className="report-help">These are editable report settings, not approved academic policy. Module attainment requires all defined LOs to meet the batch target with complete evidence.</p>
-          <button disabled={!!busy || !selected.length}>{busy === 'preview' ? 'Generatingâ€¦' : 'Preview batch report'}</button>
+          <button disabled={!!busy || !selected.length}>{busy === 'preview' ? 'Generating…' : 'Preview batch report'}</button>
         </form>}
       </section>
       {error && <p role="alert" className="report-error">{error}</p>}
@@ -128,9 +128,9 @@ export default function BatchReportsPage() {
         <div className="report-heading"><div>
           <p className="report-eyebrow">Analysis copy</p><h2>Batch {report.batch}</h2>
           <p>Generated {new Date(report.generatedAt).toLocaleString()}</p>
-        </div><button onClick={download} disabled={!!busy}>{busy === 'download' ? 'Downloadingâ€¦' : 'Download batch PDF'}</button></div>
+        </div><button onClick={download} disabled={!!busy}>{busy === 'download' ? 'Downloading…' : 'Download batch PDF'}</button></div>
         <p className="batch-scope">{report.scope}</p>
-        <p>Student threshold: <strong>{number(report.studentThreshold)}%</strong> Â· Batch LO target: <strong>{number(report.loTarget)}%</strong> Â· PO target: <strong>{number(report.poTarget)}%</strong></p>
+        <p>Student threshold: <strong>{number(report.studentThreshold)}%</strong> · Batch LO target: <strong>{number(report.loTarget)}%</strong> · PO target: <strong>{number(report.poTarget)}%</strong></p>
         <div className="report-stats">
           <div><strong>{report.studentsWithRecords}</strong><span>Students with records</span></div>
           <div><strong>{report.modules.length}</strong><span>Modules in scope</span></div>
@@ -143,13 +143,13 @@ export default function BatchReportsPage() {
           <div className="report-table-scroll"><table><caption>Module summary</caption><thead><tr>
             <th>Module</th><th>Students with records</th><th>LOs achieved / total</th><th>Coverage</th><th>Status</th>
           </tr></thead><tbody>{report.modules.map(module => <tr key={module.moduleId}>
-            <td>{module.moduleId} â€” {module.moduleName}</td><td>{module.studentsWithRecords}</td>
+            <td>{module.moduleId} — {module.moduleName}</td><td>{module.studentsWithRecords}</td>
             <td>{module.achievedLos} / {module.totalLos}</td><td>{number(module.achievedLoPercent)}%</td>
             <td><span className={`report-status ${statusClass(module.status)}`}>{module.status}</span></td>
           </tr>)}</tbody></table></div>
         </section>
         {report.modules.map(module => <section className="report-module" key={module.moduleId}>
-          <h3>{module.moduleId} â€” {module.moduleName}</h3>
+          <h3>{module.moduleId} — {module.moduleName}</h3>
           <p className="report-help">LO percentage = achieved / fully assessed students. Percentages with pending evidence are provisional; the target line is {report.loTarget}%.</p>
           {module.los.map(lo => <AttainmentBar key={lo.loId} label={lo.loId} value={lo.achievementPercent} target={lo.target} status={lo.status} />)}
           <div className="report-table-scroll"><table><caption>LO results and evidence completeness</caption><thead><tr>
@@ -161,10 +161,10 @@ export default function BatchReportsPage() {
           </tr>)}</tbody></table></div>
         </section>)}
         <section className="report-module"><h3>PO attainment in the selected scope</h3>
-          <p className="report-help">Weighted achievement rates from approved positive LOâ€“PO mappings. Pending scores use complete mapped LOs only and are provisional. These are not student PO pass rates.</p>
+          <p className="report-help">Weighted achievement rates from approved positive LO–PO mappings. Pending scores use complete mapped LOs only and are provisional. These are not student PO pass rates.</p>
           {!report.pos.length && <p>No active programme outcomes are configured.</p>}
           {report.pos.map(po => <div className="batch-po" key={po.poId}>
-            <h4>{po.code} â€” {po.title}</h4>
+            <h4>{po.code} — {po.title}</h4>
             <AttainmentBar label={po.code} value={po.attainmentPercent} target={po.target} status={po.status} />
             <p>{po.completeLos} of {po.mappedLos} mapped LOs have complete evidence.</p>
             {!!po.contributions.length && <div className="report-table-scroll"><table><caption>Approved contributions to {po.code}</caption>
