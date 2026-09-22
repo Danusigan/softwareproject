@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -355,5 +356,244 @@ class POAttainmentServiceTest {
 
         // Legacy: 60 >= 50, so should PASS
         assertEquals(1, poCredits.get("PO1"), "Legacy behavior: 60% >= 50% threshold should pass");
+    }
+
+    @Test
+    @DisplayName("Test 4: Duplicate templates sharing an assignment label must not inflate the denominator")
+    void testDuplicateTemplatesForSameAssignmentLabelDoNotInflateMaxMarks() {
+        // SCENARIO (from real data, module EC4356 batch 24):
+        // The same assignment was uploaded twice, producing two templates sharing the label
+        // "Assignment 01" - an earlier one with max 5 and a later re-upload with max 2. Both
+        // carry recorded question scores, but the re-upload overwrote the student's aggregated
+        // StudentMark (2), so the denominator must come from that later template.
+        // Summing both gives 7, so a student scoring 2 lands at 28.6% and FAILS, when the real
+        // result is 2/2 = 100% and a PASS.
+        String losId = "LO001";
+        String batch = "24";
+        String markType = "ASSIGNMENT";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        AssessmentTemplate firstUpload = new AssessmentTemplate();
+        firstUpload.setId("TPL-FIRST");
+        firstUpload.setBatch(batch);
+        firstUpload.setMarkType(markType);
+        firstUpload.setAssignmentLabel("Assignment 01");
+        firstUpload.setCreatedAt(LocalDateTime.of(2026, 9, 21, 16, 15));
+
+        AssessmentTemplate reUpload = new AssessmentTemplate();
+        reUpload.setId("TPL-REUPLOAD");
+        reUpload.setBatch(batch);
+        reUpload.setMarkType(markType);
+        reUpload.setAssignmentLabel("Assignment 01");
+        reUpload.setCreatedAt(LocalDateTime.of(2026, 9, 21, 16, 29));
+
+        AssessmentItem firstUploadItem = new AssessmentItem();
+        firstUploadItem.setId(10L);
+        firstUploadItem.setQuestionLabel("Q1");
+        firstUploadItem.setMaxMarks(5.0);
+        firstUploadItem.setLos(los1);
+        firstUploadItem.setAssessmentTemplate(firstUpload);
+
+        AssessmentItem reUploadItem = new AssessmentItem();
+        reUploadItem.setId(11L);
+        reUploadItem.setQuestionLabel("Q1");
+        reUploadItem.setMaxMarks(2.0);
+        reUploadItem.setLos(los1);
+        reUploadItem.setAssessmentTemplate(reUpload);
+
+        StudentMark mark = new StudentMark();
+        mark.setStudent(student1);
+        mark.setLos(los1);
+        mark.setScore(2.0);
+        mark.setBatch(batch);
+        mark.setMarkType(MarkType.ASSIGNMENT);
+        mark.setAssignmentLabel("Assignment 01");
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+            .thenReturn(Arrays.asList(firstUploadItem, reUploadItem));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
+        Map<String, Object> studentDetail = students.get(0);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> loScores = (Map<String, String>) studentDetail.get("loScores");
+        assertTrue(loScores.get(losId).startsWith("Pass"),
+            "2 marks against the re-upload's max of 2 is 100%, so the LO must pass; the earlier "
+                + "duplicate template's max must not be added to the denominator. Got: "
+                + loScores.get(losId));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> poCredits = (Map<String, Integer>) studentDetail.get("poCredits");
+        assertEquals(1, poCredits.get("PO1"),
+            "Student should earn the mapping weight for PO1 once the denominator ignores the duplicate template");
+    }
+
+    @Test
+    @DisplayName("Test 5: A student is measured only against the assignments they have marks for")
+    void testStudentIsNotChargedForAnAssignmentTheyHaveNoMarksIn() {
+        // SCENARIO: the ASSIGNMENT markType holds two assessments for the same LO -
+        // "Assignment 01" (max 10) and "Assignment 02" (max 40). A student scored 8/10 on the
+        // first and has no marks at all under the second.
+        // Measuring 8 against 10 + 40 gives 16% and a FAIL. The student's real result on the
+        // work they submitted is 8/10 = 80%, a PASS. A FINAL_EXAM normally carries a single
+        // assessment, which is why this only shows up on assignments.
+        String losId = "LO001";
+        String batch = "24";
+        String markType = "ASSIGNMENT";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        AssessmentTemplate assignment01 = new AssessmentTemplate();
+        assignment01.setId("TPL-A01");
+        assignment01.setBatch(batch);
+        assignment01.setMarkType(markType);
+        assignment01.setAssignmentLabel("Assignment 01");
+        assignment01.setCreatedAt(LocalDateTime.of(2026, 9, 20, 9, 0));
+
+        AssessmentTemplate assignment02 = new AssessmentTemplate();
+        assignment02.setId("TPL-A02");
+        assignment02.setBatch(batch);
+        assignment02.setMarkType(markType);
+        assignment02.setAssignmentLabel("Assignment 02");
+        assignment02.setCreatedAt(LocalDateTime.of(2026, 9, 21, 9, 0));
+
+        AssessmentItem itemA01 = new AssessmentItem();
+        itemA01.setId(20L);
+        itemA01.setQuestionLabel("Q1");
+        itemA01.setMaxMarks(10.0);
+        itemA01.setLos(los1);
+        itemA01.setAssessmentTemplate(assignment01);
+
+        AssessmentItem itemA02 = new AssessmentItem();
+        itemA02.setId(21L);
+        itemA02.setQuestionLabel("Q1");
+        itemA02.setMaxMarks(40.0);
+        itemA02.setLos(los1);
+        itemA02.setAssessmentTemplate(assignment02);
+
+        StudentMark assignment01Mark = new StudentMark();
+        assignment01Mark.setStudent(student1);
+        assignment01Mark.setLos(los1);
+        assignment01Mark.setScore(8.0);
+        assignment01Mark.setBatch(batch);
+        assignment01Mark.setMarkType(MarkType.ASSIGNMENT);
+        assignment01Mark.setAssignmentLabel("Assignment 01");
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(assignment01Mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+            .thenReturn(Arrays.asList(itemA01, itemA02));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
+        Map<String, Object> studentDetail = students.get(0);
+
+        @SuppressWarnings("unchecked")
+        Map<String, String> loScores = (Map<String, String>) studentDetail.get("loScores");
+        assertTrue(loScores.get(losId).startsWith("Pass"),
+            "8/10 on the only assignment the student sat is 80%, so the LO must pass; "
+                + "Assignment 02's max must not be added to their denominator. Got: " + loScores.get(losId));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> poCredits = (Map<String, Integer>) studentDetail.get("poCredits");
+        assertEquals(1, poCredits.get("PO1"),
+            "Student should earn the mapping weight for PO1 from the assignment they actually sat");
+    }
+
+    @Test
+    @DisplayName("Test 6: Marks across two assignments are combined against both maxima")
+    void testMarksAcrossTwoAssignmentsAreCombined() {
+        // SCENARIO: the student has marks under both assignments for the same LO.
+        // 4/10 on Assignment 01 and 26/40 on Assignment 02 is 30/50 = 60%, a PASS at 50%.
+        String losId = "LO001";
+        String batch = "24";
+        String markType = "ASSIGNMENT";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        AssessmentTemplate assignment01 = new AssessmentTemplate();
+        assignment01.setId("TPL-A01");
+        assignment01.setBatch(batch);
+        assignment01.setMarkType(markType);
+        assignment01.setAssignmentLabel("Assignment 01");
+
+        AssessmentTemplate assignment02 = new AssessmentTemplate();
+        assignment02.setId("TPL-A02");
+        assignment02.setBatch(batch);
+        assignment02.setMarkType(markType);
+        assignment02.setAssignmentLabel("Assignment 02");
+
+        AssessmentItem itemA01 = new AssessmentItem();
+        itemA01.setId(30L);
+        itemA01.setQuestionLabel("Q1");
+        itemA01.setMaxMarks(10.0);
+        itemA01.setLos(los1);
+        itemA01.setAssessmentTemplate(assignment01);
+
+        AssessmentItem itemA02 = new AssessmentItem();
+        itemA02.setId(31L);
+        itemA02.setQuestionLabel("Q1");
+        itemA02.setMaxMarks(40.0);
+        itemA02.setLos(los1);
+        itemA02.setAssessmentTemplate(assignment02);
+
+        StudentMark markA01 = new StudentMark();
+        markA01.setStudent(student1);
+        markA01.setLos(los1);
+        markA01.setScore(4.0);
+        markA01.setBatch(batch);
+        markA01.setMarkType(MarkType.ASSIGNMENT);
+        markA01.setAssignmentLabel("Assignment 01");
+
+        StudentMark markA02 = new StudentMark();
+        markA02.setStudent(student1);
+        markA02.setLos(los1);
+        markA02.setScore(26.0);
+        markA02.setBatch(batch);
+        markA02.setMarkType(MarkType.ASSIGNMENT);
+        markA02.setAssignmentLabel("Assignment 02");
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+            .thenReturn(Arrays.asList(markA01, markA02));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+            .thenReturn(Arrays.asList(itemA01, itemA02));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
+        @SuppressWarnings("unchecked")
+        Map<String, String> loScores = (Map<String, String>) students.get(0).get("loScores");
+
+        assertTrue(loScores.get(losId).startsWith("Pass"),
+            "30 marks across both assignments against a combined max of 50 is 60%, a pass. Got: " + loScores.get(losId));
+        assertTrue(loScores.get(losId).contains("60.0"),
+            "The reported percentage should be 60.0. Got: " + loScores.get(losId));
     }
 }

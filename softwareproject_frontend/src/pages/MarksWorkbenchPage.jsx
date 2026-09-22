@@ -377,6 +377,22 @@ export default function MarksWorkbenchPage() {
     const b = String(m.batch); if (!acc[b]) acc[b] = []; acc[b].push(m); return acc
   }, {}), [availableMarks])
 
+  // Mark types that actually have marks uploaded for the batch on screen. PO attainment reads
+  // one mark type at a time, so offering a type with no marks just returns an empty report.
+  const batchMarkTypes = useMemo(
+    () => markTypeOptions.filter(o => batchAssignments.some(m => m.markType === o.value)),
+    [batchAssignments]
+  )
+
+  // Follow the batch: keep the current selection when it still has marks, otherwise move to a
+  // type that does, so switching batches never silently reports on an empty mark type.
+  useEffect(() => {
+    if (!batchMarkTypes.length) return
+    if (!batchMarkTypes.some(o => o.value === analyticsMarkType)) {
+      setAnalyticsMarkType(batchMarkTypes[0].value)
+    }
+  }, [batchMarkTypes, analyticsMarkType])
+
   const moduleTitle = moduleData?.moduleName || moduleData?.name || 'Marks Workflow'
   const pendingCqiForBatch = useMemo(
     () => cqiHistory.filter(a => a.status === 'PLANNED' && !a.submitted && String(a.batch) === String(activeBatch)),
@@ -692,8 +708,16 @@ export default function MarksWorkbenchPage() {
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mark type</label>
                     <select value={analyticsMarkType} onChange={e => setAnalyticsMarkType(e.target.value)} className="input-field bg-white">
-                      {markTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {markTypeOptions.map(o => {
+                        const has = batchAssignments.some(m => m.markType === o.value)
+                        return <option key={o.value} value={o.value}>{o.label}{has ? '' : ' — no marks uploaded'}</option>
+                      })}
                     </select>
+                    {!batchAssignments.some(m => m.markType === analyticsMarkType) && (
+                      <p className="text-xs text-amber-600 font-semibold">
+                        No {analyticsMarkType === 'FINAL_EXAM' ? 'final exam' : 'assignment'} marks are uploaded for batch {activeBatch}, so this will come back empty.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -747,6 +771,16 @@ export default function MarksWorkbenchPage() {
                     Clear results
                   </button>
                 </div>
+                {poAttainment.studentCount === 0 && (
+                  <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+                    <div className="font-black text-amber-800 mb-1">No marks matched this selection</div>
+                    <p className="text-sm text-amber-700">
+                      Batch <strong>{activeBatch}</strong> has no <strong>{analyticsMarkType === 'FINAL_EXAM' ? 'Final Exam' : 'Assignment'}</strong> marks
+                      for the selected learning outcomes, so there is nothing to calculate.
+                      {batchMarkTypes.length > 0 && <> Uploaded for this batch: <strong>{batchMarkTypes.map(o => o.label).join(', ')}</strong>.</>}
+                    </p>
+                  </div>
+                )}
                 {poAttainment.loPoMappings?.length > 0 && (
                   <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">LO → PO Mappings</div>

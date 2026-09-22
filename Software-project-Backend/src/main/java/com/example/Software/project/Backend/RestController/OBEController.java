@@ -582,7 +582,10 @@ public class OBEController {
             for (Object[] row : raw) {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("batch", row[0]);
-                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                // MarkType.toString() is the display name ("Final Exam"), which no other endpoint
+                // accepts — callers send this value straight back as a markType parameter, so it
+                // has to be the enum name.
+                entry.put("markType", row[1] instanceof MarkType mt ? mt.name() : (row[1] != null ? row[1].toString() : null));
                 entry.put("assignmentLabel", row[2] != null ? row[2].toString() : null);
                 entry.put("markCount", row[3]);
                 entry.put("loCount", row[4]);
@@ -677,7 +680,7 @@ public class OBEController {
             for (Object[] row : raw) {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("batch", row[0]);
-                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                entry.put("markType", row[1] instanceof MarkType mt ? mt.name() : (row[1] != null ? row[1].toString() : null));
                 entry.put("markCount", row[2]);
                 result.add(entry);
             }
