@@ -12,6 +12,11 @@
 .DS_Store
 *.iml
 
+# Claude Code skills (locally installed, machine-specific)
+.agents/
+.claude/skills/
+skills-lock.json
+
 # Node.js
 node_modules/
 npm-debug.log*
