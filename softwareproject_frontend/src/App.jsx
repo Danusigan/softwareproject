@@ -14,6 +14,7 @@ import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
+import StudentPOSummaryPage from './pages/StudentPOSummaryPage'
 import CqiReviewPage from './pages/CqiReviewPage'
 import ManageLecturersPage from './pages/ManageLecturersPage'
 import ManageAdminsPage from './pages/ManageAdminsPage'
@@ -84,6 +85,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <MarksWorkbenchPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student-po-summary"
+        element={
+          <ProtectedRoute>
+            <StudentPOSummaryPage />
           </ProtectedRoute>
         }
       />

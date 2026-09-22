@@ -106,6 +106,15 @@ export const marksService = {
     return axios.get(`${BASE_URL}/api/obe/assessment/templates/${moduleId}`, config)
   },
 
+  // Cumulative PO credits for one student, summed across every module whose PO attainment has
+  // been calculated and saved (POAttainmentService.calculateStudentPOCredits persists on every
+  // run). Raw earned/max/percentage only — no achieved/not-achieved verdict.
+  async getStudentPOSummary({ studentId, markType }, config = {}) {
+    const params = new URLSearchParams({ studentId })
+    if (markType) params.set('markType', markType)
+    return axios.get(`${BASE_URL}/api/obe/po-attainment/student-summary?${params.toString()}`, config)
+  },
+
   async getTemplate(templateId, config = {}) {
     return axios.get(`${BASE_URL}/api/obe/assessment/template/${templateId}`, config)
   },

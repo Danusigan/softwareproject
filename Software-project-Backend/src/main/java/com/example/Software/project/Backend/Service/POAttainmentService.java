@@ -1,7 +1,10 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.*;
+import com.example.Software.project.Backend.Model.Module; // disambiguate from java.lang.Module
 import com.example.Software.project.Backend.Repository.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +15,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class POAttainmentService {
+
+    private static final Logger log = LoggerFactory.getLogger(POAttainmentService.class);
 
     @Autowired
     private StudentMarkRepository studentMarkRepository;
@@ -31,6 +36,9 @@ public class POAttainmentService {
     @Autowired
     private StudentRepository studentRepository;
 
+    @Autowired
+    private StudentPoCreditRepository studentPoCreditRepository;
+
     /**
      * Calculate per-student PO credits based on LO pass/fail and LO-PO mappings.
      *
@@ -39,20 +47,29 @@ public class POAttainmentService {
      *   - For each approved LO→PO mapping of that LO, add 100% of the mapping weight to student's PO credit
      *   - If student failed → add 0
      *
+     * Every call also overwrites the saved {@link StudentPoCredit} rows for the LOs' module,
+     * batch and mark type (skipped only if the LOs resolve to no module, which existing data
+     * never does — see V3__student_po_credit.sql). Those saved rows are what
+     * {@link #getStudentPOSummary} reads back to build the cross-module cumulative view.
+     *
      * @param losIds    List of LO IDs to consider
      * @param markType  FINAL_EXAM or ASSIGNMENT
      * @param batch     Batch year
      * @param threshold Pass threshold (0-100)
      * @return Map with keys: "students", "poList", "credits", "maxCredits", "loPoMappings"
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String markType, String batch, int threshold) {
         return calculateStudentPOCredits(losIds, markType, batch, threshold, 0.0);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String markType, String batch, int threshold, double maxMarksPerLo) {
         MarkType type = MarkType.valueOf(markType.toUpperCase());
+        // A duplicate LO id here (the frontend's "All" selector, or a caller passing the same
+        // id twice) would double-count that LO's mapped PO weight for every student who passed
+        // it, and feeds the same doubled entry into allMappings/loListInfo below.
+        losIds = losIds.stream().distinct().collect(Collectors.toList());
 
         // 1. Get all distinct students for these LOs, markType, and batch
         List<Student> students = studentMarkRepository
@@ -65,6 +82,10 @@ public class POAttainmentService {
         // 3. Get ALL mappings for these LOs (even if pending)
         List<OutcomeMapping> allMappings = new ArrayList<>();
         List<Map<String, String>> loListInfo = new ArrayList<>();
+        // Module these LOs belong to, for saving StudentPoCredit rows below (§8b). LOs are
+        // required to have a module (los.module_id is NOT NULL), so this is really only ever
+        // null in tests that build a Los without setting one.
+        Module resolvedModule = null;
 
         for (String losId : losIds) {
             List<OutcomeMapping> loMappings = outcomeMappingRepository
@@ -76,16 +97,24 @@ public class POAttainmentService {
             info.put("id", losId);
             info.put("name", los != null ? los.getName() : losId);
             loListInfo.add(info);
+
+            if (resolvedModule == null && los != null && los.getModule() != null) {
+                resolvedModule = los.getModule();
+            }
         }
 
         // 4. Build a lookup: LO ID -> List of (PO code, weight)
         Map<String, List<OutcomeMapping>> mappingsByLo = allMappings.stream()
                 .collect(Collectors.groupingBy(m -> m.getLearningOutcome().getId()));
 
-        // 5. Collect all unique PO codes (sorted)
+        // 5. Collect all unique PO codes (sorted), and keep the actual ProgramOutcome entity
+        // behind each code so §8b can save credits without a second database round trip.
         Set<String> poCodeSet = new TreeSet<>();
+        Map<String, ProgramOutcome> poByCode = new LinkedHashMap<>();
         for (OutcomeMapping m : allMappings) {
-            poCodeSet.add(m.getProgramOutcome().getCode());
+            String poCode = m.getProgramOutcome().getCode();
+            poCodeSet.add(poCode);
+            poByCode.putIfAbsent(poCode, m.getProgramOutcome());
         }
         List<String> poList = new ArrayList<>(poCodeSet);
 
@@ -212,6 +241,14 @@ public class POAttainmentService {
             studentDetails.add(detail);
         }
 
+        // 8b. Save these credits so they survive past this request. Overwrites whatever was
+        // saved for this module/batch/markType last time — see V3__student_po_credit.sql.
+        boolean persisted = false;
+        if (resolvedModule != null) {
+            saveStudentPoCredits(resolvedModule, batch, type, threshold, students, credits, maxCredits, poByCode);
+            persisted = true;
+        }
+
         // 9. Calculate total max credit
         int totalMaxCredit = maxCredits.values().stream().mapToInt(Integer::intValue).sum();
 
@@ -241,7 +278,150 @@ public class POAttainmentService {
         result.put("studentCount", students.size());
         result.put("students", studentDetails);
         result.put("loPoMappings", loPoMappingInfo);
+        // Whether this calculation was saved to student_po_credit. False only means the LOs
+        // resolved to no module (never true for real data - see resolvedModule above); the
+        // frontend uses this to tell a real save from one it could not attribute to a module.
+        result.put("persisted", persisted);
 
+        return result;
+    }
+
+    /**
+     * Recalculates and saves PO credits for every LO in a module, for one batch/markType —
+     * the same work {@link #calculateStudentPOCredits} does, just triggered by a marks change
+     * instead of a lecturer clicking "Calculate PO Attainment". Called after marks are
+     * uploaded, edited (re-uploaded) or deleted, so student_po_credit never goes stale waiting
+     * for someone to press the button.
+     *
+     * Always recalculates using every LO in the module, never just the one that changed —
+     * {@link #saveStudentPoCredits} deletes all of a module/batch/markType's saved rows before
+     * re-inserting, so recalculating from a partial LO list would wipe out credits earned via
+     * this module's other LOs that weren't touched by this particular change.
+     *
+     * Uses threshold 50, the same default used everywhere else in this app when the caller
+     * hasn't chosen one. A lecturer who wants a different threshold can still use the manual
+     * "Calculate PO Attainment" button, which overwrites this with their chosen threshold.
+     *
+     * Deliberately swallows its own errors: a background recalculation failing must never fail
+     * the upload/edit/delete that triggered it. Worst case, the saved attainment lags behind
+     * until the next successful trigger or a manual recalculation.
+     */
+    @Transactional
+    public void recalculateForModule(String moduleId, String batch, String markType) {
+        if (moduleId == null || moduleId.isBlank() || batch == null || batch.isBlank()
+                || markType == null || markType.isBlank()) {
+            return;
+        }
+        try {
+            List<String> losIds = losRepository.findByModule_ModuleId(moduleId).stream()
+                    .map(Los::getId)
+                    .collect(Collectors.toList());
+            if (losIds.isEmpty()) return;
+            calculateStudentPOCredits(losIds, markType, batch, 50, 0.0);
+        } catch (Exception e) {
+            log.warn("Auto-recalculation of PO attainment failed for module {} batch {} markType {}: {}",
+                    moduleId, batch, markType, e.getMessage());
+        }
+    }
+
+    /**
+     * Overwrite the saved credits for one module/batch/markType: delete what was saved last
+     * time this combination was calculated, then insert the current result. This is what makes
+     * a recalculation replace its previous save rather than accumulate duplicates, and what
+     * {@link #getStudentPOSummary} later reads to build the cross-module total.
+     */
+    private void saveStudentPoCredits(Module module, String batch, MarkType markType, int threshold,
+            List<Student> students, Map<String, Map<String, Integer>> credits,
+            Map<String, Integer> maxCredits, Map<String, ProgramOutcome> poByCode) {
+        studentPoCreditRepository.deleteByModule_ModuleIdAndBatchAndMarkType(module.getModuleId(), batch, markType);
+
+        // Keyed by studentId+poCode rather than a plain list: student_po_credit's unique
+        // constraint is exactly this tuple (plus module/batch/markType, fixed for this whole
+        // call), so two rows sharing a key would make saveAll below fail with a duplicate-key
+        // error against each other - independent of whatever the delete above did. A Map here
+        // means that can't happen even if `students` ever contained the same student twice.
+        Map<String, StudentPoCredit> rowsByKey = new LinkedHashMap<>();
+        for (Student student : students) {
+            Map<String, Integer> studentCredits = credits.get(student.getStudentId());
+            if (studentCredits == null) continue;
+            for (Map.Entry<String, Integer> entry : studentCredits.entrySet()) {
+                ProgramOutcome po = poByCode.get(entry.getKey());
+                if (po == null) continue; // every poCode here came from a mapping, so this never happens
+                StudentPoCredit row = new StudentPoCredit();
+                row.setStudent(student);
+                row.setProgramOutcome(po);
+                row.setModule(module);
+                row.setBatch(batch);
+                row.setMarkType(markType);
+                row.setCreditsEarned(entry.getValue());
+                row.setMaxCredits(maxCredits.getOrDefault(entry.getKey(), 0));
+                row.setThreshold(threshold);
+                rowsByKey.put(student.getStudentId() + "|" + entry.getKey(), row);
+            }
+        }
+        List<StudentPoCredit> rows = new ArrayList<>(rowsByKey.values());
+        if (!rows.isEmpty()) studentPoCreditRepository.saveAll(rows);
+    }
+
+    /**
+     * Cumulative PO standing for one student across every module whose PO attainment has been
+     * calculated and saved (§8b above): sums credits_earned and max_credits per PO across all
+     * that student's saved rows, regardless of which module or batch produced them.
+     *
+     * Deliberately raw numbers only - earned/possible credits and the plain percentage they
+     * imply. No pass/fail verdict against a threshold, and nothing generated from it: turning
+     * "credits earned" into "this PO is attained" and producing a report from that is a
+     * separate, not-yet-built feature (a per-PO achievement threshold has to be decided first).
+     *
+     * @param studentId Student to summarize
+     * @param markType  Restrict to one mark type (FINAL_EXAM or ASSIGNMENT), or null/blank for both combined
+     * @return Map with "studentId", "markType", "moduleCount" and "poSummaries" (per-PO totals with a moduleBreakdown list)
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getStudentPOSummary(String studentId, String markType) {
+        MarkType type = (markType != null && !markType.isBlank()) ? MarkType.valueOf(markType.toUpperCase()) : null;
+        List<StudentPoCredit> rows = type != null
+                ? studentPoCreditRepository.findByStudent_StudentIdAndMarkType(studentId, type)
+                : studentPoCreditRepository.findByStudent_StudentId(studentId);
+
+        Map<String, Integer> earnedByPo = new LinkedHashMap<>();
+        Map<String, Integer> maxByPo = new LinkedHashMap<>();
+        Map<String, List<Map<String, Object>>> breakdownByPo = new LinkedHashMap<>();
+
+        for (StudentPoCredit row : rows) {
+            String poCode = row.getProgramOutcome().getCode();
+            earnedByPo.merge(poCode, row.getCreditsEarned(), Integer::sum);
+            maxByPo.merge(poCode, row.getMaxCredits(), Integer::sum);
+
+            Map<String, Object> contribution = new LinkedHashMap<>();
+            contribution.put("moduleId", row.getModule().getModuleId());
+            contribution.put("batch", row.getBatch());
+            contribution.put("markType", row.getMarkType().name());
+            contribution.put("creditsEarned", row.getCreditsEarned());
+            contribution.put("maxCredits", row.getMaxCredits());
+            contribution.put("updatedAt", row.getUpdatedAt());
+            breakdownByPo.computeIfAbsent(poCode, k -> new ArrayList<>()).add(contribution);
+        }
+
+        List<Map<String, Object>> poSummaries = new ArrayList<>();
+        for (String poCode : earnedByPo.keySet()) {
+            int earned = earnedByPo.get(poCode);
+            int max = maxByPo.getOrDefault(poCode, 0);
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("poCode", poCode);
+            summary.put("creditsEarned", earned);
+            summary.put("maxCredits", max);
+            summary.put("percentage", max > 0 ? (earned * 100.0 / max) : null);
+            summary.put("moduleBreakdown", breakdownByPo.get(poCode));
+            poSummaries.add(summary);
+        }
+        poSummaries.sort(Comparator.comparing(m -> (String) m.get("poCode")));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("studentId", studentId);
+        result.put("markType", type != null ? type.name() : "ALL");
+        result.put("moduleCount", rows.stream().map(r -> r.getModule().getModuleId()).distinct().count());
+        result.put("poSummaries", poSummaries);
         return result;
     }
 

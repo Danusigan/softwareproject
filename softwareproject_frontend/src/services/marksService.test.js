@@ -70,4 +70,26 @@ describe('marksService', () => {
     const [, formData] = axios.post.mock.calls[0]
     expect(formData.get('losIds')).toBe('LO1')
   })
+
+  it('getStudentPOSummary requests the student by id, without a markType when none is given', async () => {
+    axios.get.mockResolvedValue({ data: {} })
+
+    await marksService.getStudentPOSummary({ studentId: 'EG/2024/6555' })
+
+    expect(axios.get).toHaveBeenCalledWith(
+      '/api/obe/po-attainment/student-summary?studentId=EG%2F2024%2F6555',
+      {}
+    )
+  })
+
+  it('getStudentPOSummary includes markType when provided', async () => {
+    axios.get.mockResolvedValue({ data: {} })
+
+    await marksService.getStudentPOSummary({ studentId: 'EG/2024/6555', markType: 'ASSIGNMENT' })
+
+    expect(axios.get).toHaveBeenCalledWith(
+      '/api/obe/po-attainment/student-summary?studentId=EG%2F2024%2F6555&markType=ASSIGNMENT',
+      {}
+    )
+  })
 })

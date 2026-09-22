@@ -1,10 +1,12 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.*;
+import com.example.Software.project.Backend.Model.Module; // disambiguate from java.lang.Module
 import com.example.Software.project.Backend.Repository.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -13,6 +15,11 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -41,6 +48,9 @@ class POAttainmentServiceTest {
 
     @Mock
     private StudentRepository studentRepository;
+
+    @Mock
+    private StudentPoCreditRepository studentPoCreditRepository;
 
     @InjectMocks
     private POAttainmentService poAttainmentService;
@@ -595,5 +605,334 @@ class POAttainmentServiceTest {
             "30 marks across both assignments against a combined max of 50 is 60%, a pass. Got: " + loScores.get(losId));
         assertTrue(loScores.get(losId).contains("60.0"),
             "The reported percentage should be 60.0. Got: " + loScores.get(losId));
+    }
+
+    @Test
+    @DisplayName("Test 7: A calculation whose LOs resolve to no module is not persisted")
+    void testCalculationWithoutModuleIsNotPersisted() {
+        // SCENARIO: los1 in this suite's fixture has no module set (unit-test shortcut - real
+        // LOs always have one, since los.module_id is NOT NULL). Persistence must be skipped
+        // rather than throwing, and the response must say so via "persisted": false.
+        String losId = "LO001";
+        String batch = "20";
+        String markType = "FINAL_EXAM";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        AssessmentItem singleItem = new AssessmentItem();
+        singleItem.setId(1L);
+        singleItem.setQuestionLabel("Q1");
+        singleItem.setMaxMarks(10.0);
+        singleItem.setLos(los1);
+        singleItem.setAssessmentTemplate(template1);
+
+        StudentMark mark = new StudentMark();
+        mark.setStudent(student1);
+        mark.setLos(los1);
+        mark.setScore(6.0);
+        mark.setBatch(batch);
+        mark.setMarkType(MarkType.FINAL_EXAM);
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+            .thenReturn(Arrays.asList(singleItem));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+        assertEquals(false, result.get("persisted"), "No module on the LO means nothing to attribute the saved row to");
+        verifyNoInteractions(studentPoCreditRepository);
+    }
+
+    @Test
+    @DisplayName("Test 8: A calculation whose LOs belong to a module is saved, overwriting any previous save")
+    void testCalculationWithModuleIsPersistedAndOverwritesPreviousSave() {
+        // SCENARIO: same 6/10 pass as Test 1, but los1 now belongs to module EC4356. The saved
+        // row must carry the right student/PO/module/batch/markType/credits, and saving must
+        // first clear out whatever was saved for this module/batch/markType before.
+        String losId = "LO001";
+        String batch = "20";
+        String markType = "FINAL_EXAM";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        Module module = new Module();
+        module.setModuleId("EC4356");
+        los1.setModule(module);
+
+        AssessmentItem singleItem = new AssessmentItem();
+        singleItem.setId(1L);
+        singleItem.setQuestionLabel("Q1");
+        singleItem.setMaxMarks(10.0);
+        singleItem.setLos(los1);
+        singleItem.setAssessmentTemplate(template1);
+
+        StudentMark mark = new StudentMark();
+        mark.setStudent(student1);
+        mark.setLos(los1);
+        mark.setScore(6.0);
+        mark.setBatch(batch);
+        mark.setMarkType(MarkType.FINAL_EXAM);
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+            .thenReturn(Arrays.asList(singleItem));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+
+        assertEquals(true, result.get("persisted"));
+        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatchAndMarkType("EC4356", batch, MarkType.FINAL_EXAM);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StudentPoCredit>> captor = ArgumentCaptor.forClass((Class) List.class);
+        verify(studentPoCreditRepository).saveAll(captor.capture());
+        List<StudentPoCredit> saved = captor.getValue();
+        assertEquals(1, saved.size(), "One student x one mapped PO = one saved row");
+
+        StudentPoCredit row = saved.get(0);
+        assertEquals("EN001", row.getStudent().getStudentId());
+        assertEquals("PO1", row.getProgramOutcome().getCode());
+        assertEquals("EC4356", row.getModule().getModuleId());
+        assertEquals(batch, row.getBatch());
+        assertEquals(MarkType.FINAL_EXAM, row.getMarkType());
+        assertEquals(1, row.getCreditsEarned(), "Passed the LO, so earns the mapping's full weight (1)");
+        assertEquals(1, row.getMaxCredits());
+        assertEquals(threshold, row.getThreshold());
+    }
+
+    @Test
+    @DisplayName("Test 9: Cross-module summary sums a student's credits across every module")
+    void testStudentPOSummarySumsAcrossModules() {
+        // SCENARIO: EC4356 credited PO1 with 2/4 and PO2 with 0/3; EC4357 separately credited
+        // PO1 with 3/4. The cumulative summary must add PO1 across both modules (5/8) and keep
+        // PO2 as-is (0/3, only ever calculated in EC4356) - not merge or drop it.
+        Module ec4356 = new Module();
+        ec4356.setModuleId("EC4356");
+        Module ec4357 = new Module();
+        ec4357.setModuleId("EC4357");
+
+        ProgramOutcome po2 = new ProgramOutcome();
+        po2.setPoId("PO2");
+        po2.setCode("PO2");
+        po2.setTitle("Program Outcome 2");
+
+        StudentPoCredit ec4356Po1 = new StudentPoCredit();
+        ec4356Po1.setStudent(student1);
+        ec4356Po1.setProgramOutcome(po1);
+        ec4356Po1.setModule(ec4356);
+        ec4356Po1.setBatch("24");
+        ec4356Po1.setMarkType(MarkType.ASSIGNMENT);
+        ec4356Po1.setCreditsEarned(2);
+        ec4356Po1.setMaxCredits(4);
+        ec4356Po1.setThreshold(50);
+        ec4356Po1.setUpdatedAt(LocalDateTime.now());
+
+        StudentPoCredit ec4356Po2 = new StudentPoCredit();
+        ec4356Po2.setStudent(student1);
+        ec4356Po2.setProgramOutcome(po2);
+        ec4356Po2.setModule(ec4356);
+        ec4356Po2.setBatch("24");
+        ec4356Po2.setMarkType(MarkType.ASSIGNMENT);
+        ec4356Po2.setCreditsEarned(0);
+        ec4356Po2.setMaxCredits(3);
+        ec4356Po2.setThreshold(50);
+        ec4356Po2.setUpdatedAt(LocalDateTime.now());
+
+        StudentPoCredit ec4357Po1 = new StudentPoCredit();
+        ec4357Po1.setStudent(student1);
+        ec4357Po1.setProgramOutcome(po1);
+        ec4357Po1.setModule(ec4357);
+        ec4357Po1.setBatch("24");
+        ec4357Po1.setMarkType(MarkType.ASSIGNMENT);
+        ec4357Po1.setCreditsEarned(3);
+        ec4357Po1.setMaxCredits(4);
+        ec4357Po1.setThreshold(50);
+        ec4357Po1.setUpdatedAt(LocalDateTime.now());
+
+        when(studentPoCreditRepository.findByStudent_StudentId("EN001"))
+            .thenReturn(Arrays.asList(ec4356Po1, ec4356Po2, ec4357Po1));
+
+        Map<String, Object> result = poAttainmentService.getStudentPOSummary("EN001", null);
+
+        assertEquals("EN001", result.get("studentId"));
+        assertEquals("ALL", result.get("markType"));
+        assertEquals(2L, result.get("moduleCount"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> summaries = (List<Map<String, Object>>) result.get("poSummaries");
+        assertEquals(2, summaries.size());
+
+        Map<String, Object> po1Summary = summaries.stream().filter(m -> "PO1".equals(m.get("poCode"))).findFirst().orElseThrow();
+        assertEquals(5, po1Summary.get("creditsEarned"), "2 (EC4356) + 3 (EC4357) = 5");
+        assertEquals(8, po1Summary.get("maxCredits"), "4 (EC4356) + 4 (EC4357) = 8");
+        assertEquals(62.5, (double) po1Summary.get("percentage"), 0.001);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> po1Breakdown = (List<Map<String, Object>>) po1Summary.get("moduleBreakdown");
+        assertEquals(2, po1Breakdown.size(), "PO1 was credited from two separate modules");
+
+        Map<String, Object> po2Summary = summaries.stream().filter(m -> "PO2".equals(m.get("poCode"))).findFirst().orElseThrow();
+        assertEquals(0, po2Summary.get("creditsEarned"));
+        assertEquals(3, po2Summary.get("maxCredits"), "PO2 was only ever calculated in EC4356, so its max is not doubled");
+    }
+
+    @Test
+    @DisplayName("Test 10: Cross-module summary can be scoped to a single mark type")
+    void testStudentPOSummaryScopedToMarkType() {
+        when(studentPoCreditRepository.findByStudent_StudentIdAndMarkType("EN001", MarkType.ASSIGNMENT))
+            .thenReturn(Collections.emptyList());
+
+        Map<String, Object> result = poAttainmentService.getStudentPOSummary("EN001", "ASSIGNMENT");
+
+        assertEquals("ASSIGNMENT", result.get("markType"));
+        verify(studentPoCreditRepository).findByStudent_StudentIdAndMarkType("EN001", MarkType.ASSIGNMENT);
+        verify(studentPoCreditRepository, never()).findByStudent_StudentId(anyString());
+    }
+
+    @Test
+    @DisplayName("Test 11: recalculateForModule resolves the module's LOs and persists the recalculation")
+    void testRecalculateForModuleRecalculatesAndPersists() {
+        // SCENARIO: marks were just uploaded/edited/deleted for module EC4356 - the controller
+        // calls recalculateForModule instead of waiting for a lecturer to click "Calculate PO
+        // Attainment". It must look up every LO belonging to the module (not just whichever LO
+        // the triggering change touched - see the method's own doc comment on why) and run the
+        // same calculate-and-save path the manual button uses.
+        String moduleId = "EC4356";
+        String batch = "20";
+        String markType = "FINAL_EXAM";
+
+        Module module = new Module();
+        module.setModuleId(moduleId);
+        los1.setModule(module);
+
+        AssessmentItem singleItem = new AssessmentItem();
+        singleItem.setId(1L);
+        singleItem.setQuestionLabel("Q1");
+        singleItem.setMaxMarks(10.0);
+        singleItem.setLos(los1);
+        singleItem.setAssessmentTemplate(template1);
+
+        StudentMark mark = new StudentMark();
+        mark.setStudent(student1);
+        mark.setLos(los1);
+        mark.setScore(6.0);
+        mark.setBatch(batch);
+        mark.setMarkType(MarkType.FINAL_EXAM);
+
+        when(losRepository.findByModule_ModuleId(moduleId)).thenReturn(Arrays.asList(los1));
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(Arrays.asList("LO001"), MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(Arrays.asList("LO001"), MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id("LO001"))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById("LO001"))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType("LO001", batch, markType, MarkType.FINAL_EXAM))
+            .thenReturn(Arrays.asList(singleItem));
+
+        poAttainmentService.recalculateForModule(moduleId, batch, markType);
+
+        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.FINAL_EXAM);
+        verify(studentPoCreditRepository).saveAll(any());
+    }
+
+    @Test
+    @DisplayName("Test 12: recalculateForModule with no LOs in the module does nothing")
+    void testRecalculateForModuleNoLosIsNoOp() {
+        when(losRepository.findByModule_ModuleId("EMPTY")).thenReturn(Collections.emptyList());
+
+        poAttainmentService.recalculateForModule("EMPTY", "20", "FINAL_EXAM");
+
+        verifyNoInteractions(studentPoCreditRepository);
+    }
+
+    @Test
+    @DisplayName("Test 13: recalculateForModule with a blank moduleId, batch or markType is a no-op")
+    void testRecalculateForModuleBlankParamsIsNoOp() {
+        poAttainmentService.recalculateForModule(null, "20", "FINAL_EXAM");
+        poAttainmentService.recalculateForModule("EC4356", "", "FINAL_EXAM");
+        poAttainmentService.recalculateForModule("EC4356", "20", "");
+
+        verifyNoInteractions(losRepository, studentPoCreditRepository);
+    }
+
+    @Test
+    @DisplayName("Test 14: recalculateForModule swallows errors instead of failing the upload/delete that triggered it")
+    void testRecalculateForModuleSwallowsErrors() {
+        when(losRepository.findByModule_ModuleId("EC4356")).thenThrow(new RuntimeException("db down"));
+
+        assertDoesNotThrow(() -> poAttainmentService.recalculateForModule("EC4356", "20", "FINAL_EXAM"));
+    }
+
+    @Test
+    @DisplayName("Test 15: a duplicate LO id in the request neither double-counts credits nor duplicates the saved row")
+    void testDuplicateLosIdsDoNotDoubleCountOrDuplicateRows() {
+        // Reproduces the production crash: "Calculate PO Attainment" with a losIds list
+        // containing the same LO twice (e.g. the frontend's "All" selector) made the per-student
+        // loop process that LO's mapping weight twice, and made saveStudentPoCredits build two
+        // rows with the identical (student, po, module, batch, markType) key - which MySQL's
+        // uk_student_po_credit constraint rejects as a duplicate entry within the same saveAll
+        // batch, independent of whether the prior delete worked. Both the weight double-count
+        // and the row duplication must be fixed, not just the crash suppressed.
+        String losId = "LO001";
+        String batch = "20";
+        String markType = "FINAL_EXAM";
+        int threshold = 50;
+        List<String> losIdsWithDuplicate = Arrays.asList(losId, losId);
+
+        Module module = new Module();
+        module.setModuleId("EC4356");
+        los1.setModule(module);
+
+        AssessmentItem singleItem = new AssessmentItem();
+        singleItem.setId(1L);
+        singleItem.setQuestionLabel("Q1");
+        singleItem.setMaxMarks(10.0);
+        singleItem.setLos(los1);
+        singleItem.setAssessmentTemplate(template1);
+
+        StudentMark mark = new StudentMark();
+        mark.setStudent(student1);
+        mark.setLos(los1);
+        mark.setScore(6.0);
+        mark.setBatch(batch);
+        mark.setMarkType(MarkType.FINAL_EXAM);
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(Arrays.asList(losId), MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(Arrays.asList(losId), MarkType.FINAL_EXAM, batch))
+            .thenReturn(Arrays.asList(mark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+            .thenReturn(Arrays.asList(singleItem));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIdsWithDuplicate, markType, batch, threshold);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> poCredits = (Map<String, Integer>) students.get(0).get("poCredits");
+        assertEquals(1, poCredits.get("PO1"), "A duplicate LO id must not double the mapping weight (1, not 2)");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<StudentPoCredit>> captor = ArgumentCaptor.forClass((Class) List.class);
+        verify(studentPoCreditRepository).saveAll(captor.capture());
+        assertEquals(1, captor.getValue().size(), "Only one saved row for this student+PO, not two colliding on the unique key");
     }
 }
