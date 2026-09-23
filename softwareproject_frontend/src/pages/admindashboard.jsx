@@ -303,6 +303,22 @@ export default function AdminDashboard() {
                         <p className="text-center text-gray-600">Add, edit & assign modules to lecturers</p>
                     </div>
 
+                    {/* Manage Students Card */}
+                    <div
+                        onClick={() => navigate('/manage-students')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-teal-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Manage Students</h2>
+                        <p className="text-center text-gray-600">Bulk-import the student roster & batch</p>
+                    </div>
+
                     {/* Program Outcomes Management Card */}
                     <div
                         onClick={() => navigate('/program-outcomes')}
@@ -349,6 +365,22 @@ export default function AdminDashboard() {
                         </div>
                         <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">CQI Review</h2>
                         <p className="text-center text-gray-600">Review & approve corrective action plans</p>
+                    </div>
+
+                    {/* PO Reports Card */}
+                    <div
+                        onClick={() => navigate('/po-reports')}
+                        className="bg-white rounded-xl shadow-lg p-8 cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2 border-transparent hover:border-emerald-500"
+                    >
+                        <div className="flex items-center justify-center mb-4">
+                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+                                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M4 4h7a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">PO Reports</h2>
+                        <p className="text-center text-gray-600">Student & batch PO attainment reports (PDF)</p>
                     </div>
                 </div>
             </div>

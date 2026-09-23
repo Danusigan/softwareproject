@@ -15,8 +15,10 @@ import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
 import StudentPOSummaryPage from './pages/StudentPOSummaryPage'
+import PoReportsPage from './pages/PoReportsPage'
 import CqiReviewPage from './pages/CqiReviewPage'
 import ManageLecturersPage from './pages/ManageLecturersPage'
+import ManageStudentsPage from './pages/ManageStudentsPage'
 import ManageAdminsPage from './pages/ManageAdminsPage'
 import MyCqiPlansPage from './pages/MyCqiPlansPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -97,6 +99,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/po-reports"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <PoReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/program-outcomes"
         element={
           <ProtectedRoute requiredRole="admin">
@@ -133,6 +143,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="admin">
             <ManageLecturersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage-students"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <ManageStudentsPage />
           </ProtectedRoute>
         }
       />

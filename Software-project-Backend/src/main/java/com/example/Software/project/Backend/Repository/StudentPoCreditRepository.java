@@ -23,4 +23,8 @@ public interface StudentPoCreditRepository extends JpaRepository<StudentPoCredit
     List<StudentPoCredit> findByStudent_StudentId(String studentId);
 
     List<StudentPoCredit> findByStudent_StudentIdAndMarkType(String studentId, MarkType markType);
+
+    // Every saved credit row for one batch, across all modules and mark types — the raw
+    // material for the admin batch PO report (PoReportService.batchReport).
+    List<StudentPoCredit> findByBatch(String batch);
 }
