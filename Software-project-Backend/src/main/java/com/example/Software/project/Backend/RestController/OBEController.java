@@ -1,6 +1,7 @@
 package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.*;
+import com.example.Software.project.Backend.Model.Module; // disambiguate from java.lang.Module
 import com.example.Software.project.Backend.Repository.*;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.*;
@@ -29,6 +30,25 @@ public class OBEController {
     @Autowired private AssessmentTemplateRepository assessmentTemplateRepo;
     @Autowired private AssessmentItemRepository assessmentItemRepo;
     @Autowired private ModuleRepository moduleRepo;
+
+    // Best-effort module lookup for triggering the post-upload/delete PO attainment
+    // recalculation (see POAttainmentService.recalculateForModule) — never throws, since a
+    // module we can't resolve just means the recalculation is skipped, not that the marks
+    // operation that triggered this lookup should fail.
+    private String moduleIdOfLo(String losId) {
+        return losRepo.findById(losId)
+                .map(Los::getModule)
+                .map(Module::getModuleId)
+                .orElse(null);
+    }
+
+    private String moduleIdOfTemplate(String templateId) {
+        if (templateId == null || templateId.isBlank()) return null;
+        return assessmentTemplateRepo.findById(templateId)
+                .map(AssessmentTemplate::getModule)
+                .map(Module::getModuleId)
+                .orElse(null);
+    }
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
@@ -201,6 +221,7 @@ public class OBEController {
             }
 
             String result;
+            String recalcModuleId;
             if ("QUESTION_WISE".equalsIgnoreCase(templateType)) {
                 String templateId = meta.getOrDefault("TEMPLATE_ID", "");
                 if (templateId.isBlank()) {
@@ -209,6 +230,7 @@ public class OBEController {
                 }
                 result = excelService.importQuestionWiseMarks(file, templateId, batch, markType,
                     assignmentLabel.isBlank() ? null : assignmentLabel);
+                recalcModuleId = moduleIdOfTemplate(templateId);
             } else {
                 String losIdsStr = meta.getOrDefault("LO_IDS", "");
                 if (losIdsStr.isBlank()) {
@@ -229,7 +251,9 @@ public class OBEController {
                 }
                 result = excelService.importMarksBulk(file, losIds, batch, markType,
                     assignmentLabel.isBlank() ? null : assignmentLabel, perLoMaxMarks);
+                recalcModuleId = losIds.length > 0 ? moduleIdOfLo(losIds[0].trim()) : null;
             }
+            poAttainmentService.recalculateForModule(recalcModuleId, batch, markType);
 
             return ResponseEntity.ok(Map.of(
                 "message", result,
@@ -275,6 +299,7 @@ public class OBEController {
                     .body(Map.of("message", "templateId is required (or embed it in the template METADATA sheet)", "status", "ERROR"));
             }
             String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
+            poAttainmentService.recalculateForModule(moduleIdOfTemplate(templateId), batch, markType);
             return ResponseEntity.ok(Map.of(
                 "message", result,
                 "status", "SUCCESS",
@@ -561,6 +586,9 @@ public class OBEController {
 
             String[] losIds = losIdsParam.split(",");
             String result = excelService.importMarksBulk(file, losIds, batch.trim(), markType);
+            if (losIds.length > 0) {
+                poAttainmentService.recalculateForModule(moduleIdOfLo(losIds[0].trim()), batch.trim(), markType);
+            }
 
             return ResponseEntity.ok(Map.of(
                 "message", result, "status", "SUCCESS",
@@ -582,7 +610,10 @@ public class OBEController {
             for (Object[] row : raw) {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("batch", row[0]);
-                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                // MarkType.toString() is the display name ("Final Exam"), which no other endpoint
+                // accepts — callers send this value straight back as a markType parameter, so it
+                // has to be the enum name.
+                entry.put("markType", row[1] instanceof MarkType mt ? mt.name() : (row[1] != null ? row[1].toString() : null));
                 entry.put("assignmentLabel", row[2] != null ? row[2].toString() : null);
                 entry.put("markCount", row[3]);
                 entry.put("loCount", row[4]);
@@ -619,6 +650,7 @@ public class OBEController {
                     .filter(t -> assignmentLabel.equals(t.getAssignmentLabel()))
                     .forEach(t -> assessmentTemplateRepo.delete(t));
             }
+            poAttainmentService.recalculateForModule(moduleId, batch, markType);
             return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -636,6 +668,7 @@ public class OBEController {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_")));
+            poAttainmentService.recalculateForModule(moduleId, batch, markType);
             return ResponseEntity.ok(Map.of("message", "Marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -677,7 +710,7 @@ public class OBEController {
             for (Object[] row : raw) {
                 Map<String, Object> entry = new LinkedHashMap<>();
                 entry.put("batch", row[0]);
-                entry.put("markType", row[1] != null ? row[1].toString() : null);
+                entry.put("markType", row[1] instanceof MarkType mt ? mt.name() : (row[1] != null ? row[1].toString() : null));
                 entry.put("markCount", row[2]);
                 result.add(entry);
             }
@@ -763,6 +796,40 @@ public class OBEController {
             String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Failed to calculate PO attainment: " + errorDetail, "status", "ERROR"));
+        }
+    }
+
+    // --- STUDENT PO SUMMARY: Cumulative credits for one student across every module whose
+    // attainment has been calculated and saved. Raw earned/max/percentage only - no achieved/
+    // not-achieved verdict and no report; that threshold decision is a separate future feature. ---
+    @GetMapping("/po-attainment/student-summary")
+    public ResponseEntity<?> getStudentPOSummary(
+            @RequestParam String studentId,
+            @RequestParam(required = false) String markType,
+            @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view PO attainment", "status", "ERROR"));
+        }
+        try {
+            if (studentId == null || studentId.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: studentId is required", "status", "ERROR"));
+            }
+            if (markType != null && !markType.isBlank()) {
+                try {
+                    MarkType.valueOf(markType.trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
+                }
+            }
+            Map<String, Object> result = poAttainmentService.getStudentPOSummary(studentId.trim(), markType);
+            return ResponseEntity.ok(Map.of("message", "Student PO summary calculated successfully", "data", result, "status", "SUCCESS"));
+        } catch (Exception e) {
+            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to calculate student PO summary: " + errorDetail, "status", "ERROR"));
         }
     }
 

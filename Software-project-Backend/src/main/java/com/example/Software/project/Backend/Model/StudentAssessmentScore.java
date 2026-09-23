@@ -21,6 +21,16 @@ public class StudentAssessmentScore {
     @Column(name = "score")
     private Double score;
 
+    @PrePersist
+    @PreUpdate
+    private void validateMark() {
+        if (score == null) return;
+        Double maximum = assessmentItem == null ? null : assessmentItem.getMaxMarks();
+        if (!Double.isFinite(score) || score < 0 || maximum == null || !Double.isFinite(maximum)
+                || maximum <= 0 || score > maximum)
+            throw new IllegalArgumentException("Obtained mark must be between zero and the assessment item's positive maximum");
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

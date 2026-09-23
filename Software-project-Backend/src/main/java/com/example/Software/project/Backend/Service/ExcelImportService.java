@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.MarkType;
+import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Model.AssessmentItem;
 import com.example.Software.project.Backend.Model.AssessmentTemplate;
 import com.example.Software.project.Backend.Model.StudentAssessmentScore;
@@ -245,11 +246,17 @@ public class ExcelImportService {
                 }
 
                 // Create/update AssessmentTemplate + AssessmentItems for per-LO max marks
+                String createdTemplateId = null;
                 if (!effectiveLoMax.isEmpty()) {
                     String tmplBatch = batch != null ? batch : "batch";
                     String tmplType = markType != null ? markType.toUpperCase() : "FINAL_EXAM";
                     String tmplLabel = assignmentLabel != null ? assignmentLabel : "";
-                    String tmplId = "lo_" + tmplBatch + "_" + tmplType + (tmplLabel.isEmpty() ? "" : "_" + tmplLabel.replaceAll("[^a-zA-Z0-9]", "_"));
+                    // The module belongs in the id: an assignment label like "Assignment 01" is
+                    // reused by other modules, and without it their LO-wise uploads share one id
+                    // and each one deletes the previous module's max marks.
+                    Module module = moduleOf(losIds);
+                    String tmplModule = module != null && module.getModuleId() != null ? module.getModuleId() : "module";
+                    String tmplId = "lo_" + tmplModule + "_" + tmplBatch + "_" + tmplType + (tmplLabel.isEmpty() ? "" : "_" + tmplLabel.replaceAll("[^a-zA-Z0-9]", "_"));
                     // Delete old template+items for this id if re-uploading
                     if (assessmentTemplateRepository.existsById(tmplId)) {
                         assessmentTemplateRepository.deleteById(tmplId);
@@ -258,9 +265,11 @@ public class ExcelImportService {
                     tmpl.setId(tmplId);
                     tmpl.setBatch(tmplBatch);
                     tmpl.setMarkType(tmplType);
+                    tmpl.setModule(module);
                     tmpl.setAssignmentLabel(tmplLabel.isEmpty() ? null : tmplLabel);
                     tmpl.setName(tmplBatch + "_" + tmplType + (tmplLabel.isEmpty() ? "" : "_" + tmplLabel) + "_lo_wise");
                     tmpl = assessmentTemplateRepository.save(tmpl);
+                    createdTemplateId = tmplId;
                     for (int i = 0; i < losIds.length; i++) {
                         String losId = losIds[i];
                         Los los = losRepository.findById(losId).orElse(null);
@@ -303,6 +312,10 @@ public class ExcelImportService {
                         totalImported++;
                     }
                 }
+                if (createdTemplateId != null) {
+                    retireSupersededTemplates(createdTemplateId);
+                }
+
                 return "Successfully imported " + totalImported + " LO marks from " + losIds.length + " LOs"
                     + (assignmentLabel != null ? " for " + assignmentLabel : "");
             }
@@ -490,10 +503,54 @@ public class ExcelImportService {
                 aggregatedMarksSaved++;
             }
 
+            retireSupersededTemplates(templateId.trim());
+
             return "Successfully imported " + questionScoresSaved + " question scores and " + aggregatedMarksSaved + " LO marks for " + (assignmentLabel != null ? assignmentLabel : templateId);
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Drop the templates this upload has just made obsolete.
+     *
+     * Every "Download template" click mints a fresh template without retiring the previous one, so
+     * an assignment that was set up more than once leaves several templates sharing its label. The
+     * upload that just ran replaced every StudentMark for that module/batch/markType/label, so any
+     * other template carrying the same label no longer describes marks on file — and leaving it
+     * behind inflates the max-marks denominator that attainment is measured against.
+     *
+     * Scoped to the uploaded template's own module: the same label ("Assignment 01") is routinely
+     * reused by other modules, whose templates are none of this upload's business. A template with
+     * no module recorded cannot be scoped safely, so nothing is removed in that case.
+     */
+    private void retireSupersededTemplates(String uploadedTemplateId) {
+        AssessmentTemplate uploaded = assessmentTemplateRepository.findById(uploadedTemplateId).orElse(null);
+        if (uploaded == null || uploaded.getModule() == null || uploaded.getModule().getModuleId() == null) return;
+        if (uploaded.getBatch() == null || uploaded.getMarkType() == null) return;
+
+        List<AssessmentTemplate> sameMarkType = assessmentTemplateRepository
+                .findByModule_ModuleIdAndBatchAndMarkType(uploaded.getModule().getModuleId(), uploaded.getBatch(), uploaded.getMarkType());
+
+        for (AssessmentTemplate other : sameMarkType) {
+            if (other.getId().equals(uploaded.getId())) continue;
+            if (!Objects.equals(normalizeLabel(other.getAssignmentLabel()), normalizeLabel(uploaded.getAssignmentLabel()))) continue;
+            studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(other.getId());
+            assessmentTemplateRepository.delete(other);
+        }
+    }
+
+    private String normalizeLabel(String label) {
+        return label == null ? "" : label.trim();
+    }
+
+    /** The module these LOs belong to, or null if none of them records one. */
+    private Module moduleOf(String[] losIds) {
+        for (String losId : losIds) {
+            Module module = losRepository.findById(losId).map(Los::getModule).orElse(null);
+            if (module != null) return module;
+        }
+        return null;
     }
 
     private Double parseScore(Cell cell) {

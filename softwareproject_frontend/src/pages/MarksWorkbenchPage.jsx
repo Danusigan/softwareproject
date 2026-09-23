@@ -377,6 +377,22 @@ export default function MarksWorkbenchPage() {
     const b = String(m.batch); if (!acc[b]) acc[b] = []; acc[b].push(m); return acc
   }, {}), [availableMarks])
 
+  // Mark types that actually have marks uploaded for the batch on screen. PO attainment reads
+  // one mark type at a time, so offering a type with no marks just returns an empty report.
+  const batchMarkTypes = useMemo(
+    () => markTypeOptions.filter(o => batchAssignments.some(m => m.markType === o.value)),
+    [batchAssignments]
+  )
+
+  // Follow the batch: keep the current selection when it still has marks, otherwise move to a
+  // type that does, so switching batches never silently reports on an empty mark type.
+  useEffect(() => {
+    if (!batchMarkTypes.length) return
+    if (!batchMarkTypes.some(o => o.value === analyticsMarkType)) {
+      setAnalyticsMarkType(batchMarkTypes[0].value)
+    }
+  }, [batchMarkTypes, analyticsMarkType])
+
   const moduleTitle = moduleData?.moduleName || moduleData?.name || 'Marks Workflow'
   const pendingCqiForBatch = useMemo(
     () => cqiHistory.filter(a => a.status === 'PLANNED' && !a.submitted && String(a.batch) === String(activeBatch)),
@@ -688,12 +704,24 @@ export default function MarksWorkbenchPage() {
                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2 block">Analytics</span>
                     <h2 className="heading-lg">PO Attainment</h2>
                     <p className="text-xs text-slate-500 mt-1">Using threshold: <strong>{getThreshold(activeBatch)}%</strong></p>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Saved automatically (threshold 50%) whenever marks are uploaded, edited or deleted — no need to press the button below for that.
+                      Use it to view the results here, or to recalculate and save with a different threshold.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mark type</label>
                     <select value={analyticsMarkType} onChange={e => setAnalyticsMarkType(e.target.value)} className="input-field bg-white">
-                      {markTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      {markTypeOptions.map(o => {
+                        const has = batchAssignments.some(m => m.markType === o.value)
+                        return <option key={o.value} value={o.value}>{o.label}{has ? '' : ' — no marks uploaded'}</option>
+                      })}
                     </select>
+                    {!batchAssignments.some(m => m.markType === analyticsMarkType) && (
+                      <p className="text-xs text-amber-600 font-semibold">
+                        No {analyticsMarkType === 'FINAL_EXAM' ? 'final exam' : 'assignment'} marks are uploaded for batch {activeBatch}, so this will come back empty.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -720,7 +748,7 @@ export default function MarksWorkbenchPage() {
                       disabled={busyAction==='po'||!analyticsLos.length}
                       className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-lg transition-all flex items-center justify-center gap-3 ${busyAction==='po'||!analyticsLos.length?'bg-slate-300 cursor-not-allowed':'bg-emerald-600 hover:bg-emerald-700'}`}>
                       {busyAction==='po'&&<span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>}
-                      Calculate PO Attainment
+                      View / Recalculate PO Attainment
                     </button>
                     <button type="button" onClick={handleExportPOAttainment}
                       disabled={busyAction==='po-export'||!analyticsLos.length}
@@ -741,12 +769,32 @@ export default function MarksWorkbenchPage() {
                     <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2 block">Results</span>
                     <h2 className="heading-lg">Per-Student PO Credit Attainment</h2>
                     <p className="text-sm text-slate-500 mt-1">Threshold: <strong>{poAttainment.threshold}%</strong> · Students: <strong>{poAttainment.studentCount}</strong> · POs: <strong>{poAttainment.poList.length}</strong></p>
+                    {poAttainment.studentCount > 0 && (
+                      poAttainment.persisted ? (
+                        <p className="text-xs text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                          Saved — counted in this student&apos;s cross-module PO summary
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-600 font-bold mt-1.5">Not saved — these LOs have no module on record.</p>
+                      )
+                    )}
                   </div>
                   <button type="button" onClick={() => setPOAttainment(null)}
                     className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors">
                     Clear results
                   </button>
                 </div>
+                {poAttainment.studentCount === 0 && (
+                  <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
+                    <div className="font-black text-amber-800 mb-1">No marks matched this selection</div>
+                    <p className="text-sm text-amber-700">
+                      Batch <strong>{activeBatch}</strong> has no <strong>{analyticsMarkType === 'FINAL_EXAM' ? 'Final Exam' : 'Assignment'}</strong> marks
+                      for the selected learning outcomes, so there is nothing to calculate.
+                      {batchMarkTypes.length > 0 && <> Uploaded for this batch: <strong>{batchMarkTypes.map(o => o.label).join(', ')}</strong>.</>}
+                    </p>
+                  </div>
+                )}
                 {poAttainment.loPoMappings?.length > 0 && (
                   <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">LO → PO Mappings</div>

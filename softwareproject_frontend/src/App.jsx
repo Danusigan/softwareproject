@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import BatchReportsPage from './pages/BatchReportsPage'
+import StudentReportsPage from './pages/StudentReportsPage'
 import LandingPage from './pages/landingpage'
 import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
@@ -12,8 +14,11 @@ import ProgramOutcomesPage from './pages/ProgramOutcomesPage'
 import CreateLOWithMappingPage from './pages/CreateLOWithMappingPage'
 import LOPOMappingManagementPage from './pages/LOPOMappingManagementPage'
 import MarksWorkbenchPage from './pages/MarksWorkbenchPage'
+import StudentPOSummaryPage from './pages/StudentPOSummaryPage'
+import PoReportsPage from './pages/PoReportsPage'
 import CqiReviewPage from './pages/CqiReviewPage'
 import ManageLecturersPage from './pages/ManageLecturersPage'
+import ManageStudentsPage from './pages/ManageStudentsPage'
 import ManageAdminsPage from './pages/ManageAdminsPage'
 import MyCqiPlansPage from './pages/MyCqiPlansPage'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -30,6 +35,8 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/batch-reports" element={<ProtectedRoute><BatchReportsPage /></ProtectedRoute>} />
+      <Route path="/student-reports" element={<ProtectedRoute><StudentReportsPage /></ProtectedRoute>} />
       <Route path="/" element={<LandingPage />} />
       <Route path="/loginpage" element={<LoginPage />} />
       <Route path="/forgottenpassword" element={<ForgotPasswordPage />} />
@@ -84,6 +91,22 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/student-po-summary"
+        element={
+          <ProtectedRoute>
+            <StudentPOSummaryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/po-reports"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <PoReportsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/program-outcomes"
         element={
           <ProtectedRoute requiredRole="admin">
@@ -120,6 +143,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requiredRole="admin">
             <ManageLecturersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/manage-students"
+        element={
+          <ProtectedRoute requiredRole="admin">
+            <ManageStudentsPage />
           </ProtectedRoute>
         }
       />
