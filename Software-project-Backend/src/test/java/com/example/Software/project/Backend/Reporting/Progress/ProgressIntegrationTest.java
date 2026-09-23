@@ -32,9 +32,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.Mockito.*;
 
 @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
+// ddl-auto is explicit here (not inherited from src/test/resources/application.properties)
+// because it can't be validate like everywhere else in this project: H2's MODE=MySQL reports a
+// native MySQL `enum(...)` column (e.g. cqi_action.action_type, captured as-is in
+// V1__baseline_legacy_schema.sql) as JDBC type OTHER, which doesn't match the VARCHAR Hibernate
+// expects for a Java enum mapped @Enumerated(STRING) - a real MySQL connection doesn't have
+// this mismatch, which is why it only ever shows up here. create-drop sidesteps it by rebuilding
+// the schema from the entity mappings after Flyway runs, which is fine for this test's purpose
+// (exercising Flyway migration + Progress business logic, not schema-validation itself).
 @DataJpaTest(showSql=false,properties={"spring.flyway.enabled=true","spring.datasource.url=jdbc:h2:mem:progress;MODE=MySQL;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1","spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=","spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "spring.jpa.hibernate.naming.physical-strategy=org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
         "logging.level.org.springframework=WARN","logging.level.org.hibernate=WARN"})
 @Import({ProgressStore.class,ProgressAccess.class,ProgressConfiguration.class,AttainmentCalculator.class,ProgressService.class,ProgressIntegrationTest.JsonConfig.class})
 class ProgressIntegrationTest {
