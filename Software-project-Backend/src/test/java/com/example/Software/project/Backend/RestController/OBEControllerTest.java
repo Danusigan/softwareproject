@@ -44,8 +44,10 @@ class OBEControllerTest {
     @MockBean private POAttainmentService poAttainmentService;
     @MockBean private TrendService trendService;
     @MockBean private JwtUtil jwtUtil;
+    @MockBean private FileValidationService fileValidationService;
     @MockBean private AssessmentTemplateRepository assessmentTemplateRepo;
     @MockBean private AssessmentItemRepository assessmentItemRepo;
+    @MockBean private StudentAssessmentScoreRepository studentAssessmentScoreRepo;
     @MockBean private ModuleRepository moduleRepo;
     @MockBean private StudentMarkRepository studentMarkRepository;
 
@@ -149,7 +151,7 @@ class OBEControllerTest {
     @DisplayName("POST /po-attainment returns 200 with the calculated credits for a lecturer token")
     void poAttainment_succeedsForLecturer() throws Exception {
         when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
-        when(poAttainmentService.calculateStudentPOCredits(anyList(), eq("FINAL_EXAM"), eq("20"), eq(50), eq(0.0)))
+        when(poAttainmentService.calculateStudentPOCredits(anyList(), eq("20"), eq(50), eq(0.0)))
             .thenReturn(Map.of("students", Collections.emptyList()));
 
         mockMvc.perform(post("/api/obe/po-attainment")

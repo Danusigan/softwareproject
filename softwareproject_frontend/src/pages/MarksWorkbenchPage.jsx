@@ -86,7 +86,6 @@ export default function MarksWorkbenchPage() {
 
   // ── analytics state ───────────────────────────────────────────────────
   const [analyticsLosIds, setAnalyticsLosIds] = useState([])
-  const [analyticsMarkType, setAnalyticsMarkType] = useState('FINAL_EXAM')
   const [poAttainment, setPOAttainment] = useState(null)
 
   // ── CQI state ──────────────────────────────────────────────────────────
@@ -317,7 +316,7 @@ export default function MarksWorkbenchPage() {
     if (!analyticsLos.length) { setMessage({ type: 'error', text: 'Select at least one LO.' }); return }
     try {
       setBusyAction('po'); setMessage({ type: '', text: '' }); setPOAttainment(null)
-      const r = await marksService.getPOAttainment({ losIds: analyticsLos.map(lo => lo.id), markType: analyticsMarkType, batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
+      const r = await marksService.getPOAttainment({ losIds: analyticsLos.map(lo => lo.id), batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
       setPOAttainment(r.data?.data || r.data)
       setMessage({ type: 'success', text: 'PO attainment calculated.' })
     } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || 'PO attainment failed.' }) }
@@ -328,7 +327,7 @@ export default function MarksWorkbenchPage() {
     if (!analyticsLos.length) return
     try {
       setBusyAction('po-export')
-      const r = await marksService.exportPOAttainment({ losIds: analyticsLos.map(lo => lo.id), markType: analyticsMarkType, batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
+      const r = await marksService.exportPOAttainment({ losIds: analyticsLos.map(lo => lo.id), batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
       downloadBlob(r.data, parseFilename(r.headers?.['content-disposition'], `po_attainment_${activeBatch}.xlsx`))
     } catch (e) { setMessage({ type: 'error', text: await readBlobError(e) }) }
     finally { setBusyAction('') }
@@ -376,22 +375,6 @@ export default function MarksWorkbenchPage() {
   const marksByBatch = useMemo(() => availableMarks.reduce((acc, m) => {
     const b = String(m.batch); if (!acc[b]) acc[b] = []; acc[b].push(m); return acc
   }, {}), [availableMarks])
-
-  // Mark types that actually have marks uploaded for the batch on screen. PO attainment reads
-  // one mark type at a time, so offering a type with no marks just returns an empty report.
-  const batchMarkTypes = useMemo(
-    () => markTypeOptions.filter(o => batchAssignments.some(m => m.markType === o.value)),
-    [batchAssignments]
-  )
-
-  // Follow the batch: keep the current selection when it still has marks, otherwise move to a
-  // type that does, so switching batches never silently reports on an empty mark type.
-  useEffect(() => {
-    if (!batchMarkTypes.length) return
-    if (!batchMarkTypes.some(o => o.value === analyticsMarkType)) {
-      setAnalyticsMarkType(batchMarkTypes[0].value)
-    }
-  }, [batchMarkTypes, analyticsMarkType])
 
   const moduleTitle = moduleData?.moduleName || moduleData?.name || 'Marks Workflow'
   const pendingCqiForBatch = useMemo(
@@ -706,23 +689,14 @@ export default function MarksWorkbenchPage() {
                     <p className="text-xs text-slate-500 mt-1">Using threshold: <strong>{getThreshold(activeBatch)}%</strong></p>
                     <p className="text-[11px] text-slate-400 mt-1">
                       Saved automatically (threshold 50%) whenever marks are uploaded, edited or deleted — no need to press the button below for that.
-                      Use it to view the results here, or to recalculate and save with a different threshold.
+                      Use it to view the results here, or to recalculate and save with a different threshold. Combines Final Exam and Assignment marks together.
                     </p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Mark type</label>
-                    <select value={analyticsMarkType} onChange={e => setAnalyticsMarkType(e.target.value)} className="input-field bg-white">
-                      {markTypeOptions.map(o => {
-                        const has = batchAssignments.some(m => m.markType === o.value)
-                        return <option key={o.value} value={o.value}>{o.label}{has ? '' : ' — no marks uploaded'}</option>
-                      })}
-                    </select>
-                    {!batchAssignments.some(m => m.markType === analyticsMarkType) && (
-                      <p className="text-xs text-amber-600 font-semibold">
-                        No {analyticsMarkType === 'FINAL_EXAM' ? 'final exam' : 'assignment'} marks are uploaded for batch {activeBatch}, so this will come back empty.
-                      </p>
-                    )}
-                  </div>
+                  {!batchAssignments.length && (
+                    <p className="text-xs text-amber-600 font-semibold">
+                      No marks are uploaded for batch {activeBatch}, so this will come back empty.
+                    </p>
+                  )}
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Learning outcomes</label>
@@ -789,9 +763,7 @@ export default function MarksWorkbenchPage() {
                   <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
                     <div className="font-black text-amber-800 mb-1">No marks matched this selection</div>
                     <p className="text-sm text-amber-700">
-                      Batch <strong>{activeBatch}</strong> has no <strong>{analyticsMarkType === 'FINAL_EXAM' ? 'Final Exam' : 'Assignment'}</strong> marks
-                      for the selected learning outcomes, so there is nothing to calculate.
-                      {batchMarkTypes.length > 0 && <> Uploaded for this batch: <strong>{batchMarkTypes.map(o => o.label).join(', ')}</strong>.</>}
+                      Batch <strong>{activeBatch}</strong> has no marks (Final Exam or Assignment) for the selected learning outcomes, so there is nothing to calculate.
                     </p>
                   </div>
                 )}

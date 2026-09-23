@@ -17,19 +17,18 @@ describe('marksService', () => {
     expect(axios.get).toHaveBeenCalledWith('/api/modules/M1', {})
   })
 
-  it('getPOAttainment posts the selected LOs, mark type, batch and threshold', async () => {
+  it('getPOAttainment posts the selected LOs, batch and threshold', async () => {
     axios.post.mockResolvedValue({ data: {} })
 
     await marksService.getPOAttainment({
       losIds: ['LO1', 'LO2'],
-      markType: 'FINAL_EXAM',
       batch: '20',
       threshold: 50,
     })
 
     expect(axios.post).toHaveBeenCalledWith(
       '/api/obe/po-attainment',
-      { losIds: ['LO1', 'LO2'], markType: 'FINAL_EXAM', batch: '20', threshold: 50 },
+      { losIds: ['LO1', 'LO2'], batch: '20', threshold: 50 },
       {}
     )
   })
@@ -71,24 +70,13 @@ describe('marksService', () => {
     expect(formData.get('losIds')).toBe('LO1')
   })
 
-  it('getStudentPOSummary requests the student by id, without a markType when none is given', async () => {
+  it('getStudentPOSummary requests the student by id', async () => {
     axios.get.mockResolvedValue({ data: {} })
 
     await marksService.getStudentPOSummary({ studentId: 'EG/2024/6555' })
 
     expect(axios.get).toHaveBeenCalledWith(
       '/api/obe/po-attainment/student-summary?studentId=EG%2F2024%2F6555',
-      {}
-    )
-  })
-
-  it('getStudentPOSummary includes markType when provided', async () => {
-    axios.get.mockResolvedValue({ data: {} })
-
-    await marksService.getStudentPOSummary({ studentId: 'EG/2024/6555', markType: 'ASSIGNMENT' })
-
-    expect(axios.get).toHaveBeenCalledWith(
-      '/api/obe/po-attainment/student-summary?studentId=EG%2F2024%2F6555&markType=ASSIGNMENT',
       {}
     )
   })

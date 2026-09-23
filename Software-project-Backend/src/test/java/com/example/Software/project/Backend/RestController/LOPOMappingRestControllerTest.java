@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.LOPOMappingService;
 import com.example.Software.project.Backend.Service.ProgramOutcomeService;
 import org.junit.jupiter.api.DisplayName;
@@ -45,6 +46,9 @@ class LOPOMappingRestControllerTest {
 
     @MockBean
     private JwtUtil jwtUtil;
+
+    @MockBean
+    private AuditLogService auditLogService;
 
     @Test
     @DisplayName("GET /admin/pending is rejected with 403 for a lecturer token")

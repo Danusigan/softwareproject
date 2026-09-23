@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ModuleService;
 import com.example.Software.project.Backend.Service.UserService;
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +51,7 @@ class UserRestControllerTest {
     @MockBean private ModuleService moduleService;
     @MockBean private AuthenticationManager authenticationManager;
     @MockBean private JwtUtil jwtUtil;
+    @MockBean private AuditLogService auditLogService;
 
     private org.springframework.security.core.userdetails.User principalFor(String username) {
         return new org.springframework.security.core.userdetails.User(
@@ -177,7 +179,8 @@ class UserRestControllerTest {
         mockMvc.perform(post("/api/auth/add-admin")
                 .header("Authorization", "Bearer admin.jwt")
                 .contentType("application/json")
-                .content("{\"userID\": \"newadmin\", \"usertype\": \"admin\"}"))
+                .content("{\"userID\": \"newadmin\", \"email\": \"newadmin@example.com\", "
+                    + "\"password\": \"Str0ng!Pass\", \"usertype\": \"admin\"}"))
             .andExpect(status().isForbidden());
     }
 
@@ -189,7 +192,8 @@ class UserRestControllerTest {
         mockMvc.perform(post("/api/auth/add-admin")
                 .header("Authorization", "Bearer superadmin.jwt")
                 .contentType("application/json")
-                .content("{\"userID\": \"newlecture\", \"usertype\": \"lecture\"}"))
+                .content("{\"userID\": \"newlecture\", \"email\": \"newlecture@example.com\", "
+                    + "\"password\": \"Str0ng!Pass\", \"usertype\": \"lecture\"}"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.message").value("Error: New user must be of type 'admin'"));
     }

@@ -19,15 +19,29 @@ public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> 
 
     Optional<StudentMark> findByStudentAndLos_IdAndBatchAndMarkType(Student student, String losId, String batch, MarkType markType);
 
+    // Pooled across mark type - the legacy (no-assessment-items) fallback in
+    // POAttainmentService.checkStudentPoAchievement can see up to one row per mark type here.
+    List<StudentMark> findByStudentAndLos_IdAndBatch(Student student, String losId, String batch);
+
     Optional<StudentMark> findByStudentAndLos_IdAndBatchAndMarkTypeAndAssignmentLabel(Student student, String losId, String batch, MarkType markType, String assignmentLabel);
 
     // Query by mark type and batch
     @Query("SELECT sm FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
        List<StudentMark> findByLosIdsAndMarkTypeAndBatch(@Param("losIds") List<String> losIds, @Param("markType") MarkType markType, @Param("batch") String batch);
 
+    // Pooled across mark type - PO attainment is one calculation per module/batch that counts
+    // Final Exam and Assignment marks as evidence together (see POAttainmentService). The
+    // markType-scoped queries above stay for marks recording/export, which is legitimately
+    // split by how a mark was entered.
+    @Query("SELECT sm FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.batch = :batch ORDER BY sm.student.studentId ASC")
+       List<StudentMark> findByLosIdsAndBatch(@Param("losIds") List<String> losIds, @Param("batch") String batch);
+
     // Get all unique students for given LOs
    @Query("SELECT DISTINCT s FROM StudentMark sm JOIN sm.student s WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch = :batch ORDER BY s.studentId ASC")
        List<Student> findDistinctStudentsByLosIdsAndMarkTypeAndBatch(@Param("losIds") List<String> losIds, @Param("markType") MarkType markType, @Param("batch") String batch);
+
+    @Query("SELECT DISTINCT s FROM StudentMark sm JOIN sm.student s WHERE sm.los.id IN :losIds AND sm.batch = :batch ORDER BY s.studentId ASC")
+       List<Student> findDistinctStudentsByLosIdsAndBatch(@Param("losIds") List<String> losIds, @Param("batch") String batch);
 
     // Get all batches for given LOs and mark type
     @Query("SELECT DISTINCT sm.batch FROM StudentMark sm WHERE sm.los.id IN :losIds AND sm.markType = :markType AND sm.batch IS NOT NULL ORDER BY sm.batch")
