@@ -5,9 +5,14 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * Admin-only PO reports: a named student's cross-module PO credit standing, and a batch's PO
@@ -66,6 +71,37 @@ public class PoReportController {
                     .contentType(MediaType.APPLICATION_PDF).body(pdf.renderStudent(report));
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(report);
+    }
+
+    /**
+     * Every student in a batch's individual PO report, bundled as one ZIP (one PDF per
+     * student) — the "download all individual reports for a batch" action, as opposed to
+     * {@link #batchReport} which is a single aggregated PO-success report for the whole batch.
+     */
+    @GetMapping("/student/batch")
+    public ResponseEntity<?> studentReportsForBatch(
+            @RequestParam String batch,
+            @RequestParam(defaultValue = "40") double studentThreshold,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        requireAdmin(authorization);
+        List<PoStudentReport> reports = service.studentReportsForBatch(batch.trim(), studentThreshold);
+
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(buffer)) {
+            for (PoStudentReport report : reports) {
+                zip.putNextEntry(new ZipEntry("po-report-" + report.studentId().replaceAll("[^A-Za-z0-9_-]", "_") + ".pdf"));
+                zip.write(pdf.renderStudent(report));
+                zip.closeEntry();
+            }
+        } catch (IOException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the report bundle: " + e.getMessage());
+        }
+
+        String filename = "po-reports-batch-" + batch.trim().replaceAll("[^A-Za-z0-9_-]", "_") + ".zip";
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .contentType(MediaType.valueOf("application/zip"))
+                .body(buffer.toByteArray());
     }
 
     @GetMapping("/batch")

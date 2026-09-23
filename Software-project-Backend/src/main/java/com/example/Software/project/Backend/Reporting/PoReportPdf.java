@@ -41,16 +41,6 @@ public class PoReportPdf {
         if (report.pos().isEmpty()) row(table, "No PO credits saved for this student yet", "-", "-", "-", "No evidence");
         document.add(table);
 
-        for (PoStudentReport.PoRow po : report.pos()) {
-            if (po.moduleBreakdown().isEmpty()) continue;
-            document.add(new Paragraph(po.code() + " - contributing modules", font(11, true)));
-            PdfPTable modules = table("Module", "Batch", "Credits Earned", "Max Credits");
-            for (PoStudentReport.ModuleContribution c : po.moduleBreakdown()) {
-                row(modules, c.moduleId(), c.batch(), String.valueOf(c.creditsEarned()), String.valueOf(c.maxCredits()));
-            }
-            document.add(modules);
-        }
-
         document.add(new Paragraph("Notes", font(12, true)));
         document.add(new Paragraph("- \"Attained\" means this student's credit percentage for the PO meets or exceeds the threshold above.", font(9, false)));
         document.add(new Paragraph("- \"No evidence\" means no module has calculated a PO credit for this student yet.", font(9, false)));

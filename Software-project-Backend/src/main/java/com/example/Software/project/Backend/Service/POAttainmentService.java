@@ -47,37 +47,41 @@ public class POAttainmentService {
      *   - For each approved LO→PO mapping of that LO, add 100% of the mapping weight to student's PO credit
      *   - If student failed → add 0
      *
-     * Every call also overwrites the saved {@link StudentPoCredit} rows for the LOs' module,
-     * batch and mark type (skipped only if the LOs resolve to no module, which existing data
-     * never does — see V3__student_po_credit.sql). Those saved rows are what
-     * {@link #getStudentPOSummary} reads back to build the cross-module cumulative view.
+     * Pools evidence from every mark type: a student's Final Exam and Assignment marks for the
+     * same LO both count toward whether they passed it. PO attainment is one calculation per
+     * module/batch - it does not ask how the underlying marks were entered (see
+     * V4__student_po_credit_drop_mark_type.sql). Marks recording/export elsewhere in the app is
+     * legitimately still split by mark type; this calculation just isn't.
+     *
+     * Every call also overwrites the saved {@link StudentPoCredit} rows for the LOs' module and
+     * batch (skipped only if the LOs resolve to no module, which existing data never does — see
+     * V3__student_po_credit.sql). Those saved rows are what {@link #getStudentPOSummary} reads
+     * back to build the cross-module cumulative view.
      *
      * @param losIds    List of LO IDs to consider
-     * @param markType  FINAL_EXAM or ASSIGNMENT
      * @param batch     Batch year
      * @param threshold Pass threshold (0-100)
      * @return Map with keys: "students", "poList", "credits", "maxCredits", "loPoMappings"
      */
     @Transactional
-    public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String markType, String batch, int threshold) {
-        return calculateStudentPOCredits(losIds, markType, batch, threshold, 0.0);
+    public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String batch, int threshold) {
+        return calculateStudentPOCredits(losIds, batch, threshold, 0.0);
     }
 
     @Transactional
-    public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String markType, String batch, int threshold, double maxMarksPerLo) {
-        MarkType type = MarkType.valueOf(markType.toUpperCase());
+    public Map<String, Object> calculateStudentPOCredits(List<String> losIds, String batch, int threshold, double maxMarksPerLo) {
         // A duplicate LO id here (the frontend's "All" selector, or a caller passing the same
         // id twice) would double-count that LO's mapped PO weight for every student who passed
         // it, and feeds the same doubled entry into allMappings/loListInfo below.
         losIds = losIds.stream().distinct().collect(Collectors.toList());
 
-        // 1. Get all distinct students for these LOs, markType, and batch
+        // 1. Get all distinct students for these LOs and batch, across every mark type
         List<Student> students = studentMarkRepository
-                .findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+                .findDistinctStudentsByLosIdsAndBatch(losIds, batch);
 
-        // 2. Get all marks for these LOs
+        // 2. Get all marks for these LOs, across every mark type
         List<StudentMark> allMarks = studentMarkRepository
-                .findByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+                .findByLosIdsAndBatch(losIds, batch);
 
         // 3. Get ALL mappings for these LOs (even if pending)
         List<OutcomeMapping> allMappings = new ArrayList<>();
@@ -118,10 +122,13 @@ public class POAttainmentService {
         }
         List<String> poList = new ArrayList<>(poCodeSet);
 
-        // 6. Build marks lookup: studentId -> loId -> assignment label -> score.
+        // 6. Build marks lookup: studentId -> loId -> assignment key -> score.
         // Marks are kept split by assignment rather than pre-summed because each assignment
         // carries its own max marks; a student's percentage for an LO can only be worked out
-        // against the assignments that student actually has marks for.
+        // against the assignments that student actually has marks for. The key is markType+label
+        // rather than just label, since pooling both mark types together means a Final Exam and
+        // an Assignment template can otherwise share the same (often blank) label and get
+        // wrongly treated as the same assignment - see assignmentKeyOf.
         Map<String, Map<String, Map<String, Double>>> marksByStudentLoAndLabel = new HashMap<>();
         for (StudentMark mark : allMarks) {
             String studentId = mark.getStudent().getStudentId();
@@ -130,13 +137,13 @@ public class POAttainmentService {
             marksByStudentLoAndLabel
                     .computeIfAbsent(studentId, k -> new HashMap<>())
                     .computeIfAbsent(losId, k -> new LinkedHashMap<>())
-                    .merge(normalizeLabel(mark.getAssignmentLabel()), mark.getScore(), Double::sum);
+                    .merge(assignmentKeyOf(mark.getMarkType(), mark.getAssignmentLabel()), mark.getScore(), Double::sum);
         }
 
-        // 6b. Max marks per LO per assignment label, resolved once instead of per student.
+        // 6b. Max marks per LO per assignment key, resolved once instead of per student.
         Map<String, Map<String, Double>> maxMarksByLoAndLabel = new HashMap<>();
         for (String losId : losIds) {
-            maxMarksByLoAndLabel.put(losId, getMaxMarksByAssignmentLabel(losId, batch, markType));
+            maxMarksByLoAndLabel.put(losId, getMaxMarksByAssignmentKey(losId, batch));
         }
 
         // 7. Calculate max possible credit per PO (sum of all LO weights mapped to that PO)
@@ -242,10 +249,10 @@ public class POAttainmentService {
         }
 
         // 8b. Save these credits so they survive past this request. Overwrites whatever was
-        // saved for this module/batch/markType last time — see V3__student_po_credit.sql.
+        // saved for this module/batch last time — see V3__student_po_credit.sql.
         boolean persisted = false;
         if (resolvedModule != null) {
-            saveStudentPoCredits(resolvedModule, batch, type, threshold, students, credits, maxCredits, poByCode);
+            saveStudentPoCredits(resolvedModule, batch, threshold, students, credits, maxCredits, poByCode);
             persisted = true;
         }
 
@@ -287,14 +294,14 @@ public class POAttainmentService {
     }
 
     /**
-     * Recalculates and saves PO credits for every LO in a module, for one batch/markType —
-     * the same work {@link #calculateStudentPOCredits} does, just triggered by a marks change
-     * instead of a lecturer clicking "Calculate PO Attainment". Called after marks are
-     * uploaded, edited (re-uploaded) or deleted, so student_po_credit never goes stale waiting
-     * for someone to press the button.
+     * Recalculates and saves PO credits for every LO in a module, for one batch (pooling every
+     * mark type - see {@link #calculateStudentPOCredits}) — the same work that method does,
+     * just triggered by a marks change instead of a lecturer clicking "Calculate PO Attainment".
+     * Called after marks are uploaded, edited (re-uploaded) or deleted, so student_po_credit
+     * never goes stale waiting for someone to press the button.
      *
      * Always recalculates using every LO in the module, never just the one that changed —
-     * {@link #saveStudentPoCredits} deletes all of a module/batch/markType's saved rows before
+     * {@link #saveStudentPoCredits} deletes all of a module/batch's saved rows before
      * re-inserting, so recalculating from a partial LO list would wipe out credits earned via
      * this module's other LOs that weren't touched by this particular change.
      *
@@ -307,9 +314,8 @@ public class POAttainmentService {
      * until the next successful trigger or a manual recalculation.
      */
     @Transactional
-    public void recalculateForModule(String moduleId, String batch, String markType) {
-        if (moduleId == null || moduleId.isBlank() || batch == null || batch.isBlank()
-                || markType == null || markType.isBlank()) {
+    public void recalculateForModule(String moduleId, String batch) {
+        if (moduleId == null || moduleId.isBlank() || batch == null || batch.isBlank()) {
             return;
         }
         try {
@@ -317,29 +323,29 @@ public class POAttainmentService {
                     .map(Los::getId)
                     .collect(Collectors.toList());
             if (losIds.isEmpty()) return;
-            calculateStudentPOCredits(losIds, markType, batch, 50, 0.0);
+            calculateStudentPOCredits(losIds, batch, 50, 0.0);
         } catch (Exception e) {
-            log.warn("Auto-recalculation of PO attainment failed for module {} batch {} markType {}: {}",
-                    moduleId, batch, markType, e.getMessage());
+            log.warn("Auto-recalculation of PO attainment failed for module {} batch {}: {}",
+                    moduleId, batch, e.getMessage());
         }
     }
 
     /**
-     * Overwrite the saved credits for one module/batch/markType: delete what was saved last
-     * time this combination was calculated, then insert the current result. This is what makes
-     * a recalculation replace its previous save rather than accumulate duplicates, and what
+     * Overwrite the saved credits for one module/batch: delete what was saved last time this
+     * combination was calculated, then insert the current result. This is what makes a
+     * recalculation replace its previous save rather than accumulate duplicates, and what
      * {@link #getStudentPOSummary} later reads to build the cross-module total.
      */
-    private void saveStudentPoCredits(Module module, String batch, MarkType markType, int threshold,
+    private void saveStudentPoCredits(Module module, String batch, int threshold,
             List<Student> students, Map<String, Map<String, Integer>> credits,
             Map<String, Integer> maxCredits, Map<String, ProgramOutcome> poByCode) {
-        studentPoCreditRepository.deleteByModule_ModuleIdAndBatchAndMarkType(module.getModuleId(), batch, markType);
+        studentPoCreditRepository.deleteByModule_ModuleIdAndBatch(module.getModuleId(), batch);
 
         // Keyed by studentId+poCode rather than a plain list: student_po_credit's unique
-        // constraint is exactly this tuple (plus module/batch/markType, fixed for this whole
-        // call), so two rows sharing a key would make saveAll below fail with a duplicate-key
-        // error against each other - independent of whatever the delete above did. A Map here
-        // means that can't happen even if `students` ever contained the same student twice.
+        // constraint is exactly this tuple (plus module/batch, fixed for this whole call), so
+        // two rows sharing a key would make saveAll below fail with a duplicate-key error
+        // against each other - independent of whatever the delete above did. A Map here means
+        // that can't happen even if `students` ever contained the same student twice.
         Map<String, StudentPoCredit> rowsByKey = new LinkedHashMap<>();
         for (Student student : students) {
             Map<String, Integer> studentCredits = credits.get(student.getStudentId());
@@ -352,7 +358,6 @@ public class POAttainmentService {
                 row.setProgramOutcome(po);
                 row.setModule(module);
                 row.setBatch(batch);
-                row.setMarkType(markType);
                 row.setCreditsEarned(entry.getValue());
                 row.setMaxCredits(maxCredits.getOrDefault(entry.getKey(), 0));
                 row.setThreshold(threshold);
@@ -374,15 +379,11 @@ public class POAttainmentService {
      * separate, not-yet-built feature (a per-PO achievement threshold has to be decided first).
      *
      * @param studentId Student to summarize
-     * @param markType  Restrict to one mark type (FINAL_EXAM or ASSIGNMENT), or null/blank for both combined
-     * @return Map with "studentId", "markType", "moduleCount" and "poSummaries" (per-PO totals with a moduleBreakdown list)
+     * @return Map with "studentId", "moduleCount" and "poSummaries" (per-PO totals with a moduleBreakdown list)
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> getStudentPOSummary(String studentId, String markType) {
-        MarkType type = (markType != null && !markType.isBlank()) ? MarkType.valueOf(markType.toUpperCase()) : null;
-        List<StudentPoCredit> rows = type != null
-                ? studentPoCreditRepository.findByStudent_StudentIdAndMarkType(studentId, type)
-                : studentPoCreditRepository.findByStudent_StudentId(studentId);
+    public Map<String, Object> getStudentPOSummary(String studentId) {
+        List<StudentPoCredit> rows = studentPoCreditRepository.findByStudent_StudentId(studentId);
 
         Map<String, Integer> earnedByPo = new LinkedHashMap<>();
         Map<String, Integer> maxByPo = new LinkedHashMap<>();
@@ -396,7 +397,6 @@ public class POAttainmentService {
             Map<String, Object> contribution = new LinkedHashMap<>();
             contribution.put("moduleId", row.getModule().getModuleId());
             contribution.put("batch", row.getBatch());
-            contribution.put("markType", row.getMarkType().name());
             contribution.put("creditsEarned", row.getCreditsEarned());
             contribution.put("maxCredits", row.getMaxCredits());
             contribution.put("updatedAt", row.getUpdatedAt());
@@ -419,38 +419,36 @@ public class POAttainmentService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("studentId", studentId);
-        result.put("markType", type != null ? type.name() : "ALL");
         result.put("moduleCount", rows.stream().map(r -> r.getModule().getModuleId()).distinct().count());
         result.put("poSummaries", poSummaries);
         return result;
     }
 
     /**
-     * Helper: max marks available for an LO in a batch/markType, broken down by assignment label.
+     * Helper: max marks available for an LO in a batch, broken down by assignment key
+     * (mark type + assignment label), pooled across every mark type.
      *
-     * A markType can hold several assessments — "Assignment 01", "Assignment 02" and so on —
-     * and a student's StudentMark is recorded per assignment. Returning one summed total would
-     * mean measuring a student against every assignment recorded for the module, including ones
-     * they have no marks under, so the breakdown is kept and the caller picks the assignments
-     * that apply to each student.
+     * A batch can hold several assessments for one LO across both mark types — a Final Exam and
+     * "Assignment 01", "Assignment 02" and so on — and a student's StudentMark is recorded per
+     * assessment. Returning one summed total would mean measuring a student against every
+     * assessment recorded for the module, including ones they have no marks under, so the
+     * breakdown is kept and the caller picks the assessments that apply to each student.
      *
      * @param loId Learning Outcome ID
      * @param batch Batch identifier
-     * @param markType Mark type (FINAL_EXAM or ASSIGNMENT)
-     * @return assignment label (normalized, "" when unlabelled) → max marks; empty if no items found
+     * @return assignment key (see {@link #assignmentKeyOf}) → max marks; empty if no items found
      */
-    private Map<String, Double> getMaxMarksByAssignmentLabel(String loId, String batch, String markType) {
-        MarkType type = MarkType.valueOf(markType.toUpperCase());
-        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType, type);
+    private Map<String, Double> getMaxMarksByAssignmentKey(String loId, String batch) {
+        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(loId, batch);
 
-        Map<String, List<AssessmentItem>> itemsByLabel = items.stream()
-                .collect(Collectors.groupingBy(this::assignmentLabelOf, LinkedHashMap::new, Collectors.toList()));
+        Map<String, List<AssessmentItem>> itemsByKey = items.stream()
+                .collect(Collectors.groupingBy(this::assignmentKeyOf, LinkedHashMap::new, Collectors.toList()));
 
-        Map<String, Double> maxByLabel = new LinkedHashMap<>();
-        for (Map.Entry<String, List<AssessmentItem>> entry : itemsByLabel.entrySet()) {
-            maxByLabel.put(entry.getKey(), maxMarksForSingleAssignment(entry.getValue()));
+        Map<String, Double> maxByKey = new LinkedHashMap<>();
+        for (Map.Entry<String, List<AssessmentItem>> entry : itemsByKey.entrySet()) {
+            maxByKey.put(entry.getKey(), maxMarksForSingleAssignment(entry.getValue()));
         }
-        return maxByLabel;
+        return maxByKey;
     }
 
     /** Total of a student's scores for one LO, or null when they have no marks for it. */
@@ -459,9 +457,31 @@ public class POAttainmentService {
         return scoresByLabel.values().stream().mapToDouble(Double::doubleValue).sum();
     }
 
-    private String assignmentLabelOf(AssessmentItem item) {
+    /**
+     * Identifies one assessment instance: its mark type plus assignment label. Pooling Final
+     * Exam and Assignment evidence together for PO attainment means a Final Exam template and
+     * an Assignment template can otherwise share the same (often blank) label - without the
+     * mark type in the key, {@link #latestTemplateItems} would treat them as the same
+     * assignment and silently keep only the more recently created one's items.
+     *
+     * Templates store mark type as a raw String (e.g. "ASSIGNMENT"); StudentMark stores it as
+     * the {@link MarkType} enum whose {@code toString()} is overridden to a display name
+     * ("Final Exam") - {@code name()} is what actually matches the template's raw string, so
+     * both call sites below go through {@code name()}/the raw string directly, never toString().
+     */
+    private String assignmentKeyOf(AssessmentItem item) {
         AssessmentTemplate template = item.getAssessmentTemplate();
-        return normalizeLabel(template == null ? null : template.getAssignmentLabel());
+        String markType = template == null ? null : template.getMarkType();
+        String label = template == null ? null : template.getAssignmentLabel();
+        return assignmentKeyOf(markType, label);
+    }
+
+    private String assignmentKeyOf(MarkType markType, String label) {
+        return assignmentKeyOf(markType == null ? null : markType.name(), label);
+    }
+
+    private String assignmentKeyOf(String markType, String label) {
+        return (markType == null ? "" : markType.trim().toUpperCase()) + "::" + normalizeLabel(label);
     }
 
     /** Assignment labels are matched between marks and templates, so null and "" have to agree. */
@@ -514,7 +534,7 @@ public class POAttainmentService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> calculateOverallPOAttainment(String batch, String markType, Double poThreshold) {
+    public Map<String, Object> calculateOverallPOAttainment(String batch, Double poThreshold) {
         if (poThreshold == null) poThreshold = 60.0; // Default PO attainment benchmark
 
         // 1. Find all approved LO->PO mappings
@@ -546,7 +566,7 @@ public class POAttainmentService {
 
             // 5. For each student, check if they achieved this PO
             for (Student student : students) {
-                boolean studentAchievedPo = checkStudentPoAchievement(student, loIdsForPo, batch, markType);
+                boolean studentAchievedPo = checkStudentPoAchievement(student, loIdsForPo, batch);
                 if (studentAchievedPo) {
                     studentsAchievingPo++;
                 }
@@ -573,57 +593,57 @@ public class POAttainmentService {
 
         Map<String, Object> finalResult = new LinkedHashMap<>();
         finalResult.put("batch", batch);
-        finalResult.put("markType", markType);
         finalResult.put("poAttainment", poResults);
         finalResult.put("count", poResults.size());
 
         return finalResult;
     }
 
-    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch, String markType) {
-        return checkStudentPoAchievement(student, loIdsForPo, batch, markType, 50.0);
+    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch) {
+        return checkStudentPoAchievement(student, loIdsForPo, batch, 50.0);
     }
 
     /**
      * Check if a student achieves a PO (passes all LOs mapped to it).
      * Uses normalized percentage thresholds: if assessment items exist, compute (score / maxMarks) * 100;
      * otherwise assume StudentMark.score is already a percentage.
+     * Pools evidence from every mark type - see {@link #calculateStudentPOCredits}.
      * @param student Student entity
      * @param loIdsForPo Set of LO IDs mapped to the PO
      * @param batch Batch identifier
-     * @param markType Mark type
      * @param loThreshold LO pass threshold (percentage, 0-100)
      * @return true if student passed all LOs, false otherwise
      */
-    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch, String markType, double loThreshold) {
+    private boolean checkStudentPoAchievement(Student student, Set<String> loIdsForPo, String batch, double loThreshold) {
         // A student achieves a PO if they pass ALL LOs mapped to it.
         for (String loId : loIdsForPo) {
-            // Check question-based scores first
-            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType, MarkType.valueOf(markType.toUpperCase()));
+            // Check question-based scores first, across every mark type
+            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(loId, batch);
             if (!items.isEmpty()) {
                 double totalScore = 0;
                 double totalMaxMarks = 0;
-                // Grouped by assignment so a student is only measured against the assignments they
-                // have recorded scores under — a markType can hold several, and the ones a student
-                // has no scores for must not count toward their denominator.
-                Map<String, List<AssessmentItem>> itemsByLabel = items.stream()
-                        .collect(Collectors.groupingBy(this::assignmentLabelOf, LinkedHashMap::new, Collectors.toList()));
+                // Grouped by assignment key (mark type + label) so a student is only measured
+                // against the assessments they have recorded scores under — a batch can hold
+                // several, and the ones a student has no scores for must not count toward their
+                // denominator. See assignmentKeyOf for why mark type is part of the key.
+                Map<String, List<AssessmentItem>> itemsByKey = items.stream()
+                        .collect(Collectors.groupingBy(this::assignmentKeyOf, LinkedHashMap::new, Collectors.toList()));
 
-                for (List<AssessmentItem> labelItems : itemsByLabel.values()) {
-                    double labelScore = 0;
-                    double labelMax = 0;
+                for (List<AssessmentItem> keyItems : itemsByKey.values()) {
+                    double keyScore = 0;
+                    double keyMax = 0;
                     boolean sat = false;
-                    for (AssessmentItem item : latestTemplateItems(labelItems)) {
+                    for (AssessmentItem item : latestTemplateItems(keyItems)) {
                         Optional<StudentAssessmentScore> scoreOpt = studentAssessmentScoreRepository.findByStudentAndAssessmentItem(student, item);
                         if (scoreOpt.isPresent()) {
-                            labelScore += scoreOpt.get().getScore();
+                            keyScore += scoreOpt.get().getScore();
                             sat = true;
                         }
-                        labelMax += item.getMaxMarks() != null ? item.getMaxMarks() : 0.0;
+                        keyMax += item.getMaxMarks() != null ? item.getMaxMarks() : 0.0;
                     }
                     if (sat) {
-                        totalScore += labelScore;
-                        totalMaxMarks += labelMax;
+                        totalScore += keyScore;
+                        totalMaxMarks += keyMax;
                     }
                 }
                 // Normalize: compute percentage and compare to threshold
@@ -639,9 +659,16 @@ public class POAttainmentService {
                     }
                 }
             } else {
-                // Fallback to legacy StudentMark (assume score is already percentage)
-                Optional<StudentMark> markOpt = studentMarkRepository.findByStudentAndLos_IdAndBatchAndMarkType(student, loId, batch, MarkType.valueOf(markType));
-                if (markOpt.isEmpty() || markOpt.get().getScore() < loThreshold) {
+                // Fallback to legacy StudentMark (assume score is already percentage), pooled
+                // across every mark type - a student with e.g. one Assignment mark and one Final
+                // Exam mark for this LO is judged on their average of the two, same as the
+                // multi-assignment averaging calculateStudentPOCredits already does.
+                List<StudentMark> marks = studentMarkRepository.findByStudentAndLos_IdAndBatch(student, loId, batch);
+                if (marks.isEmpty()) {
+                    return false; // No evidence at all for this LO
+                }
+                double average = marks.stream().mapToDouble(StudentMark::getScore).average().orElse(0.0);
+                if (average < loThreshold) {
                     return false; // Failed this LO
                 }
             }

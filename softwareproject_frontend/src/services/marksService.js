@@ -53,18 +53,20 @@ export const marksService = {
     })
   },
 
-  async getPOAttainment({ losIds, markType, batch, threshold }, config = {}) {
+  // PO attainment pools evidence from every mark type - it isn't split by Final Exam vs
+  // Assignment (see POAttainmentService.calculateStudentPOCredits).
+  async getPOAttainment({ losIds, batch, threshold }, config = {}) {
     return axios.post(
       `${BASE_URL}/api/obe/po-attainment`,
-      { losIds, markType, batch, threshold },
+      { losIds, batch, threshold },
       config
     )
   },
 
-  async exportPOAttainment({ losIds, markType, batch, threshold }, config = {}) {
+  async exportPOAttainment({ losIds, batch, threshold }, config = {}) {
     return axios.post(
       `${BASE_URL}/api/obe/export/po-attainment`,
-      { losIds, markType, batch, threshold },
+      { losIds, batch, threshold },
       { ...config, responseType: 'blob' }
     )
   },
@@ -109,9 +111,8 @@ export const marksService = {
   // Cumulative PO credits for one student, summed across every module whose PO attainment has
   // been calculated and saved (POAttainmentService.calculateStudentPOCredits persists on every
   // run). Raw earned/max/percentage only — no achieved/not-achieved verdict.
-  async getStudentPOSummary({ studentId, markType }, config = {}) {
+  async getStudentPOSummary({ studentId }, config = {}) {
     const params = new URLSearchParams({ studentId })
-    if (markType) params.set('markType', markType)
     return axios.get(`${BASE_URL}/api/obe/po-attainment/student-summary?${params.toString()}`, config)
   },
 

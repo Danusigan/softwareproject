@@ -5,16 +5,20 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * The saved result of one PO-attainment calculation for one student, in one module, batch and
- * mark type: how many of that PO's possible credits (from this module's mapped LOs) the student
- * earned. Written by {@code POAttainmentService.calculateStudentPOCredits} every time a lecturer
- * runs the calculation for a module — see V3__student_po_credit.sql for why this row exists and
- * how it feeds the cross-module summary.
+ * The saved result of one PO-attainment calculation for one student, in one module and batch:
+ * how many of that PO's possible credits (from this module's mapped LOs) the student earned.
+ * Written by {@code POAttainmentService.calculateStudentPOCredits} every time a lecturer runs
+ * the calculation for a module — see V3__student_po_credit.sql / V4__student_po_credit_drop_mark_type.sql
+ * for why this row exists and how it feeds the cross-module summary.
+ *
+ * Pools evidence from every mark type (Final Exam and Assignment marks both count toward the
+ * same LO/PO attainment) — PO attainment is a single calculation per module/batch, not split by
+ * how the underlying marks were entered. See V4__student_po_credit_drop_mark_type.sql.
  */
 @Entity
 @Table(name = "student_po_credit",
        uniqueConstraints = @UniqueConstraint(name = "uk_student_po_credit",
-               columnNames = {"student_id", "po_id", "module_id", "batch", "mark_type"}))
+               columnNames = {"student_id", "po_id", "module_id", "batch"}))
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class StudentPoCredit {
 
@@ -39,10 +43,6 @@ public class StudentPoCredit {
 
     @Column(name = "batch", nullable = false, length = 20)
     private String batch;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "mark_type", nullable = false)
-    private MarkType markType;
 
     @Column(name = "credits_earned", nullable = false)
     private Integer creditsEarned;
@@ -76,9 +76,6 @@ public class StudentPoCredit {
 
     public String getBatch() { return batch; }
     public void setBatch(String batch) { this.batch = batch; }
-
-    public MarkType getMarkType() { return markType; }
-    public void setMarkType(MarkType markType) { this.markType = markType; }
 
     public Integer getCreditsEarned() { return creditsEarned; }
     public void setCreditsEarned(Integer creditsEarned) { this.creditsEarned = creditsEarned; }

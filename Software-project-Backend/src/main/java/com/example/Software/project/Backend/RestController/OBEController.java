@@ -29,6 +29,7 @@ public class OBEController {
     @Autowired private FileValidationService fileValidationService;
     @Autowired private AssessmentTemplateRepository assessmentTemplateRepo;
     @Autowired private AssessmentItemRepository assessmentItemRepo;
+    @Autowired private StudentAssessmentScoreRepository studentAssessmentScoreRepo;
     @Autowired private ModuleRepository moduleRepo;
 
     // Best-effort module lookup for triggering the post-upload/delete PO attainment
@@ -48,6 +49,15 @@ public class OBEController {
                 .map(AssessmentTemplate::getModule)
                 .map(Module::getModuleId)
                 .orElse(null);
+    }
+
+    // Deleting a template cascades to its assessment_item rows, but the student_assessment_score
+    // rows pointing at those items are not part of that cascade and would block it on the FK.
+    // Clearing the scores first is the same order ExcelImportService uses when it removes a
+    // superseded template.
+    private void deleteTemplateWithScores(AssessmentTemplate template) {
+        studentAssessmentScoreRepo.deleteByAssessmentItem_AssessmentTemplate_Id(template.getId());
+        assessmentTemplateRepo.delete(template);
     }
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
@@ -253,7 +263,7 @@ public class OBEController {
                     assignmentLabel.isBlank() ? null : assignmentLabel, perLoMaxMarks);
                 recalcModuleId = losIds.length > 0 ? moduleIdOfLo(losIds[0].trim()) : null;
             }
-            poAttainmentService.recalculateForModule(recalcModuleId, batch, markType);
+            poAttainmentService.recalculateForModule(recalcModuleId, batch);
 
             return ResponseEntity.ok(Map.of(
                 "message", result,
@@ -299,7 +309,7 @@ public class OBEController {
                     .body(Map.of("message", "templateId is required (or embed it in the template METADATA sheet)", "status", "ERROR"));
             }
             String result = excelService.importQuestionWiseMarks(file, templateId, batch, markType);
-            poAttainmentService.recalculateForModule(moduleIdOfTemplate(templateId), batch, markType);
+            poAttainmentService.recalculateForModule(moduleIdOfTemplate(templateId), batch);
             return ResponseEntity.ok(Map.of(
                 "message", result,
                 "status", "SUCCESS",
@@ -587,7 +597,7 @@ public class OBEController {
             String[] losIds = losIdsParam.split(",");
             String result = excelService.importMarksBulk(file, losIds, batch.trim(), markType);
             if (losIds.length > 0) {
-                poAttainmentService.recalculateForModule(moduleIdOfLo(losIds[0].trim()), batch.trim(), markType);
+                poAttainmentService.recalculateForModule(moduleIdOfLo(losIds[0].trim()), batch.trim());
             }
 
             return ResponseEntity.ok(Map.of(
@@ -641,16 +651,16 @@ public class OBEController {
                 // Delete ALL marks for this module+batch+markType regardless of assignment
                 markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, type);
                 assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
-                    .forEach(t -> assessmentTemplateRepo.delete(t));
+                    .forEach(this::deleteTemplateWithScores);
             } else {
                 markRepo().deleteByModuleIdAndBatchAndMarkTypeAndAssignmentLabel(
                     moduleId, batch, type, assignmentLabel);
                 assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
                     .stream()
                     .filter(t -> assignmentLabel.equals(t.getAssignmentLabel()))
-                    .forEach(t -> assessmentTemplateRepo.delete(t));
+                    .forEach(this::deleteTemplateWithScores);
             }
-            poAttainmentService.recalculateForModule(moduleId, batch, markType);
+            poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -668,7 +678,7 @@ public class OBEController {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_")));
-            poAttainmentService.recalculateForModule(moduleId, batch, markType);
+            poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -737,7 +747,6 @@ public class OBEController {
         try {
             @SuppressWarnings("unchecked")
             List<String> losIds = (List<String>) request.get("losIds");
-            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
             String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
 
             int threshold = 50;
@@ -765,22 +774,9 @@ public class OBEController {
                 .filter(id -> !id.isEmpty())
                 .toList();
 
-            if (markType == null || markType.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Error: markType is required", "status", "ERROR"));
-            }
-
             if (batch == null || batch.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
-            }
-
-            // Validate mark type
-            try {
-                MarkType.valueOf(markType.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
             double maxMarksPerLo = 0.0;
@@ -789,7 +785,7 @@ public class OBEController {
                 try { maxMarksPerLo = Double.parseDouble(maxMarksObj.toString().trim()); } catch (Exception ignored) {}
             }
 
-            Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold, maxMarksPerLo);
+            Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold, maxMarksPerLo);
             return ResponseEntity.ok(Map.of("message", "PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
@@ -805,7 +801,6 @@ public class OBEController {
     @GetMapping("/po-attainment/student-summary")
     public ResponseEntity<?> getStudentPOSummary(
             @RequestParam String studentId,
-            @RequestParam(required = false) String markType,
             @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -816,15 +811,7 @@ public class OBEController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Error: studentId is required", "status", "ERROR"));
             }
-            if (markType != null && !markType.isBlank()) {
-                try {
-                    MarkType.valueOf(markType.trim().toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
-                }
-            }
-            Map<String, Object> result = poAttainmentService.getStudentPOSummary(studentId.trim(), markType);
+            Map<String, Object> result = poAttainmentService.getStudentPOSummary(studentId.trim());
             return ResponseEntity.ok(Map.of("message", "Student PO summary calculated successfully", "data", result, "status", "SUCCESS"));
         } catch (Exception e) {
             String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -844,7 +831,6 @@ public class OBEController {
         try {
             @SuppressWarnings("unchecked")
             List<String> losIds = (List<String>) request.get("losIds");
-            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : null;
             String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
 
             int threshold = 50;
@@ -867,21 +853,9 @@ public class OBEController {
                 .filter(id -> !id.isEmpty())
                 .toList();
 
-            if (markType == null || markType.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Error: markType is required", "status", "ERROR"));
-            }
-
             if (batch == null || batch.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
-            }
-
-            try {
-                MarkType.valueOf(markType.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
             }
 
             double maxMarksPerLoExport = 0.0;
@@ -891,14 +865,14 @@ public class OBEController {
             }
 
             // Calculate PO credits
-            Map<String, Object> attainmentData = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold, maxMarksPerLoExport);
+            Map<String, Object> attainmentData = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold, maxMarksPerLoExport);
 
             // Generate Excel
             byte[] excelBytes = excelExportService.generatePOAttainmentExcel(attainmentData);
 
             return ResponseEntity.ok()
                 .header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                .header("Content-Disposition", "attachment; filename=\"po_attainment_" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
+                .header("Content-Disposition", "attachment; filename=\"po_attainment_" + batch + ".xlsx\"")
                 .body(excelBytes);
 
         } catch (Exception e) {
@@ -1188,7 +1162,6 @@ public class OBEController {
 
         try {
             String batch = request.get("batch") != null ? request.get("batch").toString().trim() : null;
-            String markType = request.get("markType") != null ? request.get("markType").toString().trim() : "FINAL_EXAM";
             Double poThreshold = request.get("poThreshold") != null ? Double.parseDouble(request.get("poThreshold").toString()) : null;
 
             if (batch == null || batch.isEmpty()) {
@@ -1196,7 +1169,7 @@ public class OBEController {
                     .body(Map.of("message", "Error: batch is required", "status", "ERROR"));
             }
 
-            Map<String, Object> result = poAttainmentService.calculateOverallPOAttainment(batch, markType, poThreshold);
+            Map<String, Object> result = poAttainmentService.calculateOverallPOAttainment(batch, poThreshold);
             return ResponseEntity.ok(Map.of("message", "Overall PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {

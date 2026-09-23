@@ -23,6 +23,11 @@ import java.util.*;
  * POAttainmentService.calculateStudentPOCredits persists on every calculation — manual, or
  * auto-triggered by a marks upload/edit/delete (see POAttainmentService.recalculateForModule).
  *
+ * PO-level only (no module breakdown) - just each PO's credits/attainment. Every Washington
+ * Accord standard PO ({@code ProgramOutcome.isDefault}) always appears, even with no evidence
+ * yet, so the report always has the same shape; any custom PO with actual data is appended
+ * after it.
+ *
  * Distinct from {@link BatchReportService}: that one is LO-evidence-based, anonymized (no
  * student names) and staff-accessible; this one names students, reports on PO credits directly
  * rather than re-deriving them from LO evidence, and is admin-only (enforced by
@@ -48,55 +53,74 @@ public class PoReportService {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found: " + studentId));
 
-        Map<String, Object> summary = poAttainmentService.getStudentPOSummary(studentId, null);
+        Map<String, Object> summary = poAttainmentService.getStudentPOSummary(studentId);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> poSummaries = (List<Map<String, Object>>) summary.get("poSummaries");
+        Map<String, Map<String, Object>> summaryByCode = new LinkedHashMap<>();
+        for (Map<String, Object> po : poSummaries) {
+            summaryByCode.put((String) po.get("poCode"), po);
+        }
 
         List<PoStudentReport.PoRow> rows = new ArrayList<>();
+        Set<String> covered = new LinkedHashSet<>();
+
+        // Washington Accord standard POs always appear first, in their display order, whether
+        // or not this student has any evidence for them yet.
+        for (ProgramOutcome po : programOutcomeRepository.findByIsDefaultTrueOrderByDisplayOrderAsc()) {
+            rows.add(studentRow(po.getCode(), po.getTitle(), summaryByCode.get(po.getCode()), studentThreshold));
+            covered.add(po.getCode());
+        }
+        // Any custom PO the student actually has credit data for, appended after.
         for (Map<String, Object> po : poSummaries) {
             String code = (String) po.get("poCode");
-            int earned = ((Number) po.get("creditsEarned")).intValue();
-            int max = ((Number) po.get("maxCredits")).intValue();
-            Double percentage = (Double) po.get("percentage");
-            String status = percentage == null ? "No evidence" : (percentage >= studentThreshold ? "Attained" : "Not attained");
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> breakdown = (List<Map<String, Object>>) po.get("moduleBreakdown");
-            rows.add(new PoStudentReport.PoRow(code, poTitle(code), earned, max, percentage, status, mergeByModule(breakdown)));
+            if (covered.contains(code)) continue;
+            rows.add(studentRow(code, poTitle(code), po, studentThreshold));
         }
-        rows.sort(Comparator.comparing(PoStudentReport.PoRow::code));
 
         int moduleCount = ((Number) summary.get("moduleCount")).intValue();
         return new PoStudentReport(studentId, student.getStudentName(), Instant.now(), studentThreshold, moduleCount, rows);
     }
 
-    // A module can save two rows for the same PO (one from Final Exam marks, one from
-    // Assignment marks) - merged into one contribution per module+batch here, same rule the
-    // frontend's StudentPOSummaryPage applies, so the report doesn't show a module twice
-    // unexplained.
-    private List<PoStudentReport.ModuleContribution> mergeByModule(List<Map<String, Object>> breakdown) {
-        record Key(String moduleId, String batch) {}
-        Map<Key, int[]> merged = new LinkedHashMap<>();
-        for (Map<String, Object> m : breakdown) {
-            Key key = new Key((String) m.get("moduleId"), (String) m.get("batch"));
-            int earned = ((Number) m.get("creditsEarned")).intValue();
-            int max = ((Number) m.get("maxCredits")).intValue();
-            merged.merge(key, new int[]{earned, max}, (a, b) -> new int[]{a[0] + b[0], a[1] + b[1]});
+    /**
+     * Every student in a batch's individual PO report, for bundling into one download (see
+     * {@link PoReportController}) — each report here is exactly what {@link #studentReport}
+     * would produce for that student on its own; this just runs it once per student in the
+     * batch so the admin can download every individual report in one action instead of
+     * searching each student up one at a time.
+     */
+    @Transactional(readOnly = true)
+    public List<PoStudentReport> studentReportsForBatch(String batch, double studentThreshold) {
+        List<Student> students = studentRepository.findByBatch(batch);
+        if (students.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No students found for batch: " + batch);
         }
-        List<PoStudentReport.ModuleContribution> result = new ArrayList<>();
-        for (Map.Entry<Key, int[]> e : merged.entrySet()) {
-            result.add(new PoStudentReport.ModuleContribution(e.getKey().moduleId(), e.getKey().batch(), e.getValue()[0], e.getValue()[1]));
+        List<PoStudentReport> reports = new ArrayList<>();
+        for (Student student : students) {
+            reports.add(studentReport(student.getStudentId(), studentThreshold));
         }
-        return result;
+        return reports;
+    }
+
+    private PoStudentReport.PoRow studentRow(String code, String title, Map<String, Object> po, double studentThreshold) {
+        if (po == null) {
+            return new PoStudentReport.PoRow(code, title, 0, 0, null, "No evidence");
+        }
+        int earned = ((Number) po.get("creditsEarned")).intValue();
+        int max = ((Number) po.get("maxCredits")).intValue();
+        Double percentage = (Double) po.get("percentage");
+        String status = percentage == null ? "No evidence" : (percentage >= studentThreshold ? "Attained" : "Not attained");
+        return new PoStudentReport.PoRow(code, title, earned, max, percentage, status);
     }
 
     /**
-     * Batch-level PO success: for each PO with an approved mapping, what share of the batch's
-     * students attained it (their saved credit % in this batch >= studentThreshold), and
-     * whether that share clears batchTarget. A student with no saved credit for a PO counts as
-     * not having attained it — same "missing evidence fails" convention
-     * POAttainmentService.calculateOverallPOAttainment already uses for the live LO-based
-     * check, kept consistent here for the credit-based one.
+     * Batch-level PO success: for each PO, what share of the batch's students attained it
+     * (their saved credit % in this batch >= studentThreshold), and whether that share clears
+     * batchTarget. A student with no saved credit for a PO counts as not having attained it —
+     * same "missing evidence fails" convention POAttainmentService.calculateOverallPOAttainment
+     * already uses for the live LO-based check, kept consistent here for the credit-based one.
+     *
+     * Every Washington Accord standard PO always appears, whether or not it has an approved
+     * mapping or any saved credit yet; any custom PO with an approved mapping is appended after.
      */
     @Transactional(readOnly = true)
     public PoBatchReport batchReport(String batch, double studentThreshold, double batchTarget) {
@@ -105,14 +129,7 @@ public class PoReportService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No students found for batch: " + batch);
         }
 
-        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
-        Map<String, ProgramOutcome> posByCode = new LinkedHashMap<>();
-        for (OutcomeMapping m : approvedMappings) {
-            posByCode.putIfAbsent(m.getProgramOutcome().getCode(), m.getProgramOutcome());
-        }
-
-        // studentId -> poCode -> [earned, max], summed across every module/markType saved for
-        // this batch (a module can contribute via both Final Exam and Assignment rows).
+        // studentId -> poCode -> [earned, max], summed across every module saved for this batch.
         Map<String, Map<String, int[]>> byStudentAndPo = new HashMap<>();
         for (StudentPoCredit row : studentPoCreditRepository.findByBatch(batch)) {
             byStudentAndPo
@@ -122,21 +139,38 @@ public class PoReportService {
         }
 
         List<PoBatchReport.PoRow> rows = new ArrayList<>();
-        for (ProgramOutcome po : posByCode.values()) {
-            int attained = 0;
-            for (Student student : students) {
-                int[] credit = byStudentAndPo.getOrDefault(student.getStudentId(), Collections.emptyMap()).get(po.getCode());
-                if (credit == null || credit[1] <= 0) continue;
-                double pct = credit[0] * 100.0 / credit[1];
-                if (pct >= studentThreshold) attained++;
-            }
-            double attainmentPercent = attained * 100.0 / students.size();
-            String status = attainmentPercent >= batchTarget ? "Success" : "Not successful";
-            rows.add(new PoBatchReport.PoRow(po.getCode(), po.getTitle(), attained, students.size(), attainmentPercent, status));
+        Set<String> covered = new LinkedHashSet<>();
+
+        for (ProgramOutcome po : programOutcomeRepository.findByIsDefaultTrueOrderByDisplayOrderAsc()) {
+            rows.add(batchRow(po, students, byStudentAndPo, studentThreshold, batchTarget));
+            covered.add(po.getCode());
         }
-        rows.sort(Comparator.comparing(PoBatchReport.PoRow::code));
+
+        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        Map<String, ProgramOutcome> customPos = new LinkedHashMap<>();
+        for (OutcomeMapping m : approvedMappings) {
+            String code = m.getProgramOutcome().getCode();
+            if (!covered.contains(code)) customPos.putIfAbsent(code, m.getProgramOutcome());
+        }
+        for (ProgramOutcome po : customPos.values()) {
+            rows.add(batchRow(po, students, byStudentAndPo, studentThreshold, batchTarget));
+        }
 
         return new PoBatchReport(batch, Instant.now(), studentThreshold, batchTarget, students.size(), rows);
+    }
+
+    private PoBatchReport.PoRow batchRow(ProgramOutcome po, List<Student> students,
+            Map<String, Map<String, int[]>> byStudentAndPo, double studentThreshold, double batchTarget) {
+        int attained = 0;
+        for (Student student : students) {
+            int[] credit = byStudentAndPo.getOrDefault(student.getStudentId(), Collections.emptyMap()).get(po.getCode());
+            if (credit == null || credit[1] <= 0) continue;
+            double pct = credit[0] * 100.0 / credit[1];
+            if (pct >= studentThreshold) attained++;
+        }
+        double attainmentPercent = attained * 100.0 / students.size();
+        String status = attainmentPercent >= batchTarget ? "Success" : "Not successful";
+        return new PoBatchReport.PoRow(po.getCode(), po.getTitle(), attained, students.size(), attainmentPercent, status);
     }
 
     private String poTitle(String code) {

@@ -3,6 +3,7 @@ import axios from 'axios'
 import Header from '../components/header'
 import Footer from '../components/footer'
 import authService from '../services/authService'
+import studentService from '../services/studentService'
 
 const headers = () => ({ Authorization: `Bearer ${authService.getToken()}` })
 const num = v => (v == null ? '—' : Number(v).toFixed(1))
@@ -17,17 +18,17 @@ function StatusBadge({ status }) {
   return <span className={`inline-block px-2.5 py-1 rounded-lg border text-[11px] font-black uppercase tracking-wide ${statusClasses(status)}`}>{status}</span>
 }
 
-async function downloadPdf(url, params, filename, setBusy, setError, key) {
+async function downloadFile(url, params, filename, mimeType, setBusy, setError, key) {
   setBusy(key); setError('')
   try {
-    const response = await axios.get(url, { headers: headers(), responseType: 'blob', params: { ...params, format: 'pdf' } })
-    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+    const response = await axios.get(url, { headers: headers(), responseType: 'blob', params })
+    const blobUrl = URL.createObjectURL(new Blob([response.data], { type: mimeType }))
     const anchor = document.createElement('a')
     anchor.href = blobUrl; anchor.download = filename
     document.body.appendChild(anchor); anchor.click(); anchor.remove()
     setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
   } catch (e) {
-    let message = 'Could not download the PDF. Please try again.'
+    let message = 'Could not download the file. Please try again.'
     if (e.response?.data instanceof Blob) {
       try { message = JSON.parse(await e.response.data.text()).message || message } catch { /* keep default */ }
     } else if (e.response?.data?.message) message = e.response.data.message
@@ -35,12 +36,20 @@ async function downloadPdf(url, params, filename, setBusy, setError, key) {
   } finally { setBusy('') }
 }
 
+const downloadPdf = (url, params, filename, setBusy, setError, key) =>
+  downloadFile(url, { ...params, format: 'pdf' }, filename, 'application/pdf', setBusy, setError, key)
+
 function StudentReportSection() {
+  const [mode, setMode] = useState('individual') // 'individual' | 'batch'
   const [studentId, setStudentId] = useState('')
+  const [batch, setBatch] = useState('')
   const [threshold, setThreshold] = useState('40')
   const [report, setReport] = useState(null)
+  const [batchStudents, setBatchStudents] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+
+  const switchMode = next => { setMode(next); setReport(null); setBatchStudents(null); setError('') }
 
   const preview = async e => {
     e.preventDefault()
@@ -61,6 +70,26 @@ function StudentReportSection() {
       `po-report-${report.studentId.replace(/[^A-Za-z0-9_-]/g, '_')}.pdf`, setBusy, setError, 'download')
   }
 
+  const previewBatch = async e => {
+    e.preventDefault()
+    setBusy('preview'); setError(''); setBatchStudents(null)
+    try {
+      const r = await studentService.list({ batch: batch.trim() }, { headers: headers() })
+      const students = r.data?.data || []
+      setBatchStudents(students)
+      if (!students.length) setError(`No students found for batch ${batch.trim()}.`)
+    } catch (e2) { setError(e2.response?.data?.message || 'Could not load students for this batch.') }
+    finally { setBusy('') }
+  }
+
+  const downloadAllForBatch = () => {
+    if (!batchStudents?.length) return
+    downloadFile('/api/reports/po/student/batch',
+      { batch: batch.trim(), studentThreshold: threshold },
+      `po-reports-batch-${batch.trim().replace(/[^A-Za-z0-9_-]/g, '_')}.zip`,
+      'application/zip', setBusy, setError, 'download-all')
+  }
+
   return (
     <section className="glass-card rounded-[2.5rem] p-8 border-slate-100 space-y-6">
       <div>
@@ -71,26 +100,83 @@ function StudentReportSection() {
         </p>
       </div>
 
-      <form onSubmit={preview} className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
-        <div className="flex-1 space-y-1">
-          <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Student ID</label>
-          <input type="text" value={studentId} onChange={e => setStudentId(e.target.value)}
-            placeholder="e.g. EG/2024/6555" required className="input-field bg-white w-full" />
-        </div>
-        <div className="sm:w-56 space-y-1">
-          <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Attainment threshold (%)</label>
-          <input type="number" min="0" max="100" step="0.01" value={threshold} onChange={e => setThreshold(e.target.value)}
-            required className="input-field bg-white w-full" />
-        </div>
-        <button type="submit" disabled={!!busy}
-          className={`px-6 py-3 rounded-2xl text-white font-bold shadow-lg transition-all ${busy ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
-          {busy === 'preview' ? 'Generating…' : 'Preview'}
+      <div className="flex gap-2">
+        <button type="button" onClick={() => switchMode('individual')}
+          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-colors ${mode === 'individual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-400'}`}>
+          One student
         </button>
-      </form>
+        <button type="button" onClick={() => switchMode('batch')}
+          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border transition-colors ${mode === 'batch' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-400'}`}>
+          All students in a batch
+        </button>
+      </div>
+
+      {mode === 'individual' ? (
+        <form onSubmit={preview} className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+          <div className="flex-1 space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Student ID</label>
+            <input type="text" value={studentId} onChange={e => setStudentId(e.target.value)}
+              placeholder="e.g. EG/2024/6555" required className="input-field bg-white w-full" />
+          </div>
+          <div className="sm:w-56 space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Attainment threshold (%)</label>
+            <input type="number" min="0" max="100" step="0.01" value={threshold} onChange={e => setThreshold(e.target.value)}
+              required className="input-field bg-white w-full" />
+          </div>
+          <button type="submit" disabled={!!busy}
+            className={`px-6 py-3 rounded-2xl text-white font-bold shadow-lg transition-all ${busy ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+            {busy === 'preview' ? 'Generating…' : 'Preview'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={previewBatch} className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+          <div className="flex-1 space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Batch</label>
+            <input type="text" value={batch} onChange={e => setBatch(e.target.value)}
+              placeholder="e.g. 24" required className="input-field bg-white w-full" />
+          </div>
+          <div className="sm:w-56 space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Attainment threshold (%)</label>
+            <input type="number" min="0" max="100" step="0.01" value={threshold} onChange={e => setThreshold(e.target.value)}
+              required className="input-field bg-white w-full" />
+          </div>
+          <button type="submit" disabled={!!busy}
+            className={`px-6 py-3 rounded-2xl text-white font-bold shadow-lg transition-all ${busy ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
+            {busy === 'preview' ? 'Looking up…' : 'Find students'}
+          </button>
+        </form>
+      )}
 
       {error && <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error}</div>}
 
-      {report && (
+      {mode === 'batch' && batchStudents?.length > 0 && (
+        <div className="space-y-4 pt-2 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h3 className="font-black text-slate-800 text-lg">Batch {batch.trim()}</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                {batchStudents.length} student{batchStudents.length === 1 ? '' : 's'} found · Threshold: <strong>{num(Number(threshold))}%</strong>
+              </p>
+            </div>
+            <button type="button" onClick={downloadAllForBatch} disabled={!!busy}
+              className={`px-5 py-2.5 rounded-xl border font-bold text-sm transition-all ${busy === 'download-all' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white text-indigo-700 border-indigo-200 hover:border-indigo-400'}`}>
+              {busy === 'download-all' ? 'Building ZIP…' : `Download all ${batchStudents.length} reports (ZIP)`}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {batchStudents.map(s => (
+              <span key={s.studentId} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-semibold">
+                {s.studentId} <span className="text-indigo-400">— {s.studentName}</span>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400">
+            Each student gets their own individual PO report PDF inside the ZIP — exactly the same report as downloading them one at a time.
+          </p>
+        </div>
+      )}
+
+      {mode === 'individual' && report && (
         <div className="space-y-4 pt-2 border-t border-slate-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
@@ -113,7 +199,6 @@ function StudentReportSection() {
                   <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Credits</th>
                   <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">%</th>
                   <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">Status</th>
-                  <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">Modules</th>
                 </tr>
               </thead>
               <tbody>
@@ -122,19 +207,10 @@ function StudentReportSection() {
                     <td className="px-4 py-3 font-black text-slate-800 border-r border-slate-100">{po.code}<div className="text-[11px] font-medium text-slate-400">{po.title}</div></td>
                     <td className="px-4 py-3 text-center font-bold border-r border-slate-100">{po.creditsEarned}/{po.maxCredits}</td>
                     <td className="px-4 py-3 text-center font-bold border-r border-slate-100">{num(po.percentage)}%</td>
-                    <td className="px-4 py-3 text-center border-r border-slate-100"><StatusBadge status={po.status} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1.5">
-                        {po.moduleBreakdown.map((m, i) => (
-                          <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-[11px] font-semibold">
-                            {m.moduleId} <span className="text-indigo-400">(batch {m.batch}: {m.creditsEarned}/{m.maxCredits})</span>
-                          </span>
-                        ))}
-                      </div>
-                    </td>
+                    <td className="px-4 py-3 text-center"><StatusBadge status={po.status} /></td>
                   </tr>
                 ))}
-                {!report.pos.length && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No PO credits saved for this student yet.</td></tr>}
+                {!report.pos.length && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No PO credits saved for this student yet.</td></tr>}
               </tbody>
             </table>
           </div>

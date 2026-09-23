@@ -16,17 +16,21 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for POAttainmentService threshold normalization.
+ * Unit tests for POAttainmentService threshold normalization and mark-type pooling.
  *
  * Tests the fix for the bug where a student with a score of 6/10 (60%)
  * was incorrectly marked as FAIL when threshold was 50%.
+ *
+ * PO attainment calculation pools evidence from every mark type (Final Exam and Assignment
+ * marks both count toward the same LO/PO attainment) — see
+ * V4__student_po_credit_drop_mark_type.sql. StudentMark/AssessmentTemplate fixtures still carry
+ * a mark type since marks recording itself stays split by how a mark was entered; the service
+ * methods under test just don't take a markType parameter any more.
  */
 @DisplayName("POAttainmentService Threshold Normalization Tests")
 class POAttainmentServiceTest {
@@ -107,7 +111,6 @@ class POAttainmentServiceTest {
 
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
 
         List<String> losIds = Arrays.asList(losId);
@@ -129,10 +132,10 @@ class POAttainmentServiceTest {
         mark.setMarkType(MarkType.FINAL_EXAM);
 
         // Mock repositories
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
 
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
@@ -142,11 +145,11 @@ class POAttainmentServiceTest {
             .thenReturn(Optional.of(los1));
 
         // Mock assessment items: total max = 10
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         // VERIFY
         assertNotNull(result);
@@ -176,7 +179,6 @@ class POAttainmentServiceTest {
 
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
 
         List<String> losIds = Arrays.asList(losId);
@@ -198,10 +200,10 @@ class POAttainmentServiceTest {
         mark.setMarkType(MarkType.FINAL_EXAM);
 
         // Mock repositories
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
 
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
@@ -210,11 +212,11 @@ class POAttainmentServiceTest {
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
 
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         // VERIFY
         assertNotNull(result);
@@ -242,7 +244,6 @@ class POAttainmentServiceTest {
 
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
 
         List<String> losIds = Arrays.asList(losId);
@@ -270,10 +271,10 @@ class POAttainmentServiceTest {
         mark2.setMarkType(MarkType.FINAL_EXAM);
 
         // Mock repositories
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1, student2));
 
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark1, mark2));
 
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
@@ -282,11 +283,11 @@ class POAttainmentServiceTest {
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
 
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
         // EXECUTE
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         // VERIFY
         assertNotNull(result);
@@ -323,7 +324,6 @@ class POAttainmentServiceTest {
 
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
 
         List<String> losIds = Arrays.asList(losId);
@@ -337,10 +337,10 @@ class POAttainmentServiceTest {
         mark.setMarkType(MarkType.FINAL_EXAM);
 
         // Mock repositories - NO assessment items found (legacy path)
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
 
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
@@ -350,11 +350,11 @@ class POAttainmentServiceTest {
             .thenReturn(Optional.of(los1));
 
         // NO assessment items found → uses legacy behavior
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Collections.emptyList());
 
         // EXECUTE
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         // VERIFY
         @SuppressWarnings("unchecked")
@@ -369,7 +369,7 @@ class POAttainmentServiceTest {
     }
 
     @Test
-    @DisplayName("Test 4: Duplicate templates sharing an assignment label must not inflate the denominator")
+    @DisplayName("Test 4b: Duplicate templates sharing an assignment label must not inflate the denominator")
     void testDuplicateTemplatesForSameAssignmentLabelDoNotInflateMaxMarks() {
         // SCENARIO (from real data, module EC4356 batch 24):
         // The same assignment was uploaded twice, producing two templates sharing the label
@@ -420,18 +420,18 @@ class POAttainmentServiceTest {
         mark.setMarkType(MarkType.ASSIGNMENT);
         mark.setAssignmentLabel("Assignment 01");
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(firstUploadItem, reUploadItem));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
@@ -453,12 +453,11 @@ class POAttainmentServiceTest {
     @Test
     @DisplayName("Test 5: A student is measured only against the assignments they have marks for")
     void testStudentIsNotChargedForAnAssignmentTheyHaveNoMarksIn() {
-        // SCENARIO: the ASSIGNMENT markType holds two assessments for the same LO -
-        // "Assignment 01" (max 10) and "Assignment 02" (max 40). A student scored 8/10 on the
-        // first and has no marks at all under the second.
+        // SCENARIO: the batch holds two assessments for the same LO - "Assignment 01" (max 10)
+        // and "Assignment 02" (max 40). A student scored 8/10 on the first and has no marks at
+        // all under the second.
         // Measuring 8 against 10 + 40 gives 16% and a FAIL. The student's real result on the
-        // work they submitted is 8/10 = 80%, a PASS. A FINAL_EXAM normally carries a single
-        // assessment, which is why this only shows up on assignments.
+        // work they submitted is 8/10 = 80%, a PASS.
         String losId = "LO001";
         String batch = "24";
         String markType = "ASSIGNMENT";
@@ -501,18 +500,18 @@ class POAttainmentServiceTest {
         assignment01Mark.setMarkType(MarkType.ASSIGNMENT);
         assignment01Mark.setAssignmentLabel("Assignment 01");
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(assignment01Mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(itemA01, itemA02));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
@@ -583,18 +582,18 @@ class POAttainmentServiceTest {
         markA02.setMarkType(MarkType.ASSIGNMENT);
         markA02.setAssignmentLabel("Assignment 02");
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.ASSIGNMENT, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(markA01, markA02));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.ASSIGNMENT))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(itemA01, itemA02));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
@@ -608,6 +607,88 @@ class POAttainmentServiceTest {
     }
 
     @Test
+    @DisplayName("Test 6b: Final Exam and Assignment marks for the same LO are pooled together")
+    void testFinalExamAndAssignmentMarksArePooled() {
+        // SCENARIO: PO attainment is one calculation per module/batch, not split by mark type.
+        // A student has a Final Exam mark (6/10) and an Assignment mark (2/10) for the same LO.
+        // Pooled: 8/20 = 40%, which FAILS at threshold 50 - neither mark type's evidence alone
+        // (60% or 20%) is what decides it; both must be counted together.
+        String losId = "LO001";
+        String batch = "24";
+        int threshold = 50;
+        List<String> losIds = Arrays.asList(losId);
+
+        AssessmentTemplate finalExamTemplate = new AssessmentTemplate();
+        finalExamTemplate.setId("TPL-FE");
+        finalExamTemplate.setBatch(batch);
+        finalExamTemplate.setMarkType("FINAL_EXAM");
+        finalExamTemplate.setAssignmentLabel(null);
+
+        AssessmentTemplate assignmentTemplate = new AssessmentTemplate();
+        assignmentTemplate.setId("TPL-A01");
+        assignmentTemplate.setBatch(batch);
+        assignmentTemplate.setMarkType("ASSIGNMENT");
+        assignmentTemplate.setAssignmentLabel(null); // deliberately blank, same as the exam template
+
+        AssessmentItem examItem = new AssessmentItem();
+        examItem.setId(40L);
+        examItem.setQuestionLabel("Q1");
+        examItem.setMaxMarks(10.0);
+        examItem.setLos(los1);
+        examItem.setAssessmentTemplate(finalExamTemplate);
+
+        AssessmentItem assignmentItem = new AssessmentItem();
+        assignmentItem.setId(41L);
+        assignmentItem.setQuestionLabel("Q1");
+        assignmentItem.setMaxMarks(10.0);
+        assignmentItem.setLos(los1);
+        assignmentItem.setAssessmentTemplate(assignmentTemplate);
+
+        StudentMark examMark = new StudentMark();
+        examMark.setStudent(student1);
+        examMark.setLos(los1);
+        examMark.setScore(6.0);
+        examMark.setBatch(batch);
+        examMark.setMarkType(MarkType.FINAL_EXAM);
+        examMark.setAssignmentLabel(null);
+
+        StudentMark assignmentMark = new StudentMark();
+        assignmentMark.setStudent(student1);
+        assignmentMark.setLos(los1);
+        assignmentMark.setScore(2.0);
+        assignmentMark.setBatch(batch);
+        assignmentMark.setMarkType(MarkType.ASSIGNMENT);
+        assignmentMark.setAssignmentLabel(null);
+
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
+            .thenReturn(Arrays.asList(student1));
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
+            .thenReturn(Arrays.asList(examMark, assignmentMark));
+        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+            .thenReturn(Arrays.asList(mapping1));
+        when(losRepository.findById(losId))
+            .thenReturn(Optional.of(los1));
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
+            .thenReturn(Arrays.asList(examItem, assignmentItem));
+
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
+        @SuppressWarnings("unchecked")
+        Map<String, String> loScores = (Map<String, String>) students.get(0).get("loScores");
+
+        assertTrue(loScores.get(losId).startsWith("Fail"),
+            "8 pooled marks against a combined max of 20 is 40%, below the 50% threshold, "
+                + "even though the exam alone (60%) would pass. Got: " + loScores.get(losId));
+        assertTrue(loScores.get(losId).contains("40.0"), "Got: " + loScores.get(losId));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Integer> poCredits = (Map<String, Integer>) students.get(0).get("poCredits");
+        assertEquals(0, poCredits.get("PO1"), "40% pooled fails the 50% threshold, so no credit for PO1");
+    }
+
+    @Test
     @DisplayName("Test 7: A calculation whose LOs resolve to no module is not persisted")
     void testCalculationWithoutModuleIsNotPersisted() {
         // SCENARIO: los1 in this suite's fixture has no module set (unit-test shortcut - real
@@ -615,7 +696,6 @@ class POAttainmentServiceTest {
         // rather than throwing, and the response must say so via "persisted": false.
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
         List<String> losIds = Arrays.asList(losId);
 
@@ -633,18 +713,18 @@ class POAttainmentServiceTest {
         mark.setBatch(batch);
         mark.setMarkType(MarkType.FINAL_EXAM);
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         assertEquals(false, result.get("persisted"), "No module on the LO means nothing to attribute the saved row to");
         verifyNoInteractions(studentPoCreditRepository);
@@ -654,11 +734,10 @@ class POAttainmentServiceTest {
     @DisplayName("Test 8: A calculation whose LOs belong to a module is saved, overwriting any previous save")
     void testCalculationWithModuleIsPersistedAndOverwritesPreviousSave() {
         // SCENARIO: same 6/10 pass as Test 1, but los1 now belongs to module EC4356. The saved
-        // row must carry the right student/PO/module/batch/markType/credits, and saving must
-        // first clear out whatever was saved for this module/batch/markType before.
+        // row must carry the right student/PO/module/batch/credits, and saving must first clear
+        // out whatever was saved for this module/batch before.
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
         List<String> losIds = Arrays.asList(losId);
 
@@ -680,21 +759,21 @@ class POAttainmentServiceTest {
         mark.setBatch(batch);
         mark.setMarkType(MarkType.FINAL_EXAM);
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(losIds, MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIds, batch, threshold);
 
         assertEquals(true, result.get("persisted"));
-        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatchAndMarkType("EC4356", batch, MarkType.FINAL_EXAM);
+        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatch("EC4356", batch);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<StudentPoCredit>> captor = ArgumentCaptor.forClass((Class) List.class);
@@ -707,7 +786,6 @@ class POAttainmentServiceTest {
         assertEquals("PO1", row.getProgramOutcome().getCode());
         assertEquals("EC4356", row.getModule().getModuleId());
         assertEquals(batch, row.getBatch());
-        assertEquals(MarkType.FINAL_EXAM, row.getMarkType());
         assertEquals(1, row.getCreditsEarned(), "Passed the LO, so earns the mapping's full weight (1)");
         assertEquals(1, row.getMaxCredits());
         assertEquals(threshold, row.getThreshold());
@@ -734,7 +812,6 @@ class POAttainmentServiceTest {
         ec4356Po1.setProgramOutcome(po1);
         ec4356Po1.setModule(ec4356);
         ec4356Po1.setBatch("24");
-        ec4356Po1.setMarkType(MarkType.ASSIGNMENT);
         ec4356Po1.setCreditsEarned(2);
         ec4356Po1.setMaxCredits(4);
         ec4356Po1.setThreshold(50);
@@ -745,7 +822,6 @@ class POAttainmentServiceTest {
         ec4356Po2.setProgramOutcome(po2);
         ec4356Po2.setModule(ec4356);
         ec4356Po2.setBatch("24");
-        ec4356Po2.setMarkType(MarkType.ASSIGNMENT);
         ec4356Po2.setCreditsEarned(0);
         ec4356Po2.setMaxCredits(3);
         ec4356Po2.setThreshold(50);
@@ -756,7 +832,6 @@ class POAttainmentServiceTest {
         ec4357Po1.setProgramOutcome(po1);
         ec4357Po1.setModule(ec4357);
         ec4357Po1.setBatch("24");
-        ec4357Po1.setMarkType(MarkType.ASSIGNMENT);
         ec4357Po1.setCreditsEarned(3);
         ec4357Po1.setMaxCredits(4);
         ec4357Po1.setThreshold(50);
@@ -765,10 +840,9 @@ class POAttainmentServiceTest {
         when(studentPoCreditRepository.findByStudent_StudentId("EN001"))
             .thenReturn(Arrays.asList(ec4356Po1, ec4356Po2, ec4357Po1));
 
-        Map<String, Object> result = poAttainmentService.getStudentPOSummary("EN001", null);
+        Map<String, Object> result = poAttainmentService.getStudentPOSummary("EN001");
 
         assertEquals("EN001", result.get("studentId"));
-        assertEquals("ALL", result.get("markType"));
         assertEquals(2L, result.get("moduleCount"));
 
         @SuppressWarnings("unchecked")
@@ -789,20 +863,7 @@ class POAttainmentServiceTest {
     }
 
     @Test
-    @DisplayName("Test 10: Cross-module summary can be scoped to a single mark type")
-    void testStudentPOSummaryScopedToMarkType() {
-        when(studentPoCreditRepository.findByStudent_StudentIdAndMarkType("EN001", MarkType.ASSIGNMENT))
-            .thenReturn(Collections.emptyList());
-
-        Map<String, Object> result = poAttainmentService.getStudentPOSummary("EN001", "ASSIGNMENT");
-
-        assertEquals("ASSIGNMENT", result.get("markType"));
-        verify(studentPoCreditRepository).findByStudent_StudentIdAndMarkType("EN001", MarkType.ASSIGNMENT);
-        verify(studentPoCreditRepository, never()).findByStudent_StudentId(anyString());
-    }
-
-    @Test
-    @DisplayName("Test 11: recalculateForModule resolves the module's LOs and persists the recalculation")
+    @DisplayName("Test 10: recalculateForModule resolves the module's LOs and persists the recalculation")
     void testRecalculateForModuleRecalculatesAndPersists() {
         // SCENARIO: marks were just uploaded/edited/deleted for module EC4356 - the controller
         // calls recalculateForModule instead of waiting for a lecturer to click "Calculate PO
@@ -811,7 +872,6 @@ class POAttainmentServiceTest {
         // same calculate-and-save path the manual button uses.
         String moduleId = "EC4356";
         String batch = "20";
-        String markType = "FINAL_EXAM";
 
         Module module = new Module();
         module.setModuleId(moduleId);
@@ -832,64 +892,62 @@ class POAttainmentServiceTest {
         mark.setMarkType(MarkType.FINAL_EXAM);
 
         when(losRepository.findByModule_ModuleId(moduleId)).thenReturn(Arrays.asList(los1));
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(Arrays.asList("LO001"), MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(Arrays.asList("LO001"), batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(Arrays.asList("LO001"), MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(Arrays.asList("LO001"), batch))
             .thenReturn(Arrays.asList(mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id("LO001"))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById("LO001"))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType("LO001", batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch("LO001", batch))
             .thenReturn(Arrays.asList(singleItem));
 
-        poAttainmentService.recalculateForModule(moduleId, batch, markType);
+        poAttainmentService.recalculateForModule(moduleId, batch);
 
-        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.FINAL_EXAM);
+        verify(studentPoCreditRepository).deleteByModule_ModuleIdAndBatch(moduleId, batch);
         verify(studentPoCreditRepository).saveAll(any());
     }
 
     @Test
-    @DisplayName("Test 12: recalculateForModule with no LOs in the module does nothing")
+    @DisplayName("Test 11: recalculateForModule with no LOs in the module does nothing")
     void testRecalculateForModuleNoLosIsNoOp() {
         when(losRepository.findByModule_ModuleId("EMPTY")).thenReturn(Collections.emptyList());
 
-        poAttainmentService.recalculateForModule("EMPTY", "20", "FINAL_EXAM");
+        poAttainmentService.recalculateForModule("EMPTY", "20");
 
         verifyNoInteractions(studentPoCreditRepository);
     }
 
     @Test
-    @DisplayName("Test 13: recalculateForModule with a blank moduleId, batch or markType is a no-op")
+    @DisplayName("Test 12: recalculateForModule with a blank moduleId or batch is a no-op")
     void testRecalculateForModuleBlankParamsIsNoOp() {
-        poAttainmentService.recalculateForModule(null, "20", "FINAL_EXAM");
-        poAttainmentService.recalculateForModule("EC4356", "", "FINAL_EXAM");
-        poAttainmentService.recalculateForModule("EC4356", "20", "");
+        poAttainmentService.recalculateForModule(null, "20");
+        poAttainmentService.recalculateForModule("EC4356", "");
 
         verifyNoInteractions(losRepository, studentPoCreditRepository);
     }
 
     @Test
-    @DisplayName("Test 14: recalculateForModule swallows errors instead of failing the upload/delete that triggered it")
+    @DisplayName("Test 13: recalculateForModule swallows errors instead of failing the upload/delete that triggered it")
     void testRecalculateForModuleSwallowsErrors() {
         when(losRepository.findByModule_ModuleId("EC4356")).thenThrow(new RuntimeException("db down"));
 
-        assertDoesNotThrow(() -> poAttainmentService.recalculateForModule("EC4356", "20", "FINAL_EXAM"));
+        assertDoesNotThrow(() -> poAttainmentService.recalculateForModule("EC4356", "20"));
     }
 
     @Test
-    @DisplayName("Test 15: a duplicate LO id in the request neither double-counts credits nor duplicates the saved row")
+    @DisplayName("Test 14: a duplicate LO id in the request neither double-counts credits nor duplicates the saved row")
     void testDuplicateLosIdsDoNotDoubleCountOrDuplicateRows() {
         // Reproduces the production crash: "Calculate PO Attainment" with a losIds list
         // containing the same LO twice (e.g. the frontend's "All" selector) made the per-student
         // loop process that LO's mapping weight twice, and made saveStudentPoCredits build two
-        // rows with the identical (student, po, module, batch, markType) key - which MySQL's
+        // rows with the identical (student, po, module, batch) key - which MySQL's
         // uk_student_po_credit constraint rejects as a duplicate entry within the same saveAll
         // batch, independent of whether the prior delete worked. Both the weight double-count
         // and the row duplication must be fixed, not just the crash suppressed.
         String losId = "LO001";
         String batch = "20";
-        String markType = "FINAL_EXAM";
         int threshold = 50;
         List<String> losIdsWithDuplicate = Arrays.asList(losId, losId);
 
@@ -911,18 +969,18 @@ class POAttainmentServiceTest {
         mark.setBatch(batch);
         mark.setMarkType(MarkType.FINAL_EXAM);
 
-        when(studentMarkRepository.findDistinctStudentsByLosIdsAndMarkTypeAndBatch(Arrays.asList(losId), MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(Arrays.asList(losId), batch))
             .thenReturn(Arrays.asList(student1));
-        when(studentMarkRepository.findByLosIdsAndMarkTypeAndBatch(Arrays.asList(losId), MarkType.FINAL_EXAM, batch))
+        when(studentMarkRepository.findByLosIdsAndBatch(Arrays.asList(losId), batch))
             .thenReturn(Arrays.asList(mark));
         when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
-        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(losId, batch, markType, MarkType.FINAL_EXAM))
+        when(assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(losId, batch))
             .thenReturn(Arrays.asList(singleItem));
 
-        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIdsWithDuplicate, markType, batch, threshold);
+        Map<String, Object> result = poAttainmentService.calculateStudentPOCredits(losIdsWithDuplicate, batch, threshold);
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> students = (List<Map<String, Object>>) result.get("students");
