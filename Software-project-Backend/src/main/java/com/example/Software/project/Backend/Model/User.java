@@ -10,7 +10,11 @@ import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "User")
+// Lowercase to match the actual table (V1__baseline_legacy_schema.sql creates `user`). "User"
+// resolves fine on a case-insensitive MySQL (lower_case_table_names=1, the Windows default) but
+// not on a case-sensitive one (the Linux default), where ddl-auto=validate fails with
+// "missing table [User]".
+@Table(name = "user")
 public class User {
 
     @Id
