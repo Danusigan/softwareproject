@@ -5,6 +5,7 @@ import StudentReportsPage from './pages/StudentReportsPage'
 import LandingPage from './pages/landingpage'
 import LoginPage from './pages/loginpage'
 import ForgotPasswordPage from './pages/forgottenpasword'
+import ResetPasswordPage from './pages/resetpassword'
 import AdminDashboard from './pages/admindashboard'
 import SuperAdminDashboard from './pages/superadmindashboard'
 import LecturerDashboard from './pages/lecturerdashboard'
@@ -40,6 +41,7 @@ function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/loginpage" element={<LoginPage />} />
       <Route path="/forgottenpassword" element={<ForgotPasswordPage />} />
+      <Route path="/resetpassword" element={<ResetPasswordPage />} />
 
       {/* ✅ Protected Routes - Require login */}
       <Route
