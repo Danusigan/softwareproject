@@ -3,7 +3,14 @@ package com.example.Software.project.Backend.Model;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 
+// The table is "studentmark", one lowercase word - named explicitly because this project's
+// physical naming strategy (PhysicalNamingStrategyStandardImpl, see application.properties) is a
+// pass-through, so without this Hibernate derives the table name from the class and looks for
+// "StudentMark". That matches on a case-insensitive MySQL (lower_case_table_names=1, the Windows
+// default) but not on a case-sensitive one (Linux default), where ddl-auto=validate fails with
+// "missing table [StudentMark]".
 @Entity
+@Table(name = "studentmark")
 public class StudentMark {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
