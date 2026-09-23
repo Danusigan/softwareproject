@@ -4,6 +4,7 @@ import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ModuleService;
+import com.example.Software.project.Backend.Service.PasswordResetService;
 import com.example.Software.project.Backend.Service.UserService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,7 @@ class UserRestControllerTest {
     @MockBean private AuthenticationManager authenticationManager;
     @MockBean private JwtUtil jwtUtil;
     @MockBean private AuditLogService auditLogService;
+    @MockBean private PasswordResetService passwordResetService;
 
     private org.springframework.security.core.userdetails.User principalFor(String username) {
         return new org.springframework.security.core.userdetails.User(

@@ -4,6 +4,7 @@ import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ModuleService;
+import com.example.Software.project.Backend.Service.PasswordResetService;
 import com.example.Software.project.Backend.Service.UserService;
 import jakarta.validation.Valid;
 import java.util.HashMap;
@@ -11,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
@@ -37,6 +40,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class UserRestController {
 
+    private static final Logger logger = LoggerFactory.getLogger(UserRestController.class);
+
     @Autowired
     private UserService userService;
 
@@ -54,6 +59,9 @@ public class UserRestController {
 
     @Autowired
     private AuditLogService auditLogService;
+
+    @Autowired
+    private PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
@@ -91,7 +99,7 @@ public class UserRestController {
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
                 }
 
-                
+
                 if (userType != null) {
                     userType = userType.toLowerCase().trim();
                 }
@@ -125,6 +133,48 @@ public class UserRestController {
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        }
+    }
+
+    // Step 1 of password reset. Works for all 3 roles (admin/superadmin/lecture) -
+    // they all live in the same User table keyed by email. Always returns a
+    // generic success message so callers can't use it to discover which emails exist.
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Email is required", "status", "ERROR"));
+        }
+        try {
+            passwordResetService.requestReset(email.trim());
+        } catch (Exception e) {
+            logger.error("Failed to process forgot-password request for {}", email, e);
+        }
+        return ResponseEntity.ok(Map.of(
+            "message", "If an account with that email exists, a password reset link has been sent.",
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Step 2 of password reset: consumes the emailed token and sets a new password.
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        String newPassword = body.get("newPassword");
+        if (token == null || token.isBlank() || newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Token and new password are required", "status", "ERROR"));
+        }
+        if (newPassword.length() < 6) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Password must be at least 6 characters", "status", "ERROR"));
+        }
+        try {
+            passwordResetService.resetPassword(token, newPassword);
+            return ResponseEntity.ok(Map.of("message", "Password reset successful. You can now log in.", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
         }
     }
 
