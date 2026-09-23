@@ -15,6 +15,16 @@ DELETE FROM `student_po_credit`;
 -- Split into separate statements (rather than one multi-clause ALTER TABLE) for H2's
 -- MySQL-compatibility mode, used in tests - see V1__baseline_legacy_schema.sql's header comment
 -- on why H2 is in play here at all.
+--
+-- student_id is only covered by uk_student_po_credit (as its leading column) - nothing else
+-- indexes it - and that same column backs FK FKspc_student. Dropping uk_student_po_credit as
+-- its own statement, with the FK still attached, either fails outright (real MySQL: error 1553,
+-- "needed in a foreign key constraint") or silently rebinds the FK to whatever index happens to
+-- exist at that moment instead of the new composite one (H2), which then blocks cleanup of that
+-- stand-in index instead. Dropping the FK constraint itself first sidesteps both: there is
+-- nothing for either engine to keep an index "needed" for while the index is swapped.
+ALTER TABLE `student_po_credit` DROP FOREIGN KEY `FKspc_student`;
 ALTER TABLE `student_po_credit` DROP INDEX `uk_student_po_credit`;
 ALTER TABLE `student_po_credit` DROP COLUMN `mark_type`;
 ALTER TABLE `student_po_credit` ADD UNIQUE KEY `uk_student_po_credit` (`student_id`,`po_id`,`module_id`,`batch`);
+ALTER TABLE `student_po_credit` ADD CONSTRAINT `FKspc_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
