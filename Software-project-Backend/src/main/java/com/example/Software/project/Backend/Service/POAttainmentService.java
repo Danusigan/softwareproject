@@ -39,6 +39,9 @@ public class POAttainmentService {
     @Autowired
     private StudentPoCreditRepository studentPoCreditRepository;
 
+    @Autowired
+    private CqiActionRepository cqiActionRepository;
+
     /**
      * Calculate per-student PO credits based on LO pass/fail and LO-PO mappings.
      *
@@ -187,9 +190,10 @@ public class POAttainmentService {
                 boolean hasAssessmentItems = false;
 
                 if (score != null) {
-                    // Denominator covers only the assignments this student has marks for. Charging
-                    // a student for an assignment they have no marks under (a second assignment they
-                    // missed, or one that only some LOs appear in) would sink an LO they passed.
+                    // Denominator covers only the assessments this student has marks for: one they
+                    // did not attend (absent, or a makeup still to come) is left out, not counted as
+                    // zero. CQI's batch attainment scores students the same way - see
+                    // loPercentageByStudent.
                     Map<String, Double> maxByLabel = maxMarksByLoAndLabel.getOrDefault(losId, Collections.emptyMap());
                     double scored = 0.0;
                     double possible = 0.0;
@@ -369,6 +373,43 @@ public class POAttainmentService {
     }
 
     /**
+     * Each student's percentage for one LO in one batch, pooled across every assessment the student
+     * has marks for and scored only against those assessments' max marks (an assessment they did
+     * not attend is left out, not counted as zero). Students with no marks for the LO are absent
+     * from the result. Shared by CQI's batch attainment so it and the per-student PO credits reach
+     * the same verdict on the same student. Where no max marks are known, a student's raw total is
+     * taken to already be a percentage (the legacy behaviour).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Double> loPercentageByStudent(String loId, String batch) {
+        Map<String, Map<String, Double>> scoresByStudent = new LinkedHashMap<>();
+        for (StudentMark mark : studentMarkRepository.findByLosIdsAndBatch(List.of(loId), batch)) {
+            if (mark.getScore() == null) continue;
+            scoresByStudent
+                    .computeIfAbsent(mark.getStudent().getStudentId(), k -> new LinkedHashMap<>())
+                    .merge(assignmentKeyOf(mark.getMarkType(), mark.getAssignmentLabel()), mark.getScore(), Double::sum);
+        }
+        Map<String, Double> maxByKey = getMaxMarksByAssignmentKey(loId, batch);
+
+        Map<String, Double> percentages = new LinkedHashMap<>();
+        for (Map.Entry<String, Map<String, Double>> student : scoresByStudent.entrySet()) {
+            double scored = 0.0;
+            double possible = 0.0;
+            for (Map.Entry<String, Double> entry : student.getValue().entrySet()) {
+                Double max = maxByKey.get(entry.getKey());
+                if (max != null && max > 0) {
+                    scored += entry.getValue();
+                    possible += max;
+                }
+            }
+            percentages.put(student.getKey(), possible > 0
+                    ? scored / possible * 100.0
+                    : student.getValue().values().stream().mapToDouble(Double::doubleValue).sum());
+        }
+        return percentages;
+    }
+
+    /**
      * Cumulative PO standing for one student across every module whose PO attainment has been
      * calculated and saved (§8b above): sums credits_earned and max_credits per PO across all
      * that student's saved rows, regardless of which module or batch produced them.
@@ -400,6 +441,17 @@ public class POAttainmentService {
             contribution.put("creditsEarned", row.getCreditsEarned());
             contribution.put("maxCredits", row.getMaxCredits());
             contribution.put("updatedAt", row.getUpdatedAt());
+            // Reporting only: says which CQI cycles cover this module/batch, never alters credits.
+            contribution.put("cqiActions", cqiActionRepository
+                    .findByModule_ModuleIdAndBatch(row.getModule().getModuleId(), row.getBatch()).stream()
+                    .map(a -> {
+                        Map<String, Object> flag = new LinkedHashMap<>();
+                        flag.put("losId", a.getLosId());
+                        flag.put("status", a.getStatus().name());
+                        flag.put("nextSemAttainment", a.getNextSemAttainment());
+                        return flag;
+                    })
+                    .collect(Collectors.toList()));
             breakdownByPo.computeIfAbsent(poCode, k -> new ArrayList<>()).add(contribution);
         }
 

@@ -56,6 +56,9 @@ class POAttainmentServiceTest {
     @Mock
     private StudentPoCreditRepository studentPoCreditRepository;
 
+    @Mock
+    private CqiActionRepository cqiActionRepository;
+
     @InjectMocks
     private POAttainmentService poAttainmentService;
 
@@ -457,7 +460,9 @@ class POAttainmentServiceTest {
         // and "Assignment 02" (max 40). A student scored 8/10 on the first and has no marks at
         // all under the second.
         // Measuring 8 against 10 + 40 gives 16% and a FAIL. The student's real result on the
-        // work they submitted is 8/10 = 80%, a PASS.
+        // work they submitted is 8/10 = 80%, a PASS. (An assessment the student did not attend -
+        // absent, or a makeup still to come - is left out, not counted as zero. CQI scores the
+        // same way; see loPercentageByStudent.)
         String losId = "LO001";
         String batch = "24";
         String markType = "ASSIGNMENT";

@@ -96,13 +96,19 @@ public class CqiActionController {
 
     // --- LECTURE/ADMIN: Finalize a batch's LO attainment for a module — links/triggers CQI ---
     @PostMapping("/finalize/{moduleId}")
-    public ResponseEntity<?> finalize(@PathVariable String moduleId, @RequestParam String batch, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> finalize(@PathVariable String moduleId, @RequestParam String batch,
+                                      @RequestParam(required = false) Double studentPassThreshold,
+                                      @RequestParam(required = false) Double batchTarget,
+                                      @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only", "status", "ERROR"));
+        if (!isPercent(studentPassThreshold) || !isPercent(batchTarget)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "thresholds must be between 0 and 100", "status", "ERROR"));
+        }
         if (batch == null || batch.isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "batch is required", "status", "ERROR"));
         }
         try {
-            Map<String, Object> result = cqiService.finalizeModuleAttainment(moduleId, batch.trim());
+            Map<String, Object> result = cqiService.finalizeModuleAttainment(moduleId, batch.trim(), studentPassThreshold, batchTarget);
             return ResponseEntity.ok(Map.of("message", "Attainment finalized", "data", result, "status", "SUCCESS"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
@@ -110,6 +116,10 @@ public class CqiActionController {
     }
 
     // --- Helpers ---
+
+    private static boolean isPercent(Double v) {
+        return v == null || (v >= 0 && v <= 100);
+    }
 
     private boolean ownsModule(String token, String moduleId) {
         try {
