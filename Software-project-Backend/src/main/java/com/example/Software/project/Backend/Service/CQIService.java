@@ -21,15 +21,25 @@ public class CQIService {
     // Triggers a new CQI action for every LO in the module whose batch attainment fell below
     // its stored threshold, unless one is already open (PLANNED or IN_PROGRESS) for that LO.
     public List<CqiAction> checkAndTriggerCQI(String moduleId, String batch) {
+        return checkAndTriggerCQI(moduleId, batch, null, null);
+    }
+
+    // Two separate values decide a CQI: studentPassThreshold is the % of an LO's marks a student
+    // must reach to pass it, and batchTarget is the % of the batch that must pass. Either may be
+    // null, in which case the LO's own stored threshold (default 50) stands in for it.
+    public List<CqiAction> checkAndTriggerCQI(String moduleId, String batch,
+                                              Double studentPassThreshold, Double batchTarget) {
         Module module = moduleRepository.findById(moduleId)
             .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
         List<Los> losList = losRepository.findByModule_ModuleId(moduleId);
 
         List<CqiAction> triggered = new ArrayList<>();
         for (Los los : losList) {
-            double threshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
-            Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, threshold);
-            if (attainment == null || attainment >= threshold) continue;
+            double loThreshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
+            double passThreshold = studentPassThreshold != null ? studentPassThreshold : loThreshold;
+            double target = batchTarget != null ? batchTarget : loThreshold;
+            Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, passThreshold);
+            if (attainment == null || attainment >= target) continue;
 
             boolean alreadyOpen = !cqiActionRepository
                 .findByModule_ModuleIdAndLos_IdAndStatusIn(moduleId, los.getId(), OPEN_STATUSES)
@@ -41,7 +51,7 @@ public class CQIService {
             action.setLos(los);
             action.setBatch(batch);
             action.setAttainmentScore(attainment);
-            action.setTargetScore(threshold);
+            action.setTargetScore(target);
             action.setStatus(CqiStatus.PLANNED);
             action.setSubmitted(false);
             List<String> lecturers = module.getAssignedLecturerUsernames();
@@ -103,6 +113,11 @@ public class CQIService {
     // the same module+LO. Closes the loop if the target was met; otherwise leaves it open and lets
     // checkAndTriggerCQI re-evaluate (it no-ops here since this LO's action is still open).
     public void linkNextSemesterResult(String moduleId, String losId, String newBatch, Double newAttainment) {
+        linkNextSemesterResult(moduleId, losId, newBatch, newAttainment, null, null);
+    }
+
+    public void linkNextSemesterResult(String moduleId, String losId, String newBatch, Double newAttainment,
+                                       Double studentPassThreshold, Double batchTarget) {
         List<CqiAction> open = cqiActionRepository
             .findByModule_ModuleIdAndLos_IdAndStatusIn(moduleId, losId, List.of(CqiStatus.IN_PROGRESS));
         if (open.isEmpty()) return;
@@ -115,7 +130,7 @@ public class CQIService {
         cqiActionRepository.save(action);
 
         if (action.getStatus() != CqiStatus.COMPLETED) {
-            checkAndTriggerCQI(moduleId, newBatch);
+            checkAndTriggerCQI(moduleId, newBatch, studentPassThreshold, batchTarget);
         }
     }
 
@@ -130,18 +145,24 @@ public class CQIService {
     // Entry point for POST /api/cqi/finalize/{moduleId}: for every LO in the module, links this
     // batch's result to any open CQI cycle, then checks whether a new cycle should be triggered.
     public Map<String, Object> finalizeModuleAttainment(String moduleId, String batch) {
+        return finalizeModuleAttainment(moduleId, batch, null, null);
+    }
+
+    public Map<String, Object> finalizeModuleAttainment(String moduleId, String batch,
+                                                        Double studentPassThreshold, Double batchTarget) {
         moduleRepository.findById(moduleId)
             .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
         List<Los> losList = losRepository.findByModule_ModuleId(moduleId);
 
         for (Los los : losList) {
-            double threshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
-            Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, threshold);
+            double loThreshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
+            double passThreshold = studentPassThreshold != null ? studentPassThreshold : loThreshold;
+            Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, passThreshold);
             if (attainment == null) continue;
-            linkNextSemesterResult(moduleId, los.getId(), batch, attainment);
+            linkNextSemesterResult(moduleId, los.getId(), batch, attainment, studentPassThreshold, batchTarget);
         }
 
-        List<CqiAction> triggered = checkAndTriggerCQI(moduleId, batch);
+        List<CqiAction> triggered = checkAndTriggerCQI(moduleId, batch, studentPassThreshold, batchTarget);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("triggered", triggered);
         result.put("triggeredCount", triggered.size());

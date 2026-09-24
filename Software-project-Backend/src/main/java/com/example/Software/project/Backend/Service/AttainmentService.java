@@ -21,6 +21,8 @@ public class AttainmentService {
     private AssessmentItemRepository assessmentItemRepository;
     @Autowired
     private StudentAssessmentScoreRepository studentAssessmentScoreRepository;
+    @Autowired
+    private POAttainmentService poAttainmentService;
 
     // 1. Calculate LO Attainment Level (0, 1, 2, or 3)
     public int calculateLOLevel(String loId) {
@@ -224,27 +226,11 @@ public class AttainmentService {
     // assignments for the LO+batch, divides by total max marks, compares to threshold.
     // Returns null if no marks exist yet for this LO+batch.
     public Double calculateLoAttainmentForBatch(String loId, String batch, double thresholdPercent) {
-        List<StudentMark> marks = markRepository.findByLos_IdAndBatch(loId, batch);
-        if (marks.isEmpty()) return null;
-
-        Map<String, Double> studentTotals = new HashMap<>();
-        for (StudentMark m : marks) {
-            if (m.getScore() == null) continue;
-            String sid = m.getStudent().getStudentId();
-            studentTotals.merge(sid, m.getScore(), Double::sum);
-        }
-        if (studentTotals.isEmpty()) return null;
-
-        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_Batch(loId, batch);
-        double maxMarks = items.stream().mapToDouble(i -> i.getMaxMarks() == null ? 0.0 : i.getMaxMarks()).sum();
-
-        long total = studentTotals.size();
-        long passed = studentTotals.values().stream().filter(score -> {
-            double pct = maxMarks > 0 ? (score / maxMarks) * 100.0 : score;
-            return pct >= thresholdPercent;
-        }).count();
-
-        return (double) passed / total * 100.0;
+        // thresholdPercent is the student pass mark; the result is the % of the batch that reached it.
+        Map<String, Double> percentByStudent = poAttainmentService.loPercentageByStudent(loId, batch);
+        if (percentByStudent.isEmpty()) return null;
+        long passed = percentByStudent.values().stream().filter(pct -> pct >= thresholdPercent).count();
+        return (double) passed / percentByStudent.size() * 100.0;
     }
 
     // 2. Calculate PO Attainment for a Course

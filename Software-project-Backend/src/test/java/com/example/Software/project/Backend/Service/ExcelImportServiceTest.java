@@ -53,6 +53,9 @@ class ExcelImportServiceTest {
         MockitoAnnotations.openMocks(this);
         when(losRepository.existsById("LO001")).thenReturn(true);
         when(losRepository.findById("LO001")).thenReturn(Optional.of(los("LO001")));
+        // Uploads only accept students already in the system, so these are all "existing" ones;
+        // individual tests override this for a student that isn't.
+        when(studentRepository.existsById(anyString())).thenReturn(true);
         when(studentRepository.findById(anyString())).thenAnswer(invocation -> {
             Student s = new Student();
             s.setStudentId(invocation.getArgument(0));
@@ -95,6 +98,34 @@ class ExcelImportServiceTest {
 
         assertTrue(ex.getMessage().contains("LO999"));
         verify(markRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("rejects the whole file when a student is not already in the system, importing nothing and creating no student")
+    void rejectsUnknownStudent() throws Exception {
+        when(studentRepository.existsById("GHOST")).thenReturn(false);
+        MockMultipartFile file = workbookOf("Student Index|LO1", "EN001|55", "GHOST|60");
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+            () -> excelImportService.importMarksBulk(file, LOS_IDS, "20", "FINAL_EXAM"));
+
+        assertTrue(ex.getMessage().contains("GHOST"), ex.getMessage());
+        verify(markRepository, never()).save(any());
+        verify(studentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("importMarksOBEFormat also rejects an unknown student before saving any mark")
+    void obeFormatRejectsUnknownStudent() throws Exception {
+        when(studentRepository.existsById("GHOST")).thenReturn(false);
+        MockMultipartFile file = workbookOf("Student Index|Marks", "EN001|55", "GHOST|60");
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+            () -> excelImportService.importMarksOBEFormat("LO001", file, "20", "FINAL_EXAM"));
+
+        assertTrue(ex.getMessage().contains("GHOST"), ex.getMessage());
+        verify(markRepository, never()).save(any());
+        verify(studentRepository, never()).save(any());
     }
 
     @Test

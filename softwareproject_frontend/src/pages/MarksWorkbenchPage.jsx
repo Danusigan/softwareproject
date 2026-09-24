@@ -63,6 +63,17 @@ export default function MarksWorkbenchPage() {
     try { return JSON.parse(localStorage.getItem(`marks-thresholds-${moduleId}`) || '{}') } catch { return {} }
   })
   const getThreshold = b => batchThresholds[String(b)] ?? 50
+
+  // ── per-batch CQI target: % of the batch that must reach the pass threshold ──
+  const [batchTargets, setBatchTargets] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`marks-cqi-targets-${moduleId}`) || '{}') } catch { return {} }
+  })
+  const getBatchTarget = b => batchTargets[String(b)] ?? 50
+  const saveBatchTarget = (b, val) => {
+    const next = { ...batchTargets, [String(b)]: Number(val) }
+    setBatchTargets(next)
+    localStorage.setItem(`marks-cqi-targets-${moduleId}`, JSON.stringify(next))
+  }
   const saveThreshold = (b, val) => {
     const next = { ...batchThresholds, [String(b)]: Number(val) }
     setBatchThresholds(next)
@@ -85,8 +96,6 @@ export default function MarksWorkbenchPage() {
   const [dragActive, setDragActive] = useState(false)
 
   // ── analytics state ───────────────────────────────────────────────────
-  const [analyticsLosIds, setAnalyticsLosIds] = useState([])
-  const [poAttainment, setPOAttainment] = useState(null)
 
   // ── CQI state ──────────────────────────────────────────────────────────
   const [cqiHistory, setCqiHistory] = useState([])
@@ -131,7 +140,6 @@ export default function MarksWorkbenchPage() {
         const losArr = Array.isArray(losRes.data?.data) ? losRes.data.data : (Array.isArray(losRes.data) ? losRes.data : [])
         setLos(losArr)
         setSelectedLosIds(losArr.map(lo => lo.id))
-        setAnalyticsLosIds(losArr.map(lo => lo.id))
         await loadAvailableMarks()
         await loadCqiHistory()
       } catch (e) {
@@ -143,7 +151,6 @@ export default function MarksWorkbenchPage() {
 
   // ── derived selections ────────────────────────────────────────────────
   const selectedLos = useMemo(() => los.filter(lo => selectedLosIds.includes(lo.id)), [los, selectedLosIds])
-  const analyticsLos = useMemo(() => los.filter(lo => analyticsLosIds.includes(lo.id)), [los, analyticsLosIds])
 
   useEffect(() => {
     const count = Math.max(1, Math.floor(Number(numberOfQuestions)) || 1)
@@ -160,7 +167,6 @@ export default function MarksWorkbenchPage() {
     setQuestionMappings(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it))
 
   const toggleLo = id => setSelectedLosIds(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id])
-  const toggleAnalyticsLo = id => setAnalyticsLosIds(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id])
 
   const resetFile = () => { setUploadFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }
 
@@ -311,33 +317,11 @@ export default function MarksWorkbenchPage() {
     finally { setBusyAction('') }
   }
 
-  // ── PO Attainment ─────────────────────────────────────────────────────
-  const handleCalculatePOAttainment = async () => {
-    if (!analyticsLos.length) { setMessage({ type: 'error', text: 'Select at least one LO.' }); return }
-    try {
-      setBusyAction('po'); setMessage({ type: '', text: '' }); setPOAttainment(null)
-      const r = await marksService.getPOAttainment({ losIds: analyticsLos.map(lo => lo.id), batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
-      setPOAttainment(r.data?.data || r.data)
-      setMessage({ type: 'success', text: 'PO attainment calculated.' })
-    } catch (e) { setMessage({ type: 'error', text: e.response?.data?.message || 'PO attainment failed.' }) }
-    finally { setBusyAction('') }
-  }
-
-  const handleExportPOAttainment = async () => {
-    if (!analyticsLos.length) return
-    try {
-      setBusyAction('po-export')
-      const r = await marksService.exportPOAttainment({ losIds: analyticsLos.map(lo => lo.id), batch: activeBatch, threshold: getThreshold(activeBatch) }, { headers: authHeaders() })
-      downloadBlob(r.data, parseFilename(r.headers?.['content-disposition'], `po_attainment_${activeBatch}.xlsx`))
-    } catch (e) { setMessage({ type: 'error', text: await readBlobError(e) }) }
-    finally { setBusyAction('') }
-  }
-
   // ── CQI ────────────────────────────────────────────────────────────────
   const handleFinalizeCqi = async () => {
     try {
       setBusyAction('cqi-finalize'); setMessage({ type: '', text: '' })
-      const r = await cqiService.finalize({ moduleId, batch: activeBatch }, { headers: authHeaders() })
+      const r = await cqiService.finalize({ moduleId, batch: activeBatch, studentPassThreshold: getThreshold(activeBatch), batchTarget: getBatchTarget(activeBatch) }, { headers: authHeaders() })
       const count = r.data?.data?.triggeredCount || 0
       setMessage({ type: 'success', text: count > 0 ? `Attainment finalized — ${count} new CQI action(s) triggered.` : 'Attainment finalized — no new CQI actions needed.' })
       await loadCqiHistory()
@@ -445,7 +429,7 @@ export default function MarksWorkbenchPage() {
                   const t = getThreshold(batchVal)
                   return (
                     <button key={batchVal} type="button"
-                      onClick={() => { setActiveBatch(batchVal); setMessage({ type:'',text:'' }); setPOAttainment(null) }}
+                      onClick={() => { setActiveBatch(batchVal); setMessage({ type:'',text:'' }) }}
                       className="glass-card rounded-[2rem] p-6 text-left hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group">
                       <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white text-lg font-black flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">{batchVal}</div>
                       <div className="font-black text-slate-800 text-lg mb-1">{batchVal}th Batch</div>
@@ -504,7 +488,7 @@ export default function MarksWorkbenchPage() {
           <div className="space-y-8 animate-in fade-in duration-500">
             {/* Context bar */}
             <div className="flex items-center flex-wrap gap-4 p-4 rounded-2xl bg-indigo-50 border border-indigo-100">
-              <button type="button" onClick={() => { setActiveBatch(null); setMessage({type:'',text:''}); setPOAttainment(null) }}
+              <button type="button" onClick={() => { setActiveBatch(null); setMessage({type:'',text:''}) }}
                 className="flex items-center gap-2 text-indigo-600 font-bold text-sm hover:text-indigo-800 transition-colors">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -515,14 +499,20 @@ export default function MarksWorkbenchPage() {
               <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Batch</span>
               <span className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-sm font-black">{activeBatch}</span>
               <div className="ml-auto flex items-center gap-3">
-                <span className="text-xs text-slate-600 font-bold">Pass threshold:</span>
+                <span className="text-xs text-slate-600 font-bold" title="A student passes an LO at or above this % of its marks">Student pass mark:</span>
                 <input type="number" min="0" max="100"
                   value={getThreshold(activeBatch)}
                   onChange={e => saveThreshold(activeBatch, e.target.value)}
                   className="w-20 text-center text-sm font-black border border-indigo-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" />
                 <span className="text-xs text-slate-400">%</span>
+                <span className="text-xs text-slate-600 font-bold" title="CQI is raised for an LO when fewer than this % of the batch pass it">Batch target:</span>
+                <input type="number" min="0" max="100"
+                  value={getBatchTarget(activeBatch)}
+                  onChange={e => saveBatchTarget(activeBatch, e.target.value)}
+                  className="w-20 text-center text-sm font-black border border-indigo-200 rounded-xl px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                <span className="text-xs text-slate-400">%</span>
                 <button type="button" onClick={handleFinalizeCqi} disabled={busyAction==='cqi-finalize'}
-                  title="Recompute each LO's attainment against its stored threshold and trigger CQI actions where needed"
+                  title="Count the students passing each LO at the student pass mark, and trigger CQI where fewer than the batch target pass"
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-colors ${busyAction==='cqi-finalize'?'bg-slate-200 text-slate-400 cursor-not-allowed':'bg-amber-500 text-white hover:bg-amber-600'}`}>
                   {busyAction==='cqi-finalize' && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                   Finalize &amp; Check CQI
@@ -592,7 +582,7 @@ export default function MarksWorkbenchPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-8 items-start">
+            <div className="grid grid-cols-1 gap-8 items-start">
               {/* Left — assignment list */}
               <div className="space-y-5">
                 <div className="flex items-center justify-between">
@@ -680,139 +670,7 @@ export default function MarksWorkbenchPage() {
                 )}
               </div>
 
-              {/* Right — PO Attainment panel */}
-              <div className="sticky top-28">
-                <section className="glass-card rounded-[2.5rem] p-7 border-slate-100 space-y-5">
-                  <div>
-                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2 block">Analytics</span>
-                    <h2 className="heading-lg">PO Attainment</h2>
-                    <p className="text-xs text-slate-500 mt-1">Using threshold: <strong>{getThreshold(activeBatch)}%</strong></p>
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Saved automatically (threshold 50%) whenever marks are uploaded, edited or deleted — no need to press the button below for that.
-                      Use it to view the results here, or to recalculate and save with a different threshold. Combines Final Exam and Assignment marks together.
-                    </p>
-                  </div>
-                  {!batchAssignments.length && (
-                    <p className="text-xs text-amber-600 font-semibold">
-                      No marks are uploaded for batch {activeBatch}, so this will come back empty.
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <label className="text-xs font-black text-slate-500 uppercase tracking-widest">Learning outcomes</label>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={() => setAnalyticsLosIds(los.map(l=>l.id))} className="text-[10px] font-black text-indigo-600 hover:underline">All</button>
-                        <button type="button" onClick={() => setAnalyticsLosIds([])} className="text-[10px] font-black text-slate-400 hover:underline">Clear</button>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {los.map(lo => {
-                        const checked = analyticsLosIds.includes(lo.id)
-                        return (
-                          <button key={lo.id} type="button" onClick={() => toggleAnalyticsLo(lo.id)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-colors ${checked?'bg-indigo-600 text-white border-indigo-600':'bg-white text-slate-500 border-slate-200 hover:border-indigo-400'}`}>
-                            {lo.id}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-3 pt-2 border-t border-slate-100">
-                    <button type="button" onClick={handleCalculatePOAttainment}
-                      disabled={busyAction==='po'||!analyticsLos.length}
-                      className={`w-full py-4 px-6 rounded-2xl text-white font-bold shadow-lg transition-all flex items-center justify-center gap-3 ${busyAction==='po'||!analyticsLos.length?'bg-slate-300 cursor-not-allowed':'bg-emerald-600 hover:bg-emerald-700'}`}>
-                      {busyAction==='po'&&<span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"/>}
-                      View / Recalculate PO Attainment
-                    </button>
-                    <button type="button" onClick={handleExportPOAttainment}
-                      disabled={busyAction==='po-export'||!analyticsLos.length}
-                      className={`w-full py-3 px-6 rounded-2xl border font-bold transition-all flex items-center justify-center gap-3 ${busyAction==='po-export'||!analyticsLos.length?'bg-slate-100 text-slate-400 cursor-not-allowed':'bg-white text-slate-700 border-slate-200 hover:border-emerald-200 hover:text-emerald-700'}`}>
-                      {busyAction==='po-export'&&<span className="w-4 h-4 border-2 border-slate-300 border-t-emerald-600 rounded-full animate-spin"/>}
-                      Export PO Attainment Excel
-                    </button>
-                  </div>
-                </section>
-              </div>
             </div>
-
-            {/* PO Attainment Results */}
-            {poAttainment?.poList?.length > 0 && (
-              <section className="glass-card rounded-[2.5rem] p-8 border-slate-100 space-y-6">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-2 block">Results</span>
-                    <h2 className="heading-lg">Per-Student PO Credit Attainment</h2>
-                    <p className="text-sm text-slate-500 mt-1">Threshold: <strong>{poAttainment.threshold}%</strong> · Students: <strong>{poAttainment.studentCount}</strong> · POs: <strong>{poAttainment.poList.length}</strong></p>
-                    {poAttainment.studentCount > 0 && (
-                      poAttainment.persisted ? (
-                        <p className="text-xs text-emerald-600 font-bold mt-1.5 flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                          Saved — counted in this student&apos;s cross-module PO summary
-                        </p>
-                      ) : (
-                        <p className="text-xs text-amber-600 font-bold mt-1.5">Not saved — these LOs have no module on record.</p>
-                      )
-                    )}
-                  </div>
-                  <button type="button" onClick={() => setPOAttainment(null)}
-                    className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors">
-                    Clear results
-                  </button>
-                </div>
-                {poAttainment.studentCount === 0 && (
-                  <div className="rounded-2xl border-2 border-amber-200 bg-amber-50 p-5">
-                    <div className="font-black text-amber-800 mb-1">No marks matched this selection</div>
-                    <p className="text-sm text-amber-700">
-                      Batch <strong>{activeBatch}</strong> has no marks (Final Exam or Assignment) for the selected learning outcomes, so there is nothing to calculate.
-                    </p>
-                  </div>
-                )}
-                {poAttainment.loPoMappings?.length > 0 && (
-                  <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">LO → PO Mappings</div>
-                    <div className="flex flex-wrap gap-2">
-                      {poAttainment.loPoMappings.map((m,i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-semibold">
-                          {m.loId} → {m.poCode} <span className="text-[10px] text-indigo-400">(wt: {m.weight})</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
-                  <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Maximum Possible Credits</div>
-                  <div className="flex flex-wrap gap-3">
-                    {poAttainment.poList.map(po => (
-                      <span key={po} className="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">{po}: {poAttainment.maxCredits?.[po]||0}</span>
-                    ))}
-                    <span className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold">Total: {poAttainment.totalMaxCredit}</span>
-                  </div>
-                </div>
-                <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-800 text-white">
-                        <th className="px-4 py-3 text-left font-bold text-xs uppercase tracking-widest">Student</th>
-                        {poAttainment.poList.map(po=><th key={po} className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest">{po}</th>)}
-                        <th className="px-4 py-3 text-center font-bold text-xs uppercase tracking-widest bg-slate-900">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {poAttainment.students?.map((s,idx)=>(
-                        <tr key={s.studentId} className={idx%2===0?'bg-white':'bg-slate-50'}>
-                          <td className="px-4 py-3 font-semibold text-slate-800 border-r border-slate-100">{s.studentId}</td>
-                          {poAttainment.poList.map(po=>{
-                            const c=s.poCredits?.[po]||0; const max=poAttainment.maxCredits?.[po]||1
-                            return <td key={po} className={`px-4 py-3 text-center font-bold border-r border-slate-100 ${c>0?c>=max?'bg-emerald-100 text-emerald-700':'bg-emerald-50 text-emerald-600':'text-slate-400'}`}>{c}</td>
-                          })}
-                          <td className={`px-4 py-3 text-center font-black border-l-2 border-slate-200 ${s.totalCredit>0?s.totalCredit>=poAttainment.totalMaxCredit?'bg-emerald-200 text-emerald-800':'bg-emerald-50 text-emerald-700':'text-slate-400'}`}>{s.totalCredit}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
 
             {/* CQI History — accreditation evidence for this module */}
             <section className="glass-card rounded-[2.5rem] p-8 border-slate-100 space-y-5">

@@ -67,6 +67,25 @@ public class ExcelImportService {
 
             try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
                 Sheet sheet = workbook.getSheetAt(0);
+
+                // Validate every referenced student already exists before importing anything
+                List<String> unknownStudents = new ArrayList<>();
+                for (Row row : sheet) {
+                    if (row.getRowNum() == 0) continue;
+                    Cell indexCell = row.getCell(0);
+                    if (indexCell == null) continue;
+                    String studentIndex = indexCell.toString().trim();
+                    if (studentIndex.isEmpty()) continue;
+                    if (!unknownStudents.contains(studentIndex) && !studentRepository.existsById(studentIndex)) {
+                        unknownStudents.add(studentIndex);
+                    }
+                }
+                if (!unknownStudents.isEmpty()) {
+                    throw new Exception("Upload rejected — " + unknownStudents.size() +
+                            " student(s) not found in the system: " + String.join(", ", unknownStudents) +
+                            ". Import these students first, then re-upload.");
+                }
+
                 int count = 0;
                 for (Row row : sheet) {
                     if (row.getRowNum() == 0) continue; // Skip header
@@ -76,7 +95,7 @@ public class ExcelImportService {
 
                     if (indexCell == null || markCell == null) continue;
 
-                    String studentIndex = indexCell.toString();
+                    String studentIndex = indexCell.toString().trim();
                     double score = 0.0;
 
                     if (markCell.getCellType() == CellType.NUMERIC) {
@@ -97,14 +116,8 @@ public class ExcelImportService {
                     // Clamp 0-100
                     score = Math.max(0.0, Math.min(100.0, score));
 
-                    // Find or Create Student
                     Student student = studentRepository.findById(studentIndex)
-                            .orElseGet(() -> {
-                                Student newStudent = new Student();
-                                newStudent.setStudentId(studentIndex);
-                                newStudent.setStudentName("Unknown"); // Placeholder
-                                return studentRepository.save(newStudent);
-                            });
+                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
 
                     StudentMark mark = new StudentMark();
                     mark.setStudent(student);
@@ -218,6 +231,10 @@ public class ExcelImportService {
                     Cell idxCell = row.getCell(0);
                     if (idxCell == null || idxCell.toString().trim().isEmpty()) continue;
                     String studentIndex = idxCell.toString().trim();
+                    if (!studentRepository.existsById(studentIndex)) {
+                        errors.add("Row " + (row.getRowNum() + 1) + ": student " + studentIndex + " not found in the system");
+                        continue;
+                    }
                     for (int i = 0; i < losIds.length; i++) {
                         Cell markCell = row.getCell(i + 1);
                         if (markCell == null || markCell.toString().trim().isEmpty()) continue;
@@ -292,10 +309,8 @@ public class ExcelImportService {
                     Cell idxCell = row.getCell(0);
                     if (idxCell == null || idxCell.toString().trim().isEmpty()) continue;
                     String studentIndex = idxCell.toString().trim();
-                    final Student student = studentRepository.findById(studentIndex).orElseGet(() -> {
-                        Student s = new Student(); s.setStudentId(studentIndex); s.setStudentName("Unknown");
-                        return studentRepository.save(s);
-                    });
+                    final Student student = studentRepository.findById(studentIndex)
+                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
                     for (int i = 0; i < losIds.length; i++) {
                         final String losId = losIds[i];
                         Cell markCell = row.getCell(i + 1);
@@ -404,26 +419,13 @@ public class ExcelImportService {
 
                     String studentId = studentIdCell.toString().trim();
 
-                    // If old format, read student name from col 1
-                    String studentName = "Unknown";
-                    if (qColOffset[0] == 2) {
-                        Cell nameCell = row.getCell(1);
-                        if (nameCell != null && !nameCell.toString().trim().isEmpty()) {
-                            studentName = nameCell.toString().trim();
-                        }
+                    if (!studentRepository.existsById(studentId)) {
+                        validationErrors.add("Row " + (row.getRowNum() + 1) + ": student " + studentId + " not found in the system");
+                        continue;
                     }
 
-                    final String finalStudentName = studentName;
-                    Student student = studentRepository.findById(studentId).orElseGet(() -> {
-                        Student s = new Student();
-                        s.setStudentId(studentId);
-                        s.setStudentName(finalStudentName.isEmpty() ? "Unknown" : finalStudentName);
-                        return studentRepository.save(s);
-                    });
-                    if ((student.getStudentName() == null || student.getStudentName().equals("Unknown")) && !finalStudentName.isEmpty()) {
-                        student.setStudentName(finalStudentName);
-                        studentRepository.save(student);
-                    }
+                    Student student = studentRepository.findById(studentId)
+                            .orElseThrow(() -> new Exception("Student not found: " + studentId));
                     studentsById.put(studentId, student);
 
                     for (int i = 0; i < items.size(); i++) {

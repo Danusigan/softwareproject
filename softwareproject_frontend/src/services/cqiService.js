@@ -3,8 +3,9 @@ import axios from 'axios'
 const BASE_URL = ''
 
 export const cqiService = {
-  async finalize({ moduleId, batch }, config = {}) {
-    return axios.post(`${BASE_URL}/api/cqi/finalize/${moduleId}`, null, { ...config, params: { batch } })
+  async finalize({ moduleId, batch, studentPassThreshold, batchTarget }, config = {}) {
+    return axios.post(`${BASE_URL}/api/cqi/finalize/${moduleId}`, null,
+      { ...config, params: { batch, studentPassThreshold, batchTarget } })
   },
 
   async getMyPlans(config = {}) {
