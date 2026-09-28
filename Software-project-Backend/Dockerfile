@@ -4,10 +4,13 @@ FROM maven:3.9.9-eclipse-temurin-17 AS builder
 
 WORKDIR /app
 
+# Dependencies first, in their own layer: only re-downloaded when pom.xml changes.
 COPY pom.xml .
+RUN mvn -B -q dependency:go-offline
+
 COPY src ./src
 
-RUN mvn clean package -DskipTests -q
+RUN mvn -B clean package -DskipTests -q
 
 # Stage 2: Runtime
 FROM eclipse-temurin:17-jre
@@ -23,9 +26,9 @@ USER app
 
 EXPOSE 8080
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/actuator/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -fsS http://127.0.0.1:8080/actuator/health || wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1
 
-ENTRYPOINT ["java", "-jar", "app.jar", \
-    "-Dspring.profiles.active=prod", \
-    "-Dserver.port=8080"]
+# Profile comes from SPRING_PROFILES_ACTIVE (set by compose). JVM heap sized from the
+# container's memory rather than the host's.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
