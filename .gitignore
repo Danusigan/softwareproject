@@ -71,3 +71,12 @@ Thumbs.db
 # Test coverage & SonarQube scanner work dir
 coverage/
 .scannerwork/
+
+# Infrastructure (infra/) - never commit state, secrets or generated files
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.*
+infra/terraform/**/terraform.tfvars
+infra/terraform/backend.hcl
+infra/ansible/inventory/hosts.ini
+*.pem
