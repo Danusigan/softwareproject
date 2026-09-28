@@ -203,6 +203,19 @@ public class ProgramOutcomeService {
         }
     }
 
+    // Admin-only CQI trigger threshold (% below which this PO's batch attainment opens a
+    // PO-level CQI action — see CQIService.checkAndTriggerCQI_PO).
+    public ProgramOutcome updateAttainmentThreshold(String poId, Double threshold) {
+        if (threshold == null || threshold < 0 || threshold > 100) {
+            throw new IllegalArgumentException("Threshold must be between 0 and 100");
+        }
+        ProgramOutcome po = getPOById(poId)
+            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+        po.setAttainmentThreshold(threshold);
+        po.setUpdatedAt(LocalDateTime.now());
+        return poRepository.save(po);
+    }
+
     // Reorder POs
     public void reorderPOs(List<String> poIds) {
         for (int i = 0; i < poIds.size(); i++) {

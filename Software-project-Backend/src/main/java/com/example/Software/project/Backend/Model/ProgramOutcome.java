@@ -46,6 +46,9 @@ public class ProgramOutcome {
     @Column(name = "display_order")
     private Integer displayOrder; // For ordering in lists
 
+    @Column(name = "attainment_threshold")
+    private Double attainmentThreshold = 70.0; // % below which this PO triggers a PO-level CQI action
+
     public ProgramOutcome() {}
 
     public ProgramOutcome(String poId, String code, String title, String description) {
@@ -137,6 +140,9 @@ public class ProgramOutcome {
 
     public Integer getDisplayOrder() { return displayOrder; }
     public void setDisplayOrder(Integer displayOrder) { this.displayOrder = displayOrder; }
+
+    public Double getAttainmentThreshold() { return attainmentThreshold; }
+    public void setAttainmentThreshold(Double attainmentThreshold) { this.attainmentThreshold = attainmentThreshold; }
 
     @Override
     public String toString() {

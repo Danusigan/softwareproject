@@ -18,6 +18,11 @@ public interface StudentAssessmentScoreRepository extends JpaRepository<StudentA
 
     List<StudentAssessmentScore> findByAssessmentItem_Los_Id(String loId);
 
+    // Calculation-pipeline variant: excludes scores whose item belongs to a soft-deleted template,
+    // matching AssessmentItemRepository.findByLos_IdAndAssessmentTemplate_IsDeletedFalse so a
+    // retired template's items and scores are excluded from LO attainment together (AttainmentService).
+    List<StudentAssessmentScore> findByAssessmentItem_Los_IdAndAssessmentItem_AssessmentTemplate_IsDeletedFalse(String loId);
+
     List<StudentAssessmentScore> findByAssessmentItem_AssessmentTemplate_Id(String templateId);
 
     List<StudentAssessmentScore> findByAssessmentItem_Id(Long itemId);

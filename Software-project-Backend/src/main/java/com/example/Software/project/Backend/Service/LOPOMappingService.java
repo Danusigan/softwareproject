@@ -265,21 +265,30 @@ public class LOPOMappingService {
      * Get mappings for a specific LO
      */
     public List<OutcomeMapping> getMappingsForLO(String loId) {
-        return mappingRepository.findByLearningOutcome_Id(loId);
+        return excludeDeleted(mappingRepository.findByLearningOutcome_Id(loId));
     }
 
     /**
      * Get all mappings for a module
      */
     public List<OutcomeMapping> getMappingsForModule(String moduleId) {
-        return mappingRepository.findByLearningOutcome_Module_ModuleId(moduleId);
+        return excludeDeleted(mappingRepository.findByLearningOutcome_Module_ModuleId(moduleId));
     }
 
     /**
      * Get pending mappings for admin review
      */
     public List<OutcomeMapping> getPendingMappings() {
-        return mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.PENDING);
+        return excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.PENDING));
+    }
+
+    // Soft-deleted mappings stay in the DB as accreditation evidence but should never surface in
+    // normal listing endpoints — filtered here in the service layer rather than in every one of
+    // OutcomeMappingRepository's derived/custom queries.
+    private List<OutcomeMapping> excludeDeleted(List<OutcomeMapping> mappings) {
+        return mappings.stream()
+            .filter(m -> !Boolean.TRUE.equals(m.getIsDeleted()))
+            .collect(Collectors.toList());
     }
 
     /**
@@ -360,17 +369,40 @@ public class LOPOMappingService {
     }
 
     /**
-     * Delete mapping (Lecturer only, if not yet approved)
+     * Delete mapping (Lecturer only, if not yet approved) — soft delete, recoverable via restoreMapping
      */
-    public void deleteMapping(Long mappingId) {
+    public void deleteMapping(Long mappingId, String deletedBy) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
             .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
-        
+
         if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED) {
             throw new IllegalArgumentException("Cannot delete approved mappings");
         }
-        
-        mappingRepository.delete(mapping);
+
+        mapping.softDelete(deletedBy);
+        mappingRepository.save(mapping);
+    }
+
+    /**
+     * Restore a soft-deleted mapping (Admin only)
+     */
+    public OutcomeMapping restoreMapping(Long mappingId) {
+        OutcomeMapping mapping = mappingRepository.findById(mappingId)
+            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+
+        if (!Boolean.TRUE.equals(mapping.getIsDeleted())) {
+            throw new IllegalArgumentException("Mapping is not deleted");
+        }
+
+        mapping.restore();
+        return mappingRepository.save(mapping);
+    }
+
+    /**
+     * Get all soft-deleted mappings (Admin only — archive view)
+     */
+    public List<OutcomeMapping> getDeletedMappings() {
+        return mappingRepository.findByIsDeletedTrue();
     }
 
     /**
@@ -438,8 +470,8 @@ public class LOPOMappingService {
      * Get all mappings with optional filtering
      */
     public List<OutcomeMapping> getAllMappings(String moduleId, String status, String batch, String search) {
-        List<OutcomeMapping> mappings = mappingRepository.findAll();
-        
+        List<OutcomeMapping> mappings = excludeDeleted(mappingRepository.findAll());
+
         // Filter by status if provided
         if (status != null && !status.isEmpty()) {
             mappings = mappings.stream()
@@ -502,7 +534,7 @@ public class LOPOMappingService {
         long totalPOs = poRepository.count();
         if (totalPOs == 0) return 0.0;
         
-        List<OutcomeMapping> approvedMappings = mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        List<OutcomeMapping> approvedMappings = excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED));
         Set<String> uniquePOs = approvedMappings.stream()
             .map(m -> m.getProgramOutcome().getPoId())
             .collect(Collectors.toSet());

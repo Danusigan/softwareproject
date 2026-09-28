@@ -69,7 +69,7 @@ class TrendServiceTest {
         po.setTitle("Engineering knowledge");
         OutcomeMapping map1 = mapping(lo1, po, 3);
         OutcomeMapping map2 = mapping(lo2, po, 1);
-        lenient().when(outcomeMappingRepository.findByLearningOutcome_Module_ModuleIdAndStatus(
+        lenient().when(outcomeMappingRepository.findByLearningOutcome_Module_ModuleIdAndStatusAndIsDeletedFalse(
             "SE101", OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of(map1, map2));
         lenient().when(markRepository.findByLos_Module_ModuleId("SE101")).thenReturn(marks);
     }

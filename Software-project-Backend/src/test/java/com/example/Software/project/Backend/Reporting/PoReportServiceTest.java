@@ -192,7 +192,7 @@ class PoReportServiceTest {
     @DisplayName("batchReport computes attainment share against studentThreshold and success against batchTarget")
     void batchReportComputesAttainmentAndSuccess() {
         when(programOutcomeRepository.findByIsDefaultTrueOrderByDisplayOrderAsc()).thenReturn(List.of(po1));
-        when(outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
+        when(outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
 
         when(studentRepository.findByBatch("24")).thenReturn(Arrays.asList(student1, student2));
 
@@ -215,7 +215,7 @@ class PoReportServiceTest {
     @DisplayName("batchReport counts a student with no saved credit as not attaining the PO")
     void batchReportMissingCreditCountsAsNotAttained() {
         when(programOutcomeRepository.findByIsDefaultTrueOrderByDisplayOrderAsc()).thenReturn(List.of(po1));
-        when(outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
+        when(outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
 
         when(studentRepository.findByBatch("24")).thenReturn(Arrays.asList(student1, student2));
 
@@ -235,7 +235,7 @@ class PoReportServiceTest {
     @DisplayName("batchReport always lists every Washington Accord standard PO, even with no mapping or data at all")
     void batchReportAlwaysListsWashingtonAccordDefaults() {
         when(programOutcomeRepository.findByIsDefaultTrueOrderByDisplayOrderAsc()).thenReturn(List.of(po1, po2));
-        when(outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
+        when(outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of());
 
         when(studentRepository.findByBatch("24")).thenReturn(Arrays.asList(student1, student2));
         when(studentPoCreditRepository.findByBatch("24")).thenReturn(Collections.emptyList());
@@ -259,7 +259,7 @@ class PoReportServiceTest {
         customMapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
         Los los = new Los(); los.setId("LO099");
         customMapping.setLearningOutcome(los);
-        when(outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of(customMapping));
+        when(outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED)).thenReturn(List.of(customMapping));
 
         when(studentRepository.findByBatch("24")).thenReturn(Arrays.asList(student1, student2));
         StudentPoCredit customCredit = credit(student1, customPo, module, "24", 5, 5);

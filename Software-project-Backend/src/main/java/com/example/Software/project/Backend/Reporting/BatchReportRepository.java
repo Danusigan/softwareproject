@@ -13,28 +13,32 @@ public class BatchReportRepository {
     public List<AssessmentItem> items(String batch, List<String> modules) {
         return em.createQuery("select i from AssessmentItem i join fetch i.los l " +
                 "join fetch l.module m join fetch i.assessmentTemplate t " +
-                "where t.batch = :batch and m.moduleId in :modules order by t.id, i.questionNumber", AssessmentItem.class)
+                "where t.batch = :batch and m.moduleId in :modules and l.isDeleted = false and t.isDeleted = false " +
+                "order by t.id, i.questionNumber", AssessmentItem.class)
                 .setParameter("batch", batch).setParameter("modules", modules).getResultList();
     }
     public List<StudentAssessmentScore> scores(String batch, List<String> modules) {
         return em.createQuery("select s from StudentAssessmentScore s join fetch s.student " +
                 "join fetch s.assessmentItem i join fetch i.los l join fetch l.module m " +
-                "join fetch i.assessmentTemplate t where t.batch = :batch and m.moduleId in :modules",
+                "join fetch i.assessmentTemplate t where t.batch = :batch and m.moduleId in :modules " +
+                "and l.isDeleted = false and t.isDeleted = false",
                 StudentAssessmentScore.class).setParameter("batch", batch).setParameter("modules", modules).getResultList();
     }
     public List<StudentMark> legacy(String batch, List<String> modules) {
         return em.createQuery("select s from StudentMark s join fetch s.student join fetch s.los l " +
-                "join fetch l.module m where s.batch = :batch and m.moduleId in :modules", StudentMark.class)
+                "join fetch l.module m where s.batch = :batch and m.moduleId in :modules and l.isDeleted = false",
+                StudentMark.class)
                 .setParameter("batch", batch).setParameter("modules", modules).getResultList();
     }
     public List<Los> los(List<String> modules) {
-        return em.createQuery("select l from Los l join fetch l.module m where m.moduleId in :modules order by l.id", Los.class)
+        return em.createQuery("select l from Los l join fetch l.module m where m.moduleId in :modules and l.isDeleted = false order by l.id", Los.class)
                 .setParameter("modules", modules).getResultList();
     }
     public List<OutcomeMapping> mappings(List<String> modules) {
         return em.createQuery("select o from OutcomeMapping o join fetch o.learningOutcome l " +
                 "join fetch l.module m join fetch o.programOutcome p where m.moduleId in :modules " +
-                "and o.status = :approved and o.weight > 0 and p.isActive = true", OutcomeMapping.class)
+                "and o.status = :approved and o.weight > 0 and p.isActive = true " +
+                "and o.isDeleted = false and l.isDeleted = false", OutcomeMapping.class)
                 .setParameter("modules", modules).setParameter("approved", OutcomeMapping.ApprovalStatus.APPROVED).getResultList();
     }
     public List<ProgramOutcome> pos() {
@@ -42,9 +46,10 @@ public class BatchReportRepository {
     }
     public List<String> batchModules(String batch, List<String> modules) {
         return em.createQuery("select m.moduleId from Module m where m.moduleId in :modules and (" +
-                "exists (select l.id from Los l where l.module = m and l.batch = :batch) or " +
-                "exists (select s.id from StudentMark s where s.los.module = m and s.batch = :batch) or " +
-                "exists (select i.id from AssessmentItem i where i.los.module = m and i.assessmentTemplate.batch = :batch))",
+                "exists (select l.id from Los l where l.module = m and l.batch = :batch and l.isDeleted = false) or " +
+                "exists (select s.id from StudentMark s where s.los.module = m and s.batch = :batch and s.los.isDeleted = false) or " +
+                "exists (select i.id from AssessmentItem i where i.los.module = m and i.assessmentTemplate.batch = :batch " +
+                "and i.los.isDeleted = false and i.assessmentTemplate.isDeleted = false))",
                 String.class).setParameter("batch", batch).setParameter("modules", modules).getResultList();
     }
 }

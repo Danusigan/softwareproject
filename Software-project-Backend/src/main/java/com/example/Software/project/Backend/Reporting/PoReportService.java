@@ -146,7 +146,7 @@ public class PoReportService {
             covered.add(po.getCode());
         }
 
-        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED);
         Map<String, ProgramOutcome> customPos = new LinkedHashMap<>();
         for (OutcomeMapping m : approvedMappings) {
             String code = m.getProgramOutcome().getCode();

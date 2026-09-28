@@ -287,7 +287,7 @@ public class TrendService {
         Map<String, Double> loScores = loPerformance.stream().collect(Collectors.toMap(
             item -> String.valueOf(item.get("loId")), item -> number(item.get("actual")), (a, b) -> a));
         List<OutcomeMapping> mappings = safeList(outcomeMappingRepository
-            .findByLearningOutcome_Module_ModuleIdAndStatus(moduleId, OutcomeMapping.ApprovalStatus.APPROVED))
+            .findByLearningOutcome_Module_ModuleIdAndStatusAndIsDeletedFalse(moduleId, OutcomeMapping.ApprovalStatus.APPROVED))
             .stream().filter(mapping -> focusLoId == null || (mapping.getLearningOutcome() != null
                 && focusLoId.equalsIgnoreCase(mapping.getLearningOutcome().getId())))
             .filter(mapping -> mapping.getWeight() != null && mapping.getWeight() > 0)

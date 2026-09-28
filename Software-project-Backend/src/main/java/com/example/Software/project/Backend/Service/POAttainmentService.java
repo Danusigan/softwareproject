@@ -96,7 +96,7 @@ public class POAttainmentService {
 
         for (String losId : losIds) {
             List<OutcomeMapping> loMappings = outcomeMappingRepository
-                    .findByLearningOutcome_Id(losId);
+                    .findByLearningOutcome_IdAndIsDeletedFalse(losId);
             allMappings.addAll(loMappings);
 
             Los los = losRepository.findById(losId).orElse(null);
@@ -323,7 +323,7 @@ public class POAttainmentService {
             return;
         }
         try {
-            List<String> losIds = losRepository.findByModule_ModuleId(moduleId).stream()
+            List<String> losIds = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId).stream()
                     .map(Los::getId)
                     .collect(Collectors.toList());
             if (losIds.isEmpty()) return;
@@ -590,7 +590,7 @@ public class POAttainmentService {
         if (poThreshold == null) poThreshold = 60.0; // Default PO attainment benchmark
 
         // 1. Find all approved LO->PO mappings
-        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        List<OutcomeMapping> approvedMappings = outcomeMappingRepository.findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus.APPROVED);
         if (approvedMappings.isEmpty()) {
             return Map.of("message", "No approved LO-PO mappings found.", "poAttainment", Collections.emptyList());
         }

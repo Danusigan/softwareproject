@@ -34,4 +34,8 @@ public interface StudentPoCreditRepository extends JpaRepository<StudentPoCredit
     // Every saved credit row for one batch, across all modules — the raw material for the admin
     // batch PO report (PoReportService.batchReport).
     List<StudentPoCredit> findByBatch(String batch);
+
+    // Every saved credit row for one module+batch, across all POs — used by the PO-level CQI
+    // trigger (CQIService.checkAndTriggerCQI_PO) to compute per-PO achievement rates.
+    List<StudentPoCredit> findByModule_ModuleIdAndBatch(String moduleId, String batch);
 }

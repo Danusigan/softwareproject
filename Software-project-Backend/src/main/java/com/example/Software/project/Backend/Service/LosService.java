@@ -91,13 +91,14 @@ public class LosService {
 
     // Read All Los by Module ID
     public List<Los> getLosByModuleId(String moduleId) {
-        return losRepository.findByModule_ModuleId(moduleId);
+        return losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
     }
 
     // Read One Los
     public Optional<Los> getLosById(String id) {
         try {
-            return losRepository.findById(resolveStoredLosId(id));
+            return losRepository.findById(resolveStoredLosId(id))
+                    .filter(los -> !Boolean.TRUE.equals(los.getIsDeleted()));
         } catch (Exception e) {
             return Optional.empty();
         }
@@ -125,10 +126,15 @@ public class LosService {
         return losRepository.save(los);
     }
 
-    // Delete Los (Lecture or as part of module delete)
+    // Delete Los (Lecture or as part of module delete) — soft delete: preserves the LO, its
+    // CqiActions and LO-PO mappings as accreditation evidence. Student marks and assessment
+    // items are still hard-deleted here (unchanged from before) — see StudentMark soft-delete
+    // scope note in the migration/entity for why marks weren't brought into this rollout.
     @Transactional
-    public void deleteLos(String id) throws Exception {
+    public void deleteLos(String id, String deletedBy) throws Exception {
         String storedLosId = resolveStoredLosId(id);
+        Los los = losRepository.findById(storedLosId)
+                .orElseThrow(() -> new Exception("Los not found"));
 
         // 1. Delete student marks for this LO
         studentMarkRepository.deleteByLos_Id(storedLosId);
@@ -144,16 +150,51 @@ public class LosService {
         // 3. Delete assessment items for this LO
         assessmentItemRepository.deleteAll(items);
 
-        // 4. Delete CqiAction rows that reference this LO (nullable FK los_id blocks LO deletion)
-        try { jdbcTemplate.update("DELETE FROM cqi_action WHERE los_id = ?", storedLosId); } catch (Exception ignored) {}
+        // 4. Soft-delete CqiAction rows that reference this LO
+        try {
+            jdbcTemplate.update(
+                "UPDATE cqi_action SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE los_id = ? AND is_deleted = 0",
+                deletedBy, storedLosId);
+        } catch (Exception ignored) {}
 
-        // 5. Delete LO-PO mappings
-        try { jdbcTemplate.update("DELETE FROM lo_po_mappings WHERE los_id = ? OR lospos_id = ?", storedLosId, storedLosId); } catch (Exception ignored) {}
+        // 5. Soft-delete LO-PO mappings
+        try {
+            jdbcTemplate.update(
+                "UPDATE lo_po_mappings SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE (los_id = ? OR lospos_id = ?) AND is_deleted = 0",
+                deletedBy, storedLosId, storedLosId);
+        } catch (Exception ignored) {}
 
         // 6. Delete legacy assignments table if present
         try { jdbcTemplate.update("DELETE FROM assignments WHERE los_pos_id = ?", storedLosId); } catch (Exception ignored) {}
 
-        // 7. Delete the LO
-        losRepository.deleteById(storedLosId);
+        // 7. Soft-delete the LO itself
+        los.softDelete(deletedBy);
+        losRepository.save(los);
+    }
+
+    // Restore (Lecture/Admin) — reverses deleteLos, including its mapping/CQI cascade
+    public void restoreLos(String id) throws Exception {
+        Los los = losRepository.findById(id)
+                .orElseThrow(() -> new Exception("Los not found"));
+        if (!Boolean.TRUE.equals(los.getIsDeleted())) {
+            throw new Exception("Los is not deleted");
+        }
+        los.restore();
+        losRepository.save(los);
+
+        try {
+            jdbcTemplate.update(
+                "UPDATE cqi_action SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE los_id = ?",
+                id);
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.update(
+                "UPDATE lo_po_mappings SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE los_id = ? OR lospos_id = ?",
+                id, id);
+        } catch (Exception ignored) {}
+    }
+
+    public List<Los> getDeletedLosByModuleId(String moduleId) {
+        return losRepository.findByModule_ModuleIdAndIsDeletedTrue(moduleId);
     }
 }

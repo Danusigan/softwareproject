@@ -246,7 +246,7 @@ public class LOPOMappingRestController {
         }
     }
 
-    // Delete mapping (if not approved)
+    // Delete mapping (if not approved) — soft delete, recoverable via admin restore
     @DeleteMapping("/{mappingId}")
     public ResponseEntity<?> deleteMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
         try {
@@ -254,12 +254,43 @@ public class LOPOMappingRestController {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(createErrorResponse("Access denied. Lecturer privileges required."));
             }
 
-            mappingService.deleteMapping(mappingId);
-            return ResponseEntity.ok(createSuccessResponse("Mapping deleted successfully", null));
+            mappingService.deleteMapping(mappingId, extractUsername(token));
+            return ResponseEntity.ok(createSuccessResponse("Mapping moved to archive", null));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error deleting mapping: " + e.getMessage()));
+        }
+    }
+
+    // Get all soft-deleted mappings (Admin only — archive view)
+    @GetMapping("/admin/deleted")
+    public ResponseEntity<?> getDeletedMappings(@RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(createErrorResponse("Access denied. Admin privileges required."));
+            }
+
+            return ResponseEntity.ok(createSuccessResponse("Deleted mappings retrieved", mappingService.getDeletedMappings()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving deleted mappings: " + e.getMessage()));
+        }
+    }
+
+    // Restore a soft-deleted mapping (Admin only)
+    @PutMapping("/admin/{mappingId}/restore")
+    public ResponseEntity<?> restoreMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(createErrorResponse("Access denied. Admin privileges required."));
+            }
+
+            OutcomeMapping restored = mappingService.restoreMapping(mappingId);
+            return ResponseEntity.ok(createSuccessResponse("Mapping restored from archive", restored));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error restoring mapping: " + e.getMessage()));
         }
     }
 

@@ -51,13 +51,11 @@ public class OBEController {
                 .orElse(null);
     }
 
-    // Deleting a template cascades to its assessment_item rows, but the student_assessment_score
-    // rows pointing at those items are not part of that cascade and would block it on the FK.
-    // Clearing the scores first is the same order ExcelImportService uses when it removes a
-    // superseded template.
-    private void deleteTemplateWithScores(AssessmentTemplate template) {
-        studentAssessmentScoreRepo.deleteByAssessmentItem_AssessmentTemplate_Id(template.getId());
-        assessmentTemplateRepo.delete(template);
+    // Soft-deletes the template — its assessment_item/student_assessment_score rows stay intact
+    // as accreditation evidence rather than being cascade-deleted.
+    private void deleteTemplateWithScores(AssessmentTemplate template, String deletedBy) {
+        template.softDelete(deletedBy);
+        assessmentTemplateRepo.save(template);
     }
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
@@ -647,18 +645,19 @@ public class OBEController {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             MarkType type = MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_"));
+            String actor = username(token);
             if (assignmentLabel == null || assignmentLabel.isBlank()) {
                 // Delete ALL marks for this module+batch+markType regardless of assignment
                 markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, type);
                 assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
-                    .forEach(this::deleteTemplateWithScores);
+                    .forEach(t -> deleteTemplateWithScores(t, actor));
             } else {
                 markRepo().deleteByModuleIdAndBatchAndMarkTypeAndAssignmentLabel(
                     moduleId, batch, type, assignmentLabel);
                 assessmentTemplateRepo.findByModule_ModuleIdAndBatchAndMarkType(moduleId, batch, markType.toUpperCase())
                     .stream()
                     .filter(t -> assignmentLabel.equals(t.getAssignmentLabel()))
-                    .forEach(this::deleteTemplateWithScores);
+                    .forEach(t -> deleteTemplateWithScores(t, actor));
             }
             poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
@@ -1180,6 +1179,14 @@ public class OBEController {
     }
 
     // Helper RBAC
+    private String username(String token) {
+        String bearerToken = token;
+        if (token != null && token.startsWith("Bearer ")) {
+            bearerToken = token.substring(7);
+        }
+        return jwtUtil.extractUsername(bearerToken);
+    }
+
     private boolean isAdmin(String token) {
         try {
             String bearerToken = token;

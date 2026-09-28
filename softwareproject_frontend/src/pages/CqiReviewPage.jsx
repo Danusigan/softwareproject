@@ -15,7 +15,7 @@ const actionTypeLabels = {
 
 export default function CqiReviewPage() {
   const navigate = useNavigate()
-  const [pending, setPending] = useState([])
+  const [allPlans, setAllPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState({ type: '', text: '' })
@@ -28,13 +28,19 @@ export default function CqiReviewPage() {
     try {
       setLoading(true)
       const r = await cqiService.getPending({ headers: authHeaders() })
-      setPending(r.data?.data || [])
+      // Only show LO plans (filter out PO plans)
+      const loPlans = (r.data?.data || []).filter(plan => plan.losId && !plan.poId)
+      setAllPlans(loPlans)
     } catch (e) {
       setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to load pending CQI plans.' })
     } finally { setLoading(false) }
   }
 
   useEffect(() => { loadPending() }, [])
+
+  // Separate pending and completed/approved plans
+  const pending = allPlans.filter(plan => plan.status === 'PLANNED' && plan.submitted === true)
+  const history = allPlans.filter(plan => plan.status === 'IN_PROGRESS' || plan.status === 'COMPLETED')
 
   const handleApprove = async id => {
     try {
@@ -94,14 +100,22 @@ export default function CqiReviewPage() {
             </div>
             <p className="text-slate-500 font-bold">Loading…</p>
           </div>
-        ) : pending.length === 0 ? (
+        ) : pending.length === 0 && history.length === 0 ? (
           <div className="glass-card rounded-[2.5rem] p-16 text-center">
-            <h2 className="heading-lg mb-2">No plans awaiting review</h2>
-            <p className="text-slate-500">Submitted CQI action plans will show up here.</p>
+            <h2 className="heading-lg mb-2">No CQI plans found</h2>
+            <p className="text-slate-500">Submitted CQI action plans for Learning Outcomes will show up here.</p>
           </div>
         ) : (
-          <div className="space-y-6">
-            {pending.map(action => {
+          <div className="space-y-8">
+            {/* Pending LO Plans Section */}
+            {pending.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 mb-6">
+                  <span className="text-[10px] font-black text-red-600 uppercase tracking-[0.2em]">⏳ Awaiting Approval</span>
+                  <h2 className="heading-lg">Pending LO CQI Plans</h2>
+                  <span className="ml-auto px-3 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full">{pending.length} plan{pending.length !== 1 ? 's' : ''}</span>
+                </div>
+                {pending.map(action => {
               const approveKey = `approve-${action.id}`
               const returnKey = `return-${action.id}`
               return (
@@ -161,6 +175,59 @@ export default function CqiReviewPage() {
                 </section>
               )
             })}
+              </div>
+            )}
+
+            {/* History Section */}
+            {history.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 mb-6 pt-6 border-t-2 border-slate-200">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">📋 History</span>
+                  <h2 className="heading-lg text-slate-700">Approved & Completed Plans</h2>
+                  <span className="ml-auto px-3 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">{history.length} plan{history.length !== 1 ? 's' : ''}</span>
+                </div>
+                {history.map(action => {
+                  const statusBadge = action.status === 'IN_PROGRESS'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'bg-emerald-50 text-emerald-700'
+                  const statusLabel = action.status === 'IN_PROGRESS' ? 'In Progress' : 'Completed'
+
+                  return (
+                    <section key={action.id} className="glass-card rounded-[2.5rem] p-7 border-slate-100 space-y-5 opacity-80">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 block">{action.moduleName || action.moduleId} · Batch {action.batch}</span>
+                          <h2 className="heading-lg text-slate-700">{action.losId} — {action.losName || 'Learning Outcome'}</h2>
+                        </div>
+                        <div className="flex gap-3">
+                          <span className="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 text-xs font-bold">Achieved: {Number(action.attainmentScore).toFixed(1)}%</span>
+                          <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-bold">Threshold: {Number(action.targetScore).toFixed(1)}%</span>
+                          <span className={`px-3 py-1.5 rounded-xl ${statusBadge} text-xs font-bold`}>{statusLabel}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Root Cause</div>
+                          <p className="text-sm text-slate-700">{action.rootCause || '—'}</p>
+                        </div>
+                        <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Action Plan</div>
+                          <p className="text-sm text-slate-700">{action.actionPlan || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3 text-xs">
+                        <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold">Action type: {actionTypeLabels[action.actionType] || action.actionType || '—'}</span>
+                        <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold">Deadline: {action.deadline || '—'}</span>
+                        <span className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 font-bold">Submitted by: {action.createdBy || '—'}</span>
+                        {action.approvedBy && <span className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 font-bold">Approved by: {action.approvedBy}</span>}
+                      </div>
+                    </section>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>

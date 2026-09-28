@@ -2,6 +2,8 @@ import { useState } from 'react'
 import axios from 'axios'
 import Header from '../components/header'
 import Footer from '../components/footer'
+import CqiPlanModal from '../components/CqiPlanModal'
+import CqiPlansDisplay from '../components/CqiPlansDisplay'
 import authService from '../services/authService'
 import './studentReports.css'
 import './batchReports.css'
@@ -38,6 +40,8 @@ export default function BatchReportsPage() {
   const [report, setReport] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [cqiModal, setCqiModal] = useState(null)
+  const [cqiRefresh, setCqiRefresh] = useState(0)
 
   const loadModules = async event => {
     event.preventDefault()
@@ -164,9 +168,22 @@ export default function BatchReportsPage() {
           <p className="report-help">Weighted achievement rates from approved positive LO–PO mappings. Pending scores use complete mapped LOs only and are provisional. These are not student PO pass rates.</p>
           {!report.pos.length && <p>No active programme outcomes are configured.</p>}
           {report.pos.map(po => <div className="batch-po" key={po.poId}>
-            <h4>{po.code} — {po.title}</h4>
-            <AttainmentBar label={po.code} value={po.attainmentPercent} target={po.target} status={po.status} />
-            <p>{po.completeLos} of {po.mappedLos} mapped LOs have complete evidence.</p>
+            <div className="po-header">
+              <div>
+                <h4>{po.code} — {po.title}</h4>
+                <AttainmentBar label={po.code} value={po.attainmentPercent} target={po.target} status={po.status} />
+                <p>{po.completeLos} of {po.mappedLos} mapped LOs have complete evidence.</p>
+              </div>
+              {po.status !== 'Achieved' && (
+                <button
+                  className="btn-cqi-create"
+                  onClick={() => setCqiModal({ ...po, batch: report.batch })}
+                  title="Create CQI improvement plan for this PO"
+                >
+                  Create CQI Plan
+                </button>
+              )}
+            </div>
             {!!po.contributions.length && <div className="report-table-scroll"><table><caption>Approved contributions to {po.code}</caption>
               <thead><tr><th>Module</th><th>LO</th><th>Weight</th><th>LO achievement</th><th>Evidence status</th></tr></thead>
               <tbody>{po.contributions.map(c => <tr key={c.loId}><td>{c.moduleId}</td><td>{c.loId}</td><td>{c.weight}</td><td>{number(c.achievementPercent)}%</td><td>{c.status}</td></tr>)}</tbody>
@@ -181,7 +198,17 @@ export default function BatchReportsPage() {
           <h3>Calculation and scope notes</h3><ul>{report.notes.map(note => <li key={note}>{note}</li>)}</ul>
           <p>PDF downloads use the latest saved data at download time.</p>
         </section>
+        <CqiPlansDisplay batch={report.batch} onRefresh={() => setCqiRefresh(c => c + 1)} />
       </article>}
+      {cqiModal && (
+        <CqiPlanModal
+          batch={cqiModal.batch}
+          po={cqiModal}
+          currentAttainment={cqiModal.attainmentPercent}
+          onClose={() => setCqiModal(null)}
+          onSuccess={() => { setCqiModal(null); setCqiRefresh(c => c + 1) }}
+        />
+      )}
     </main><Footer />
   </div>
 }

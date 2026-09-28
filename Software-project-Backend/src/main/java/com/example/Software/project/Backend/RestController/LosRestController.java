@@ -146,7 +146,7 @@ public class LosRestController {
         }
     }
 
-    // Delete (Lecture Only)
+    // Delete (Lecture Only) — soft delete; LO moves to the archive, recoverable via /restore
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteLos(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
@@ -156,9 +156,56 @@ public class LosRestController {
                     "status", "ERROR"
                 ));
             }
-            losService.deleteLos(id);
+            losService.deleteLos(id, username(token));
             return ResponseEntity.ok(Map.of(
-                "message", "Learning Outcome deleted successfully",
+                "message", "Learning Outcome moved to archive",
+                "losId", id,
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
+    // Archive (Lecture/Admin) — list soft-deleted Los for a module
+    @GetMapping("/module/{moduleId}/deleted")
+    public ResponseEntity<?> getDeletedLos(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Lecturers/Admins can view the Los archive",
+                    "status", "ERROR"
+                ));
+            }
+            return ResponseEntity.ok(Map.of(
+                "message", "Deleted Learning Outcomes retrieved successfully",
+                "data", losService.getDeletedLosByModuleId(moduleId),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
+    // Restore (Lecture/Admin)
+    @PutMapping("/{id}/restore")
+    public ResponseEntity<?> restoreLos(@PathVariable String id, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Lecturers/Admins can restore Los",
+                    "status", "ERROR"
+                ));
+            }
+            losService.restoreLos(id);
+            return ResponseEntity.ok(Map.of(
+                "message", "Learning Outcome restored from archive",
                 "losId", id,
                 "status", "SUCCESS"
             ));
@@ -677,6 +724,14 @@ public class LosRestController {
         public void setIndexNo(String indexNo) { this.indexNo = indexNo; }
         public List<Double> getMarks() { return marks; }
         public void setMarks(List<Double> marks) { this.marks = marks; }
+    }
+
+    private String username(String token) {
+        String bearerToken = token;
+        if (token != null && token.startsWith("Bearer ")) {
+            bearerToken = token.substring(7);
+        }
+        return jwtUtil.extractUsername(bearerToken);
     }
 
     private boolean isLecture(String token) {

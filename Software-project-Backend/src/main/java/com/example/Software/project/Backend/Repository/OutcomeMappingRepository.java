@@ -12,15 +12,25 @@ public interface OutcomeMappingRepository extends JpaRepository<OutcomeMapping, 
     
     // Find by Learning Outcome ID
     List<OutcomeMapping> findByLearningOutcome_Id(String loId);
-    
+
+    // Calculation-pipeline variant of findByLearningOutcome_Id: excludes soft-deleted mappings so
+    // a deleted mapping's weight stops contributing to PO credits (POAttainmentService).
+    List<OutcomeMapping> findByLearningOutcome_IdAndIsDeletedFalse(String loId);
+
     // Find by Module ID
     List<OutcomeMapping> findByLearningOutcome_Module_ModuleId(String moduleId);
-    
+
+    // Calculation-pipeline variant: excludes soft-deleted mappings (AttainmentService.getPOAttainment).
+    List<OutcomeMapping> findByLearningOutcome_Module_ModuleIdAndIsDeletedFalse(String moduleId);
+
     // Find by Program Outcome ID
     List<OutcomeMapping> findByProgramOutcome_PoId(String poId);
-    
+
     // Find by status
     List<OutcomeMapping> findByStatus(OutcomeMapping.ApprovalStatus status);
+
+    // Calculation-pipeline variant: excludes soft-deleted mappings (POAttainmentService.calculateOverallPOAttainment, PoReportService).
+    List<OutcomeMapping> findByStatusAndIsDeletedFalse(OutcomeMapping.ApprovalStatus status);
     
     // Find by lecturer
     List<OutcomeMapping> findByMappedBy(String mappedBy);
@@ -36,6 +46,9 @@ public interface OutcomeMappingRepository extends JpaRepository<OutcomeMapping, 
     
     // Find mappings by module and status
     List<OutcomeMapping> findByLearningOutcome_Module_ModuleIdAndStatus(String moduleId, OutcomeMapping.ApprovalStatus status);
+
+    // Calculation-pipeline variant: excludes soft-deleted mappings (TrendService.buildPoPerformance).
+    List<OutcomeMapping> findByLearningOutcome_Module_ModuleIdAndStatusAndIsDeletedFalse(String moduleId, OutcomeMapping.ApprovalStatus status);
     
     // Check if mapping exists for specific LO-PO combination
     boolean existsByLearningOutcome_IdAndProgramOutcome_PoId(String loId, String poId);
@@ -77,4 +90,7 @@ public interface OutcomeMappingRepository extends JpaRepository<OutcomeMapping, 
     
     // Count mappings by specific status
     long countByStatus(OutcomeMapping.ApprovalStatus status);
+
+    List<OutcomeMapping> findByIsDeletedFalse();
+    List<OutcomeMapping> findByIsDeletedTrue();
 }

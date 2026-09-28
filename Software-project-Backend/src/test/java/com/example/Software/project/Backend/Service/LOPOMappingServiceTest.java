@@ -241,20 +241,25 @@ class LOPOMappingServiceTest {
         mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
         when(mappingRepository.findById(1L)).thenReturn(Optional.of(mapping));
 
-        assertThrows(IllegalArgumentException.class, () -> lopoMappingService.deleteMapping(1L));
+        assertThrows(IllegalArgumentException.class, () -> lopoMappingService.deleteMapping(1L, "admin1"));
         verify(mappingRepository, never()).delete(any(OutcomeMapping.class));
+        verify(mappingRepository, never()).save(any(OutcomeMapping.class));
     }
 
     @Test
-    @DisplayName("deleteMapping deletes a pending mapping")
-    void deleteMapping_deletesPendingMapping() {
+    @DisplayName("deleteMapping soft-deletes a pending mapping")
+    void deleteMapping_softDeletesPendingMapping() {
         OutcomeMapping mapping = new OutcomeMapping(los1, po1, 3, "lecturer1");
         mapping.setId(1L);
         mapping.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
         when(mappingRepository.findById(1L)).thenReturn(Optional.of(mapping));
+        when(mappingRepository.save(any(OutcomeMapping.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        lopoMappingService.deleteMapping(1L);
+        lopoMappingService.deleteMapping(1L, "lecturer1");
 
-        verify(mappingRepository, times(1)).delete(mapping);
+        verify(mappingRepository, never()).delete(any(OutcomeMapping.class));
+        verify(mappingRepository, times(1)).save(mapping);
+        assertEquals(Boolean.TRUE, mapping.getIsDeleted());
+        assertEquals("lecturer1", mapping.getDeletedBy());
     }
 }

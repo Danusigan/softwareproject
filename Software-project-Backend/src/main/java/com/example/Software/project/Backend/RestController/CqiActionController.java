@@ -115,6 +115,95 @@ public class CqiActionController {
         }
     }
 
+    // --- LECTURE/ADMIN: Manually (re-)run the PO-level CQI check for a module+batch ---
+    // Normally piggybacks on /finalize, but exposed standalone for re-checking after PO
+    // attainment is recalculated without redoing the LO-level finalize.
+    @PostMapping("/trigger-po/{moduleId}")
+    public ResponseEntity<?> triggerPoCqi(@PathVariable String moduleId, @RequestParam String batch,
+                                          @RequestParam(required = false) Double poTargetPercent,
+                                          @RequestHeader("Authorization") String token) {
+        if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only", "status", "ERROR"));
+        if (!isPercent(poTargetPercent)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "poTargetPercent must be between 0 and 100", "status", "ERROR"));
+        }
+        if (batch == null || batch.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "batch is required", "status", "ERROR"));
+        }
+        try {
+            List<CqiAction> triggered = cqiService.checkAndTriggerCQI_PO(moduleId, batch.trim(), poTargetPercent);
+            return ResponseEntity.ok(Map.of(
+                "message", "PO-level CQI check complete",
+                "data", Map.of("triggered", triggered, "triggeredCount", triggered.size()),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN: Create CQI plan for PO directly from batch report (no approval workflow) ---
+    @PostMapping("/po/create")
+    public ResponseEntity<?> createPoCqiPlan(@RequestBody Map<String, Object> body, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+        try {
+            String poId = (String) body.get("poId");
+            String batch = (String) body.get("batch");
+            String moduleId = (String) body.get("moduleId");
+            Double currentAttainment = body.get("currentAttainment") != null ? ((Number) body.get("currentAttainment")).doubleValue() : null;
+            Double targetAttainment = body.get("targetAttainment") != null ? ((Number) body.get("targetAttainment")).doubleValue() : null;
+            String plannedActions = (String) body.get("plannedActions");
+
+            if (poId == null || poId.isBlank() || batch == null || batch.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "poId and batch are required", "status", "ERROR"));
+            }
+
+            CqiAction plan = cqiService.createPoCqiPlan(poId, batch, moduleId, currentAttainment, targetAttainment, plannedActions, username(token));
+            return ResponseEntity.ok(Map.of("message", "PO CQI plan created", "data", plan, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN: List all CQI plans for a batch ---
+    @GetMapping("/batch/{batch}")
+    public ResponseEntity<?> getCqiPlansForBatch(@PathVariable String batch, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+        try {
+            List<CqiAction> plans = cqiService.getCqiPlansForBatch(batch);
+            return ResponseEntity.ok(Map.of("message", "CQI plans for batch", "data", plans, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN: Update CQI plan status ---
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateCqiPlanStatus(@PathVariable Long id, @RequestBody Map<String, String> body, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+        try {
+            String status = body.get("status");
+            CqiAction plan = cqiService.updateCqiPlanStatus(id, status);
+            return ResponseEntity.ok(Map.of("message", "CQI plan status updated", "data", plan, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // --- ADMIN: Update CQI plan details ---
+    @PutMapping("/{id}/details")
+    public ResponseEntity<?> updateCqiPlanDetails(@PathVariable Long id, @RequestBody Map<String, Object> body, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+        try {
+            String plannedActions = (String) body.get("plannedActions");
+            Double targetAttainment = body.get("targetAttainment") != null ? ((Number) body.get("targetAttainment")).doubleValue() : null;
+
+            CqiAction plan = cqiService.updateCqiPlanDetails(id, plannedActions, targetAttainment);
+            return ResponseEntity.ok(Map.of("message", "CQI plan updated", "data", plan, "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
     // --- Helpers ---
 
     private static boolean isPercent(Double v) {

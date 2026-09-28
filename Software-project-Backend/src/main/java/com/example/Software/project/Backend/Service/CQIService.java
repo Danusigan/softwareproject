@@ -12,11 +12,14 @@ import java.util.*;
 public class CQIService {
 
     private static final List<CqiStatus> OPEN_STATUSES = List.of(CqiStatus.PLANNED, CqiStatus.IN_PROGRESS);
+    private static final double DEFAULT_PO_TARGET_PERCENT = 70.0;
 
     @Autowired private CqiActionRepository cqiActionRepository;
     @Autowired private LosRepository losRepository;
     @Autowired private ModuleRepository moduleRepository;
+    @Autowired private ProgramOutcomeRepository programOutcomeRepository;
     @Autowired private AttainmentService attainmentService;
+    @Autowired private StudentPoCreditRepository studentPoCreditRepository;
 
     // Triggers a new CQI action for every LO in the module whose batch attainment fell below
     // its stored threshold, unless one is already open (PLANNED or IN_PROGRESS) for that LO.
@@ -31,7 +34,7 @@ public class CQIService {
                                               Double studentPassThreshold, Double batchTarget) {
         Module module = moduleRepository.findById(moduleId)
             .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
-        List<Los> losList = losRepository.findByModule_ModuleId(moduleId);
+        List<Los> losList = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
 
         List<CqiAction> triggered = new ArrayList<>();
         for (Los los : losList) {
@@ -51,6 +54,65 @@ public class CQIService {
             action.setLos(los);
             action.setBatch(batch);
             action.setAttainmentScore(attainment);
+            action.setTargetScore(target);
+            action.setStatus(CqiStatus.PLANNED);
+            action.setSubmitted(false);
+            List<String> lecturers = module.getAssignedLecturerUsernames();
+            if (lecturers != null && !lecturers.isEmpty()) {
+                action.setCreatedBy(lecturers.get(0));
+            }
+            triggered.add(cqiActionRepository.save(action));
+        }
+        return triggered;
+    }
+
+    // PO-level counterpart to checkAndTriggerCQI: for every Program Outcome that has saved
+    // StudentPoCredit rows for this module+batch (i.e. a lecturer has already run PO attainment
+    // calculation - see POAttainmentService.calculateAndPersistPOAttainment), computes the % of
+    // students who met their credit threshold and triggers a PO-level CqiAction (los=null,
+    // programOutcome set) if that percentage falls below target and no cycle is already open for
+    // that PO in this module. If no StudentPoCredit rows exist yet for this module+batch, this is
+    // a no-op (returns an empty list) rather than an error.
+    //
+    // Target is an explicit poTargetPercent argument if given, otherwise DEFAULT_PO_TARGET_PERCENT.
+    // There is deliberately no per-PO stored/admin-configurable threshold here (that was tried and
+    // rolled back - no UI surface needed it).
+    public List<CqiAction> checkAndTriggerCQI_PO(String moduleId, String batch) {
+        return checkAndTriggerCQI_PO(moduleId, batch, null);
+    }
+
+    public List<CqiAction> checkAndTriggerCQI_PO(String moduleId, String batch, Double poTargetPercent) {
+        Module module = moduleRepository.findById(moduleId)
+            .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
+        double target = poTargetPercent != null ? poTargetPercent : DEFAULT_PO_TARGET_PERCENT;
+
+        List<StudentPoCredit> credits = studentPoCreditRepository.findByModule_ModuleIdAndBatch(moduleId, batch);
+        Map<String, List<StudentPoCredit>> byPo = new LinkedHashMap<>();
+        for (StudentPoCredit credit : credits) {
+            if (credit.getProgramOutcome() == null) continue;
+            byPo.computeIfAbsent(credit.getProgramOutcome().getPoId(), k -> new ArrayList<>()).add(credit);
+        }
+
+        List<CqiAction> triggered = new ArrayList<>();
+        for (Map.Entry<String, List<StudentPoCredit>> entry : byPo.entrySet()) {
+            List<StudentPoCredit> rows = entry.getValue();
+            ProgramOutcome po = rows.get(0).getProgramOutcome();
+            long achieved = rows.stream()
+                .filter(r -> r.getCreditsEarned() != null && r.getThreshold() != null && r.getCreditsEarned() >= r.getThreshold())
+                .count();
+            double percent = rows.isEmpty() ? 0 : (achieved * 100.0) / rows.size();
+            if (percent >= target) continue;
+
+            boolean alreadyOpen = !cqiActionRepository
+                .findByModule_ModuleIdAndProgramOutcome_PoIdAndStatusIn(moduleId, entry.getKey(), OPEN_STATUSES)
+                .isEmpty();
+            if (alreadyOpen) continue;
+
+            CqiAction action = new CqiAction();
+            action.setModule(module);
+            action.setProgramOutcome(po);
+            action.setBatch(batch);
+            action.setAttainmentScore(percent);
             action.setTargetScore(target);
             action.setStatus(CqiStatus.PLANNED);
             action.setSubmitted(false);
@@ -152,7 +214,7 @@ public class CQIService {
                                                         Double studentPassThreshold, Double batchTarget) {
         moduleRepository.findById(moduleId)
             .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
-        List<Los> losList = losRepository.findByModule_ModuleId(moduleId);
+        List<Los> losList = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
 
         for (Los los : losList) {
             double loThreshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
@@ -163,9 +225,80 @@ public class CQIService {
         }
 
         List<CqiAction> triggered = checkAndTriggerCQI(moduleId, batch, studentPassThreshold, batchTarget);
+
+        // Deliberately NOT calling checkAndTriggerCQI_PO here: several existing consumers of
+        // "this module's CQI actions" (getCqiHistoryForModule's most-recent-first pick,
+        // POAttainmentService.getStudentPOSummary's per-LO cqiActions breakdown) assume every row
+        // for a module is LO-scoped. Mixing in PO-level rows here breaks those assumptions non-
+        // obviously - see MarksToPoPipelineTest. PO-level triggering is intentionally opt-in via
+        // POST /api/cqi/trigger-po/{moduleId}, kept out of this LO-focused pipeline until those
+        // consumers are updated to distinguish LO vs PO actions.
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("triggered", triggered);
         result.put("triggeredCount", triggered.size());
         return result;
+    }
+
+    // ADMIN: Create a PO-level CQI plan directly from batch report (no approval workflow)
+    public CqiAction createPoCqiPlan(String poId, String batch, String moduleId, Double currentAttainment,
+                                      Double targetAttainment, String plannedActions, String adminUsername) {
+        CqiAction plan = new CqiAction();
+        plan.setBatch(batch);
+        plan.setStatus(CqiStatus.IN_PROGRESS);
+        plan.setSubmitted(true);
+        plan.setCreatedBy(adminUsername);
+        plan.setApprovedBy(adminUsername);
+        plan.setAttainmentScore(currentAttainment);
+        plan.setTargetAttainment(targetAttainment);
+        plan.setActionPlan(plannedActions);
+
+        if (moduleId != null && !moduleId.isBlank()) {
+            Module module = moduleRepository.findById(moduleId).orElse(null);
+            if (module != null) {
+                plan.setModule(module);
+            }
+        }
+
+        if (poId != null && !poId.isBlank()) {
+            ProgramOutcome po = programOutcomeRepository.findById(poId).orElse(null);
+            if (po != null) {
+                plan.setProgramOutcome(po);
+            }
+        }
+
+        return cqiActionRepository.save(plan);
+    }
+
+    // ADMIN: Get all CQI plans for a specific batch
+    public List<CqiAction> getCqiPlansForBatch(String batch) {
+        return cqiActionRepository.findByBatchOrderByCreatedAtDesc(batch);
+    }
+
+    // ADMIN: Update CQI plan status (Created -> In Progress -> Completed -> Closed)
+    public CqiAction updateCqiPlanStatus(Long planId, String newStatus) {
+        CqiAction plan = cqiActionRepository.findById(planId)
+            .orElseThrow(() -> new RuntimeException("CQI plan not found: " + planId));
+
+        try {
+            CqiStatus status = CqiStatus.valueOf(newStatus.toUpperCase());
+            plan.setStatus(status);
+            return cqiActionRepository.save(plan);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Invalid status: " + newStatus);
+        }
+    }
+
+    // ADMIN: Update CQI plan details
+    public CqiAction updateCqiPlanDetails(Long planId, String plannedActions, Double targetAttainment) {
+        CqiAction plan = cqiActionRepository.findById(planId)
+            .orElseThrow(() -> new RuntimeException("CQI plan not found: " + planId));
+
+        if (plannedActions != null && !plannedActions.isBlank()) {
+            plan.setActionPlan(plannedActions);
+        }
+        if (targetAttainment != null) {
+            plan.setTargetAttainment(targetAttainment);
+        }
+        return cqiActionRepository.save(plan);
     }
 }

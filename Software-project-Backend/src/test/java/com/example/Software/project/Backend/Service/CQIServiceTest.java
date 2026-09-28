@@ -57,7 +57,7 @@ class CQIServiceTest {
     @DisplayName("triggers a PLANNED action when batch attainment is below the LO's threshold")
     void triggersActionWhenBelowThreshold() {
         los1.setAttainmentThreshold(60.0);
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 60.0)).thenReturn(45.0);
         when(cqiActionRepository.findByModule_ModuleIdAndLos_IdAndStatusIn(eq("MOD1"), eq("LO001"), anyList()))
             .thenReturn(Collections.emptyList());
@@ -76,7 +76,7 @@ class CQIServiceTest {
     @DisplayName("does not trigger an action when attainment meets or exceeds the threshold")
     void doesNotTriggerWhenAttainmentMeetsThreshold() {
         los1.setAttainmentThreshold(50.0);
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 50.0)).thenReturn(50.0);
 
         List<CqiAction> triggered = cqiService.checkAndTriggerCQI("MOD1", "20");
@@ -89,7 +89,7 @@ class CQIServiceTest {
     @DisplayName("does not trigger an action when there are no marks yet for the batch")
     void doesNotTriggerWhenAttainmentIsNull() {
         los1.setAttainmentThreshold(50.0);
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 50.0)).thenReturn(null);
 
         List<CqiAction> triggered = cqiService.checkAndTriggerCQI("MOD1", "20");
@@ -102,7 +102,7 @@ class CQIServiceTest {
     @DisplayName("does not open a duplicate action when one is already PLANNED or IN_PROGRESS for the LO")
     void doesNotDuplicateAnAlreadyOpenAction() {
         los1.setAttainmentThreshold(50.0);
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 50.0)).thenReturn(30.0);
 
         CqiAction existing = new CqiAction();
@@ -120,7 +120,7 @@ class CQIServiceTest {
     @DisplayName("defaults the threshold to 50% when the LO has no explicit attainmentThreshold")
     void defaultsThresholdWhenLoHasNone() {
         los1.setAttainmentThreshold(null);
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 50.0)).thenReturn(40.0);
         when(cqiActionRepository.findByModule_ModuleIdAndLos_IdAndStatusIn(eq("MOD1"), eq("LO001"), anyList()))
             .thenReturn(Collections.emptyList());
@@ -139,7 +139,7 @@ class CQIServiceTest {
         User lecturer2 = new User("lect2", "lect2@example.com", "pw", "lecture");
         module.setAssignedLecturers(List.of(lecturer1, lecturer2));
 
-        when(losRepository.findByModule_ModuleId("MOD1")).thenReturn(List.of(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("MOD1")).thenReturn(List.of(los1));
         when(attainmentService.calculateLoAttainmentForBatch("LO001", "20", 50.0)).thenReturn(30.0);
         when(cqiActionRepository.findByModule_ModuleIdAndLos_IdAndStatusIn(eq("MOD1"), eq("LO001"), anyList()))
             .thenReturn(Collections.emptyList());

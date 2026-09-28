@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.AssessmentTemplateRepository;
@@ -48,19 +49,19 @@ public class ModuleService {
 
     // Read All
     public List<Module> getAllModules() {
-        return moduleRepository.findAll();
+        return moduleRepository.findByIsDeletedFalse();
     }
 
     // Read One
     public Optional<Module> getModuleById(String id) {
-        return moduleRepository.findById(id);
+        return moduleRepository.findByModuleIdAndIsDeletedFalse(id);
     }
 
     // Read All visible to a lecturer: unassigned modules stay visible to everyone
     // (so modules created before this feature existed don't suddenly disappear);
     // assigning at least one lecturer scopes that module to just them.
     public List<Module> getModulesForLecturer(String username) {
-        return moduleRepository.findAll().stream()
+        return moduleRepository.findByIsDeletedFalse().stream()
                 .filter(m -> m.getAssignedLecturers() == null || m.getAssignedLecturers().isEmpty()
                         || m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
                 .collect(Collectors.toList());
@@ -70,7 +71,7 @@ public class ModuleService {
     // modules" superset from getModulesForLecturer - used to pre-fill the admin's
     // per-lecturer module picker with exactly what's actually assigned).
     public List<String> getModuleIdsAssignedTo(String username) {
-        return moduleRepository.findAll().stream()
+        return moduleRepository.findByIsDeletedFalse().stream()
                 .filter(m -> m.getAssignedLecturers() != null
                         && m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
                 .map(Module::getModuleId)
@@ -136,7 +137,7 @@ public class ModuleService {
 
     // Update (Admin)
     public Module updateModule(String id, Module moduleDetails) throws Exception {
-        Module module = moduleRepository.findById(id)
+        Module module = moduleRepository.findByModuleIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new Exception("Module not found"));
 
         String newModuleId = moduleDetails.getModuleId();
@@ -160,31 +161,67 @@ public class ModuleService {
         return moduleRepository.save(module);
     }
 
-    // Delete (Admin)
+    // Delete (Admin) — soft delete: preserves the module and everything under it as
+    // accreditation evidence. See LosService.deleteLos for the LO-level cascade.
     @Transactional
-    public void deleteModule(String id) throws Exception {
-        if (!moduleRepository.existsById(id)) {
-            throw new Exception("Module not found");
-        }
+    public void deleteModule(String id, String deletedBy) throws Exception {
+        Module module = moduleRepository.findByModuleIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new Exception("Module not found or already deleted"));
 
-        // 1. Delete CqiAction records FIRST — they reference BOTH module_id (NOT NULL) and los_id (nullable).
-        //    Must run before LO deletions, otherwise los_id FK blocks each LO delete.
-        try { jdbcTemplate.update("DELETE FROM cqi_action WHERE module_id = ?", id); } catch (Exception ignored) {}
-
-        // 2. Nullify AssessmentTemplate.module_id — nullable FK still enforced by MySQL
+        // 1. Soft-delete CqiAction records tied to this module directly (module-level, not LO-level —
+        //    LO-linked ones are handled by the per-LO cascade below).
         try {
-            jdbcTemplate.update("UPDATE assessment_template SET module_id = NULL WHERE module_id = ?", id);
-        } catch (Exception e) {
-            try { assessmentTemplateRepository.deleteAll(assessmentTemplateRepository.findByModule_ModuleId(id)); } catch (Exception ignored) {}
+            jdbcTemplate.update(
+                "UPDATE cqi_action SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE module_id = ? AND is_deleted = 0",
+                deletedBy, id);
+        } catch (Exception ignored) {}
+
+        // 2. Soft-delete AssessmentTemplates under this module
+        try {
+            jdbcTemplate.update(
+                "UPDATE assessment_template SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE module_id = ? AND is_deleted = 0",
+                deletedBy, id);
+        } catch (Exception ignored) {}
+
+        // 3. Soft-delete each active LO under this module
+        for (Los los : losRepository.findByModule_ModuleIdAndIsDeletedFalse(id)) {
+            losService.deleteLos(los.getId(), deletedBy);
         }
 
-        // 3. Delete each LO — handles StudentMark, StudentAssessmentScore, AssessmentItem, LO-PO mappings
-        List<String> losIds = losRepository.findIdsByModuleId(id);
-        for (String losId : losIds) {
-            losService.deleteLos(losId);
+        // 4. Soft-delete the module itself
+        module.softDelete(deletedBy);
+        moduleRepository.save(module);
+    }
+
+    // Restore (Admin) — reverses deleteModule, including its LO/template/CQI cascade
+    @Transactional
+    public void restoreModule(String id) throws Exception {
+        Module module = moduleRepository.findById(id)
+                .orElseThrow(() -> new Exception("Module not found"));
+        if (!Boolean.TRUE.equals(module.getIsDeleted())) {
+            throw new Exception("Module is not deleted");
         }
 
-        // 4. Delete the module
-        moduleRepository.deleteById(id);
+        module.restore();
+        moduleRepository.save(module);
+
+        for (Los los : losRepository.findByModule_ModuleIdAndIsDeletedTrue(id)) {
+            losService.restoreLos(los.getId());
+        }
+
+        try {
+            jdbcTemplate.update(
+                "UPDATE assessment_template SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE module_id = ?",
+                id);
+        } catch (Exception ignored) {}
+        try {
+            jdbcTemplate.update(
+                "UPDATE cqi_action SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE module_id = ?",
+                id);
+        } catch (Exception ignored) {}
+    }
+
+    public List<Module> getDeletedModules() {
+        return moduleRepository.findByIsDeletedTrue();
     }
 }
