@@ -1,0 +1,45 @@
+# Full server setup. Run from your machine (WSL) after `terraform apply`, and again any time
+# the server configuration or secrets change. Safe to re-run.
+#
+#   cd infra/ansible
+#   ansible-playbook site.yml                          # no mail settings
+#   ansible-playbook site.yml --ask-vault-pass         # with group_vars/all/vault.yml
+#
+# Per-push deploys are handled by deploy.yml, which Jenkins runs.
+
+- name: Read outputs (incl. secrets) from Terraform state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: terraform output -json
+      ansible.builtin.command: terraform -chdir={{ playbook_dir }}/../terraform output -json
+      register: tf_raw
+      changed_when: false
+      no_log: true
+
+    - name: Keep outputs as a fact
+      ansible.builtin.set_fact:
+        tf: "{{ tf_raw.stdout | from_json }}"
+      no_log: true
+
+- name: Base setup (all servers)
+  hosts: all
+  become: true
+  roles:
+    - common
+    - docker
+
+- name: Jenkins server
+  hosts: jenkins
+  become: true
+  roles:
+    - jenkins
+
+- name: Application server
+  hosts: app
+  become: true
+  vars_files:
+    - ["vars/vault.yml", "vars/no-vault.yml"] # first one that exists
+  roles:
+    - app

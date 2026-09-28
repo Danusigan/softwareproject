@@ -1,0 +1,19 @@
+# Optional secrets that Terraform doesn't generate. To use:
+#
+#   cd infra/ansible
+#   cp vars/vault.yml.example vars/vault.yml
+#   (fill in values)
+#   ansible-vault encrypt vars/vault.yml     # choose a vault password and keep it safe
+#   ansible-playbook site.yml --ask-vault-pass
+#
+# vault.yml is safe to commit ONLY once encrypted (it starts with $ANSIBLE_VAULT).
+# It lives outside group_vars/ on purpose: only site.yml loads it, so Jenkins' deploy.yml
+# never needs the vault password.
+
+vault_mail_host: smtp.gmail.com
+vault_mail_port: 587
+vault_mail_username: someone@gmail.com
+vault_mail_password: "gmail-app-password"   # a Gmail *App Password*, not the account password
+vault_mail_from: someone@gmail.com
+
+# vault_app_frontend_url: https://lopo.example.com
