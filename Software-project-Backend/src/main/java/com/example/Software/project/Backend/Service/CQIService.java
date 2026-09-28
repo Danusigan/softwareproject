@@ -154,6 +154,11 @@ public class CQIService {
         return cqiActionRepository.findByStatusAndSubmittedTrue(CqiStatus.PLANNED);
     }
 
+    public List<CqiAction> getLoReviewHistory() {
+        return cqiActionRepository.findByLosIsNotNullAndStatusInOrderByCreatedAtDesc(
+            List.of(CqiStatus.IN_PROGRESS, CqiStatus.COMPLETED));
+    }
+
     public CqiAction approvePlan(Long cqiActionId, String adminUsername) {
         CqiAction action = cqiActionRepository.findById(cqiActionId)
             .orElseThrow(() -> new RuntimeException("CQI action not found: " + cqiActionId));
@@ -259,12 +264,11 @@ public class CQIService {
             }
         }
 
-        if (poId != null && !poId.isBlank()) {
-            ProgramOutcome po = programOutcomeRepository.findById(poId).orElse(null);
-            if (po != null) {
-                plan.setProgramOutcome(po);
-            }
-        }
+        // PO report rows identify a PO by its code, not its primary key, so accept either
+        ProgramOutcome po = programOutcomeRepository.findById(poId)
+            .or(() -> programOutcomeRepository.findByCode(poId))
+            .orElseThrow(() -> new RuntimeException("Program outcome not found: " + poId));
+        plan.setProgramOutcome(po);
 
         return cqiActionRepository.save(plan);
     }
