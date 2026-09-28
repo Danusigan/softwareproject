@@ -13,8 +13,9 @@ public class CqiAction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Nullable: batch-level PO plans created from the PO report aren't tied to one module
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "module_id", nullable = false)
+    @JoinColumn(name = "module_id")
     @JsonIgnore
     private Module module;
 

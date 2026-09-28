@@ -56,6 +56,17 @@ public class CqiActionController {
         }
     }
 
+    // --- ADMIN: Approved/completed LO plans (review history) ---
+    @GetMapping("/lo/history")
+    public ResponseEntity<?> getLoHistory(@RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+        try {
+            return ResponseEntity.ok(Map.of("message", "LO CQI history", "data", cqiService.getLoReviewHistory(), "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
     // --- ADMIN: Approve a submitted plan ---
     @PutMapping("/{id}/approve")
     public ResponseEntity<?> approvePlan(@PathVariable Long id, @RequestHeader("Authorization") String token) {

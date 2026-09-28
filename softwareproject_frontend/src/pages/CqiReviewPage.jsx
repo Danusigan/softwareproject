@@ -27,9 +27,12 @@ export default function CqiReviewPage() {
   const loadPending = async () => {
     try {
       setLoading(true)
-      const r = await cqiService.getPending({ headers: authHeaders() })
-      // Only show LO plans (filter out PO plans)
-      const loPlans = (r.data?.data || []).filter(plan => plan.losId && !plan.poId)
+      const [pendingRes, historyRes] = await Promise.all([
+        cqiService.getPending({ headers: authHeaders() }),
+        cqiService.getLoHistory({ headers: authHeaders() }),
+      ])
+      const loPlans = [...(pendingRes.data?.data || []), ...(historyRes.data?.data || [])]
+        .filter(plan => plan.losId && !plan.poId)
       setAllPlans(loPlans)
     } catch (e) {
       setMessage({ type: 'error', text: e.response?.data?.message || 'Failed to load pending CQI plans.' })

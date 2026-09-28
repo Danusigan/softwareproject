@@ -17,6 +17,7 @@ public interface CqiActionRepository extends JpaRepository<CqiAction, Long> {
 
     List<CqiAction> findByBatch(String batch);
     List<CqiAction> findByBatchOrderByCreatedAtDesc(String batch);
+    List<CqiAction> findByLosIsNotNullAndStatusInOrderByCreatedAtDesc(List<CqiStatus> statuses);
     List<CqiAction> findByStatus(CqiStatus status);
     List<CqiAction> findByStatusAndSubmittedTrue(CqiStatus status);
     List<CqiAction> findByModule_ModuleIdAndLos_Id(String moduleId, String losId);

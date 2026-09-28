@@ -20,6 +20,10 @@ export const cqiService = {
     return axios.get(`${BASE_URL}/api/cqi/pending`, config)
   },
 
+  async getLoHistory(config = {}) {
+    return axios.get(`${BASE_URL}/api/cqi/lo/history`, config)
+  },
+
   async approvePlan(id, config = {}) {
     return axios.put(`${BASE_URL}/api/cqi/${id}/approve`, null, config)
   },
