@@ -34,8 +34,8 @@ public class ProgressAccess {
         if(ids.isEmpty()) return List.of();
         // One scoped search query; student count does not increase the query count.
         String enrolment="select o.module_id from qa_module_enrolment e join qa_module_offering o on o.code=e.offering_code where e.student_id=s.student_id";
-        String questions="select l.module_id from student_assessment_score q join assessment_item i on i.id=q.assessment_item_id join los l on l.id=i.los_id where q.student_id=s.student_id";
-        String legacy="select l.module_id from StudentMark m join los l on l.id=m.los_id where m.student_id=s.student_id";
+        String questions="select l.module_id from student_assessment_score q join assessment_item i on i.id=q.assessment_item_id join los l on l.id=i.los_id where q.student_id=s.student_id and l.is_deleted=0";
+        String legacy="select l.module_id from StudentMark m join los l on l.id=m.los_id where m.student_id=s.student_id and l.is_deleted=0";
         String scope=" and (exists("+enrolment+") or exists("+questions+") or exists("+legacy+"))"+
                 " and not exists("+enrolment+" and o.module_id not in (?2))"+
                 " and not exists("+questions+" and l.module_id not in (?2))"+
@@ -49,8 +49,8 @@ public class ProgressAccess {
         if (!"lecture".equals(role)) return false;
         Set<String> visible = new HashSet<>(modules.getModulesForLecturer(auth.getName()).stream().map(m -> m.getModuleId()).toList());
         List<Map<String,Object>> scope = store.rows("select distinct o.module_id from qa_module_enrolment e join qa_module_offering o on o.code=e.offering_code where e.student_id=?1 " +
-                "union select distinct l.module_id from student_assessment_score s join assessment_item i on i.id=s.assessment_item_id join los l on l.id=i.los_id where s.student_id=?1 " +
-                "union select distinct l.module_id from StudentMark s join los l on l.id=s.los_id where s.student_id=?1", student);
+                "union select distinct l.module_id from student_assessment_score s join assessment_item i on i.id=s.assessment_item_id join los l on l.id=i.los_id where s.student_id=?1 and l.is_deleted=0 " +
+                "union select distinct l.module_id from StudentMark s join los l on l.id=s.los_id where s.student_id=?1 and l.is_deleted=0", student);
         return !scope.isEmpty() && scope.stream().allMatch(r -> visible.contains(str(r,"module_id")));
     }
     public void requireStudent(String student, Authentication auth) {

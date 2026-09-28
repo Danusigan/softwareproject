@@ -32,11 +32,11 @@ public class ProgressConfiguration {
     public Map<String,Object> catalog(Authentication auth) {
         access.requireAdmin(auth);
         return Map.of("curricula", store.rows("select * from qa_curriculum order by code"),
-                "modules", store.rows("select module_id,module_name from modules order by module_id"),
-                "los", store.rows("select id,module_id,name,attainment_threshold from los order by id"),
+                "modules", store.rows("select module_id,module_name from modules where is_deleted=0 order by module_id"),
+                "los", store.rows("select id,module_id,name,attainment_threshold from los where is_deleted=0 order by id"),
                 "pos", store.rows("select po_id,po_code,title from program_outcomes order by po_code"),
-                "mappings", store.rows("select los_id,program_outcome_id,weight,status from lo_po_mappings"),
-                "assessments", store.rows("select id,module_id,batch,academic_year,semester from assessment_template order by id"),
+                "mappings", store.rows("select los_id,program_outcome_id,weight,status from lo_po_mappings where is_deleted=0"),
+                "assessments", store.rows("select id,module_id,batch,academic_year,semester from assessment_template where is_deleted=0 order by id"),
                 "offerings", store.rows("select * from qa_module_offering order by code"));
     }
 
@@ -76,7 +76,7 @@ public class ProgressConfiguration {
         }
         require(c.pos().stream().anyMatch(PoRule::required),"At least one required PO is needed");
         Set<String> seen=new HashSet<>();
-        for(var m:store.rows("select los_id,program_outcome_id,weight from lo_po_mappings where status='APPROVED' and weight>0")) {
+        for(var m:store.rows("select los_id,program_outcome_id,weight from lo_po_mappings where status='APPROVED' and weight>0 and is_deleted=0")) {
             String lo=str(m,"los_id"), po=str(m,"program_outcome_id");
             if(!los.contains(lo)||!pos.contains(po)) continue;
             require(seen.add(lo+"|"+po),"Resolve duplicate approved LO-to-PO mappings before publishing");

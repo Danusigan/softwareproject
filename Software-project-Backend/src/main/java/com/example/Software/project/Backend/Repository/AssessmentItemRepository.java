@@ -16,12 +16,18 @@ public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, 
     List<AssessmentItem> findByAssessmentTemplate_IdOrderByQuestionNumber(String templateId);
     void deleteByAssessmentTemplate_Id(String templateId);
 
+    // Calculation-pipeline variant of findByLos_Id: excludes items whose template was soft-deleted,
+    // so a retired/superseded template's items stop counting toward LO attainment (AttainmentService).
+    List<AssessmentItem> findByLos_IdAndAssessmentTemplate_IsDeletedFalse(String loId);
+
     // Only items belonging to a template that actually has submitted student marks for the
     // same LO/batch/markType/assignment — excludes templates created via "Download Template"
     // that were never followed up with an upload (or whose marks were later deleted without
     // deleting the template), which would otherwise inflate the max-marks denominator used
     // for attainment calculations whenever more than one assessment exists for a markType.
+    // Also excludes soft-deleted templates for the same reason.
     @Query("SELECT ai FROM AssessmentItem ai WHERE ai.los.id = :losId AND ai.assessmentTemplate.batch = :batch AND ai.assessmentTemplate.markType = :markType " +
+           "AND ai.assessmentTemplate.isDeleted = false " +
            "AND EXISTS (SELECT 1 FROM StudentMark sm WHERE sm.los.id = ai.los.id AND sm.batch = :batch AND sm.markType = :markTypeEnum " +
            "AND (sm.assignmentLabel = ai.assessmentTemplate.assignmentLabel OR (sm.assignmentLabel IS NULL AND ai.assessmentTemplate.assignmentLabel IS NULL)))")
     List<AssessmentItem> findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(
@@ -31,8 +37,9 @@ public interface AssessmentItemRepository extends JpaRepository<AssessmentItem, 
         @Param("markTypeEnum") MarkType markTypeEnum
     );
 
-    // All items for a LO+batch regardless of markType (used for cross-assignment normalization in trends)
-    @Query("SELECT ai FROM AssessmentItem ai WHERE ai.los.id = :losId AND ai.assessmentTemplate.batch = :batch")
+    // All items for a LO+batch regardless of markType (used for cross-assignment normalization in
+    // trends and PO credit calculation), excluding soft-deleted templates.
+    @Query("SELECT ai FROM AssessmentItem ai WHERE ai.los.id = :losId AND ai.assessmentTemplate.batch = :batch AND ai.assessmentTemplate.isDeleted = false")
     List<AssessmentItem> findByLos_IdAndAssessmentTemplate_Batch(
         @Param("losId") String losId,
         @Param("batch") String batch

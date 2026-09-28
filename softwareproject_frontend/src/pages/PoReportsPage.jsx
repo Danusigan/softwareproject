@@ -2,6 +2,8 @@ import { useState } from 'react'
 import axios from 'axios'
 import Header from '../components/header'
 import Footer from '../components/footer'
+import CqiPlanModal from '../components/CqiPlanModal'
+import CqiPlansDisplay from '../components/CqiPlansDisplay'
 import authService from '../services/authService'
 import studentService from '../services/studentService'
 
@@ -227,6 +229,8 @@ function BatchReportSection() {
   const [report, setReport] = useState(null)
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [cqiModal, setCqiModal] = useState(null)
+  const [cqiRefresh, setCqiRefresh] = useState(0)
 
   const preview = async e => {
     e.preventDefault()
@@ -313,14 +317,39 @@ function BatchReportSection() {
                     <td className="px-4 py-3 font-black text-slate-800 border-r border-slate-100">{po.code}<div className="text-[11px] font-medium text-slate-400">{po.title}</div></td>
                     <td className="px-4 py-3 text-center font-bold border-r border-slate-100">{po.studentsAttained} / {po.totalStudents}</td>
                     <td className="px-4 py-3 text-center font-bold border-r border-slate-100">{num(po.attainmentPercent)}%</td>
-                    <td className="px-4 py-3 text-center"><StatusBadge status={po.status} /></td>
+                    <td className="px-4 py-3 text-center flex items-center justify-between gap-2">
+                      <StatusBadge status={po.status} />
+                      {po.status !== 'Attained' && po.status !== 'Success' && (
+                        <button
+                          onClick={() => setCqiModal({
+                            ...po,
+                            poId: po.code,
+                            batch: report.batch
+                          })}
+                          className="px-2.5 py-1 bg-blue-600 text-white text-[11px] font-bold rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+                          title="Create CQI improvement plan for this PO"
+                        >
+                          + CQI
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {!report.pos.length && <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No active programme outcomes are configured.</td></tr>}
               </tbody>
             </table>
           </div>
+          {report && <CqiPlansDisplay batch={report.batch} onRefresh={() => setCqiRefresh(c => c + 1)} />}
         </div>
+      )}
+      {cqiModal && (
+        <CqiPlanModal
+          batch={cqiModal.batch}
+          po={cqiModal}
+          currentAttainment={cqiModal.attainmentPercent}
+          onClose={() => setCqiModal(null)}
+          onSuccess={() => { setCqiModal(null); setCqiRefresh(c => c + 1) }}
+        />
       )}
     </section>
   )

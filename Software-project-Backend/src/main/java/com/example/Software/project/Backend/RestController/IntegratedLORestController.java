@@ -220,7 +220,7 @@ public class IntegratedLORestController {
             // Delete existing pending/rejected mappings
             for (OutcomeMapping mapping : currentMappings) {
                 if (mapping.getStatus() != OutcomeMapping.ApprovalStatus.APPROVED) {
-                    mappingService.deleteMapping(mapping.getId());
+                    mappingService.deleteMapping(mapping.getId(), username);
                 }
             }
 

@@ -125,7 +125,7 @@ class AttainmentServiceTest {
         OutcomeMapping rejected = new OutcomeMapping(los1, po1, 3, "lecturer1");
         rejected.setStatus(OutcomeMapping.ApprovalStatus.REJECTED);
 
-        when(mappingRepository.findByLearningOutcome_Module_ModuleId("MOD1"))
+        when(mappingRepository.findByLearningOutcome_Module_ModuleIdAndIsDeletedFalse("MOD1"))
             .thenReturn(List.of(rejected));
 
         Map<String, Double> result = attainmentService.getPOAttainment("MOD1");
@@ -148,7 +148,7 @@ class AttainmentServiceTest {
         OutcomeMapping pending = new OutcomeMapping(los3, po1, 3, "lecturer1");
         pending.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
 
-        when(mappingRepository.findByLearningOutcome_Module_ModuleId("MOD1"))
+        when(mappingRepository.findByLearningOutcome_Module_ModuleIdAndIsDeletedFalse("MOD1"))
             .thenReturn(List.of(approvedHighWeight, approvedLowWeight, pending));
 
         // LO1: 100% pass rate -> level 3. LO2: 60% pass rate -> level 1.

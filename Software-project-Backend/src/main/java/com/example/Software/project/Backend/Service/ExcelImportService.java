@@ -537,8 +537,10 @@ public class ExcelImportService {
         for (AssessmentTemplate other : sameMarkType) {
             if (other.getId().equals(uploaded.getId())) continue;
             if (!Objects.equals(normalizeLabel(other.getAssignmentLabel()), normalizeLabel(uploaded.getAssignmentLabel()))) continue;
-            studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(other.getId());
-            assessmentTemplateRepository.delete(other);
+            // Soft-delete rather than remove — the retired template stays as accreditation
+            // evidence (recoverable via the admin restore endpoint) instead of being purged.
+            other.softDelete("SYSTEM");
+            assessmentTemplateRepository.save(other);
         }
     }
 

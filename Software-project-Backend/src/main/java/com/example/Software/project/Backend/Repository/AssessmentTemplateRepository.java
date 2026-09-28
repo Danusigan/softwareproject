@@ -12,4 +12,7 @@ public interface AssessmentTemplateRepository extends JpaRepository<AssessmentTe
     List<AssessmentTemplate> findByModule_ModuleIdOrderByCreatedAtDesc(String moduleId);
     List<AssessmentTemplate> findByModule_ModuleIdAndBatch(String moduleId, String batch);
     List<AssessmentTemplate> findByModule_ModuleIdAndBatchAndMarkType(String moduleId, String batch, String markType);
+    List<AssessmentTemplate> findByModule_ModuleIdAndIsDeletedFalse(String moduleId);
+    List<AssessmentTemplate> findByIsDeletedFalse();
+    List<AssessmentTemplate> findByIsDeletedTrue();
 }

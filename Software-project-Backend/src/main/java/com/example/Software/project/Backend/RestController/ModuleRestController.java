@@ -118,7 +118,7 @@ public class ModuleRestController {
         }
     }
 
-    // Delete (Admin Only)
+    // Delete (Admin Only) — soft delete; module moves to the archive, recoverable via /restore
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteModule(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
@@ -128,9 +128,9 @@ public class ModuleRestController {
                     "status", "ERROR"
                 ));
             }
-            moduleService.deleteModule(id);
+            moduleService.deleteModule(id, username(token));
             return ResponseEntity.ok(Map.of(
-                "message", "Module deleted successfully",
+                "message", "Module moved to archive",
                 "moduleId", id,
                 "status", "SUCCESS"
             ));
@@ -140,6 +140,61 @@ public class ModuleRestController {
                 "status", "ERROR"
             ));
         }
+    }
+
+    // Archive (Admin Only) — list soft-deleted modules
+    @GetMapping("/admin/deleted")
+    public ResponseEntity<?> getDeletedModules(@RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Admin can view the module archive",
+                    "status", "ERROR"
+                ));
+            }
+            return ResponseEntity.ok(Map.of(
+                "message", "Deleted modules retrieved successfully",
+                "data", moduleService.getDeletedModules(),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
+    // Restore (Admin Only)
+    @PutMapping("/{id}/restore")
+    public ResponseEntity<?> restoreModule(@PathVariable String id, @RequestHeader("Authorization") String token) {
+        try {
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "message", "Access Denied: Only Admin can restore modules",
+                    "status", "ERROR"
+                ));
+            }
+            moduleService.restoreModule(id);
+            return ResponseEntity.ok(Map.of(
+                "message", "Module restored from archive",
+                "moduleId", id,
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "message", "Error: " + e.getMessage(),
+                "status", "ERROR"
+            ));
+        }
+    }
+
+    private String username(String token) {
+        String bearerToken = token;
+        if (token != null && token.startsWith("Bearer ")) {
+            bearerToken = token.substring(7);
+        }
+        return jwtUtil.extractUsername(bearerToken);
     }
 
     private boolean isAdmin(String token) {

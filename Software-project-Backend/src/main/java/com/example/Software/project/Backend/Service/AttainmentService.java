@@ -77,10 +77,10 @@ public class AttainmentService {
 
         List<Map<String, Object>> loResults = new ArrayList<>();
         for (String loId : resolvedLoIds) {
-            Los lo = losRepository.findById(loId).orElse(null);
+            Los lo = losRepository.findById(loId).filter(l -> !Boolean.TRUE.equals(l.getIsDeleted())).orElse(null);
             double loThreshold = loThresholds.getOrDefault(loId, defaultThreshold);
 
-            List<AssessmentItem> items = assessmentItemRepository.findByLos_Id(loId);
+            List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_IsDeletedFalse(loId);
             if (templateId != null && !templateId.trim().isEmpty()) {
                 String tId = templateId.trim();
                 items = items.stream()
@@ -121,7 +121,7 @@ public class AttainmentService {
                 requiredMarks = (loThreshold / 100.0) * totalMax;
             }
 
-            List<StudentAssessmentScore> scores = studentAssessmentScoreRepository.findByAssessmentItem_Los_Id(loId);
+            List<StudentAssessmentScore> scores = studentAssessmentScoreRepository.findByAssessmentItem_Los_IdAndAssessmentItem_AssessmentTemplate_IsDeletedFalse(loId);
             if (templateId != null && !templateId.trim().isEmpty()) {
                 String tId = templateId.trim();
                 scores = scores.stream()
@@ -169,10 +169,10 @@ public class AttainmentService {
     }
 
     private Double calculateQuestionBasedLoAttainmentPercent(String loId, Double thresholdPercent, Map<Long, Double> itemThresholds) {
-        Los los = losRepository.findById(loId).orElse(null);
+        Los los = losRepository.findById(loId).filter(l -> !Boolean.TRUE.equals(l.getIsDeleted())).orElse(null);
         if (los == null) return null;
 
-        List<AssessmentItem> items = assessmentItemRepository.findByLos_Id(loId);
+        List<AssessmentItem> items = assessmentItemRepository.findByLos_IdAndAssessmentTemplate_IsDeletedFalse(loId);
         if (items == null || items.isEmpty()) return null;
 
         double effectiveThresholdPercent = thresholdPercent != null ? thresholdPercent : 50.0;
@@ -200,7 +200,7 @@ public class AttainmentService {
             requiredMarks = (effectiveThresholdPercent / 100.0) * totalMax;
         }
 
-        List<StudentAssessmentScore> scores = studentAssessmentScoreRepository.findByAssessmentItem_Los_Id(loId);
+        List<StudentAssessmentScore> scores = studentAssessmentScoreRepository.findByAssessmentItem_Los_IdAndAssessmentItem_AssessmentTemplate_IsDeletedFalse(loId);
         if (scores.isEmpty()) return 0.0;
 
         Map<String, Double> studentTotals = new HashMap<>();
@@ -235,7 +235,7 @@ public class AttainmentService {
 
     // 2. Calculate PO Attainment for a Course
     public Map<String, Double> getPOAttainment(String moduleId) {
-        List<OutcomeMapping> mappings = mappingRepository.findByLearningOutcome_Module_ModuleId(moduleId);
+        List<OutcomeMapping> mappings = mappingRepository.findByLearningOutcome_Module_ModuleIdAndIsDeletedFalse(moduleId);
 
         // Group mappings by PO Code
         Map<String, List<OutcomeMapping>> poGroups = mappings.stream()

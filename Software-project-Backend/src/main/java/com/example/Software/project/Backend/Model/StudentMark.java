@@ -2,6 +2,7 @@ package com.example.Software.project.Backend.Model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 // The table is "studentmark", one lowercase word - named explicitly because this project's
 // physical naming strategy (PhysicalNamingStrategyStandardImpl, see application.properties) is a
@@ -38,6 +39,27 @@ public class StudentMark {
     @Column(name = "assignment_label")
     private String assignmentLabel; // e.g. "Assignment 1", "Assignment 2"
 
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
+    public void softDelete(String deletedByUsername) {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.deletedBy = deletedByUsername;
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+        this.deletedBy = null;
+    }
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -59,6 +81,15 @@ public class StudentMark {
 
     public String getAssignmentLabel() { return assignmentLabel; }
     public void setAssignmentLabel(String assignmentLabel) { this.assignmentLabel = assignmentLabel; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public String getDeletedBy() { return deletedBy; }
+    public void setDeletedBy(String deletedBy) { this.deletedBy = deletedBy; }
 
     // Helper to get student index for backward compatibility/display
     public String getStudentIndex() {

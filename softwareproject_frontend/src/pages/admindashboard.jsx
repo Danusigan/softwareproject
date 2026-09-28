@@ -12,6 +12,12 @@ export default function AdminDashboard() {
     const [showEditModuleDialog, setShowEditModuleDialog] = useState(false);
     const [editingModule, setEditingModule] = useState(null);
 
+    // Archive/restore
+    const [moduleView, setModuleView] = useState('active'); // 'active' | 'archived'
+    const [archivedModules, setArchivedModules] = useState([]);
+    const [archivedDetail, setArchivedDetail] = useState(null);
+    const [restoring, setRestoring] = useState(false);
+
     // Module form states
     const [moduleData, setModuleData] = useState({
         moduleId: '',
@@ -42,6 +48,7 @@ export default function AdminDashboard() {
     // Fetch modules and lecturers on mount
     useEffect(() => {
         fetchModules();
+        fetchArchivedModules();
         fetchLecturers();
     }, []);
 
@@ -56,6 +63,47 @@ export default function AdminDashboard() {
         } catch (err) {
             console.error('Failed to fetch modules:', err);
             setModules([]);
+        }
+    };
+
+    const fetchArchivedModules = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('/api/modules/admin/deleted', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setArchivedModules(res.data.data || []);
+        } catch (err) {
+            console.error('Failed to fetch archived modules:', err);
+            setArchivedModules([]);
+        }
+    };
+
+    const formatDateTime = (value) => {
+        if (!value) return 'Unknown';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+    };
+
+    const handleRestoreModule = async (moduleId) => {
+        setRestoring(true);
+        setMessage({ type: '', text: '' });
+        try {
+            const token = localStorage.getItem('token');
+            await axios.put(`/api/modules/${moduleId}/restore`, {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setMessage({ type: 'success', text: `Module ${moduleId} restored from archive.` });
+            setArchivedDetail(null);
+            fetchModules();
+            fetchArchivedModules();
+        } catch (err) {
+            setMessage({
+                type: 'error',
+                text: err.response?.data?.message || 'Failed to restore module'
+            });
+        } finally {
+            setRestoring(false);
         }
     };
 
@@ -189,12 +237,6 @@ export default function AdminDashboard() {
             <div className="max-w-7xl mx-auto px-4 py-8">
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-                    <button
-                        onClick={() => navigate('/modules')}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                        View Modules
-                    </button>
                 </div>
 
                 {message.text && (
@@ -207,56 +249,122 @@ export default function AdminDashboard() {
 
                 {/* Modules Management Section */}
                 <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Manage Modules</h2>
-                    {modules.length === 0 ? (
+                    <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Manage Modules</h2>
+                        <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">
+                            <button
+                                onClick={() => setModuleView('active')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                                    moduleView === 'active' ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Active
+                            </button>
+                            <button
+                                onClick={() => setModuleView('archived')}
+                                className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
+                                    moduleView === 'archived' ? 'bg-gray-700 text-white' : 'text-gray-600 hover:bg-gray-100'
+                                }`}
+                            >
+                                Archived Modules{archivedModules.length ? ` (${archivedModules.length})` : ''}
+                            </button>
+                        </div>
+                    </div>
+
+                    {moduleView === 'active' ? (
+                        modules.length === 0 ? (
+                            <div className="bg-white rounded-xl shadow-lg p-8 text-center text-gray-500">
+                                No modules available. Create one using the "Create Module" card below.
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                                {modules.map((module) => (
+                                    <div
+                                        key={module.moduleId}
+                                        className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-200 hover:border-green-400 transition-all"
+                                    >
+                                        <div className="flex items-center justify-center mb-4">
+                                            <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center">
+                                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <h3 className="text-xl font-bold text-center text-gray-800 mb-2">
+                                            {module.moduleName}
+                                        </h3>
+                                        <p className="text-center text-gray-600 text-sm mb-4">
+                                            Module ID: {module.moduleId}
+                                        </p>
+                                        <p className="text-center text-xs text-gray-500 mb-4">
+                                            {module.assignedLecturerUsernames?.length
+                                                ? `Assigned: ${module.assignedLecturerUsernames.join(', ')}`
+                                                : 'Visible to all lecturers'}
+                                        </p>
+                                        <div className="flex justify-center gap-2 mt-4">
+                                            {/* Edit Icon */}
+                                            <button
+                                                onClick={() => openEditModuleDialog(module)}
+                                                className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                title="Edit Module"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                </svg>
+                                            </button>
+                                            {/* Delete Icon */}
+                                            <button
+                                                onClick={() => handleDeleteModule(module.moduleId)}
+                                                className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                title="Delete Module"
+                                            >
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )
+                    ) : archivedModules.length === 0 ? (
                         <div className="bg-white rounded-xl shadow-lg p-8 text-center text-gray-500">
-                            No modules available. Create one using the "Create Module" card below.
+                            No archived modules. Deleted modules show up here and can be restored.
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                            {modules.map((module) => (
+                            {archivedModules.map((module) => (
                                 <div
                                     key={module.moduleId}
-                                    className="bg-white rounded-xl shadow-lg p-6 border-2 border-gray-200 hover:border-green-400 transition-all"
+                                    onClick={() => setArchivedDetail(module)}
+                                    className="bg-gray-50 rounded-xl shadow-lg p-6 border-2 border-dashed border-gray-300 hover:border-gray-400 transition-all cursor-pointer"
                                 >
                                     <div className="flex items-center justify-center mb-4">
-                                        <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center">
-                                            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                        <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 01-2-2V4a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                                             </svg>
                                         </div>
                                     </div>
-                                    <h3 className="text-xl font-bold text-center text-gray-800 mb-2">
+                                    <h3 className="text-xl font-bold text-center text-gray-700 mb-2">
                                         {module.moduleName}
                                     </h3>
-                                    <p className="text-center text-gray-600 text-sm mb-4">
+                                    <p className="text-center text-gray-500 text-sm mb-1">
                                         Module ID: {module.moduleId}
                                     </p>
-                                    <p className="text-center text-xs text-gray-500 mb-4">
-                                        {module.assignedLecturerUsernames?.length
-                                            ? `Assigned: ${module.assignedLecturerUsernames.join(', ')}`
-                                            : 'Visible to all lecturers'}
+                                    <p className="text-center text-xs text-gray-500 mb-1">
+                                        Deleted by: {module.deletedBy || 'Unknown'}
                                     </p>
-                                    <div className="flex justify-center gap-2 mt-4">
-                                        {/* Edit Icon */}
+                                    <p className="text-center text-xs text-gray-500 mb-4">
+                                        Deleted at: {formatDateTime(module.deletedAt)}
+                                    </p>
+                                    <div className="flex justify-center mt-4">
                                         <button
-                                            onClick={() => openEditModuleDialog(module)}
-                                            className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                            title="Edit Module"
+                                            onClick={(e) => { e.stopPropagation(); handleRestoreModule(module.moduleId); }}
+                                            disabled={restoring}
+                                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400"
                                         >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                        {/* Delete Icon */}
-                                        <button
-                                            onClick={() => handleDeleteModule(module.moduleId)}
-                                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                            title="Delete Module"
-                                        >
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
+                                            {restoring ? 'Restoring…' : 'Restore'}
                                         </button>
                                     </div>
                                 </div>
@@ -533,6 +641,46 @@ export default function AdminDashboard() {
                                 {loading ? 'Updating...' : 'Update Module'}
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Archived Module Detail Banner */}
+            {archivedDetail && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="bg-amber-50 border-b-2 border-amber-200 p-4 flex items-start gap-3">
+                            <svg className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div>
+                                <p className="font-bold text-amber-800">This module is archived</p>
+                                <p className="text-sm text-amber-700 mt-1">
+                                    Deleted by <strong>{archivedDetail.deletedBy || 'Unknown'}</strong> on{' '}
+                                    {formatDateTime(archivedDetail.deletedAt)}. It is hidden from lecturers and normal
+                                    module lists but its learning outcomes, mappings and CQI records are preserved.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-6">
+                            <h3 className="text-xl font-bold text-gray-800 mb-1">{archivedDetail.moduleName}</h3>
+                            <p className="text-gray-500 text-sm mb-6">Module ID: {archivedDetail.moduleId}</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => handleRestoreModule(archivedDetail.moduleId)}
+                                    disabled={restoring}
+                                    className="flex-1 bg-green-600 text-white py-2.5 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400"
+                                >
+                                    {restoring ? 'Restoring…' : 'Restore Module'}
+                                </button>
+                                <button
+                                    onClick={() => setArchivedDetail(null)}
+                                    className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

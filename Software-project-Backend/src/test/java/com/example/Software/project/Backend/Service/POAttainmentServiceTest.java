@@ -141,7 +141,7 @@ class POAttainmentServiceTest {
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
 
         when(losRepository.findById(losId))
@@ -209,7 +209,7 @@ class POAttainmentServiceTest {
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
 
         when(losRepository.findById(losId))
@@ -280,7 +280,7 @@ class POAttainmentServiceTest {
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark1, mark2));
 
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
 
         when(losRepository.findById(losId))
@@ -346,7 +346,7 @@ class POAttainmentServiceTest {
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
 
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
 
         when(losRepository.findById(losId))
@@ -427,7 +427,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -509,7 +509,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(assignment01Mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -591,7 +591,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(markA01, markA02));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -669,7 +669,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(examMark, assignmentMark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -722,7 +722,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -768,7 +768,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(losIds, batch))
             .thenReturn(Arrays.asList(mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
@@ -896,12 +896,12 @@ class POAttainmentServiceTest {
         mark.setBatch(batch);
         mark.setMarkType(MarkType.FINAL_EXAM);
 
-        when(losRepository.findByModule_ModuleId(moduleId)).thenReturn(Arrays.asList(los1));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId)).thenReturn(Arrays.asList(los1));
         when(studentMarkRepository.findDistinctStudentsByLosIdsAndBatch(Arrays.asList("LO001"), batch))
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(Arrays.asList("LO001"), batch))
             .thenReturn(Arrays.asList(mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id("LO001"))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse("LO001"))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById("LO001"))
             .thenReturn(Optional.of(los1));
@@ -917,7 +917,7 @@ class POAttainmentServiceTest {
     @Test
     @DisplayName("Test 11: recalculateForModule with no LOs in the module does nothing")
     void testRecalculateForModuleNoLosIsNoOp() {
-        when(losRepository.findByModule_ModuleId("EMPTY")).thenReturn(Collections.emptyList());
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("EMPTY")).thenReturn(Collections.emptyList());
 
         poAttainmentService.recalculateForModule("EMPTY", "20");
 
@@ -936,7 +936,7 @@ class POAttainmentServiceTest {
     @Test
     @DisplayName("Test 13: recalculateForModule swallows errors instead of failing the upload/delete that triggered it")
     void testRecalculateForModuleSwallowsErrors() {
-        when(losRepository.findByModule_ModuleId("EC4356")).thenThrow(new RuntimeException("db down"));
+        when(losRepository.findByModule_ModuleIdAndIsDeletedFalse("EC4356")).thenThrow(new RuntimeException("db down"));
 
         assertDoesNotThrow(() -> poAttainmentService.recalculateForModule("EC4356", "20"));
     }
@@ -978,7 +978,7 @@ class POAttainmentServiceTest {
             .thenReturn(Arrays.asList(student1));
         when(studentMarkRepository.findByLosIdsAndBatch(Arrays.asList(losId), batch))
             .thenReturn(Arrays.asList(mark));
-        when(outcomeMappingRepository.findByLearningOutcome_Id(losId))
+        when(outcomeMappingRepository.findByLearningOutcome_IdAndIsDeletedFalse(losId))
             .thenReturn(Arrays.asList(mapping1));
         when(losRepository.findById(losId))
             .thenReturn(Optional.of(los1));
