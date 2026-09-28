@@ -1,54 +1,41 @@
-version: '3.8'
+# Production stack on the app EC2 server. The database is Amazon RDS (MySQL 8.0), not a
+# container - see infra/terraform/rds.tf.
+#
+# Lives at /opt/lopo on the server, run as:
+#   docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml up -d
+# .env (secrets) is written by Ansible (infra/ansible/roles/app); release.env holds
+# IMAGE_TAG, written by infra/ansible/deploy.yml on every Jenkins deploy.
 
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: softwareproject-db
-    environment:
-      MYSQL_ROOT_PASSWORD: ${PROD_DB_PASSWORD}
-      MYSQL_DATABASE: ${PROD_DB_NAME}
-      MYSQL_USER: ${PROD_DB_USERNAME}
-      MYSQL_PASSWORD: ${PROD_DB_PASSWORD}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - softwareproject
-    restart: unless-stopped
-
   backend:
-    image: ghcr.io/danusigan/softwareproject/backend:latest
+    image: docker.io/${DOCKERHUB_NAMESPACE:-danusigan}/lopo-backend:${IMAGE_TAG:-latest}
     container_name: softwareproject-backend
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${PROD_DB_NAME}?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: ${PROD_DB_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${PROD_DB_PASSWORD}
+      # RDS enforces TLS (require_secure_transport=1).
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:3306/${DB_NAME}?sslMode=REQUIRED&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_PROFILES_ACTIVE: prod
       JWT_SECRET: ${JWT_SECRET}
-      # Forgot-password emails: reset links point at APP_FRONTEND_URL (e.g. http://<VM-IP>).
+      # Forgot-password emails: reset links point at APP_FRONTEND_URL (e.g. http://<app-IP>).
       APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
-    depends_on:
-      mysql:
-        condition: service_healthy
     networks:
       - softwareproject
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health || wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 90s
 
   frontend:
-    image: ghcr.io/danusigan/softwareproject/frontend:latest
+    image: docker.io/${DOCKERHUB_NAMESPACE:-danusigan}/lopo-frontend:${IMAGE_TAG:-latest}
     container_name: softwareproject-frontend
     ports:
       - "80:80"
@@ -58,15 +45,11 @@ services:
       - softwareproject
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
-
-volumes:
-  mysql_data:
-    driver: local
 
 networks:
   softwareproject:
