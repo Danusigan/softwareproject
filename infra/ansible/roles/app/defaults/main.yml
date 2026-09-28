@@ -1,0 +1,15 @@
+app_dir: /opt/lopo
+dockerhub_namespace: danusigan
+db_app_username: lopo_app
+
+# Mail (forgot-password emails). Real values come from the encrypted vars/vault.yml - see
+# vars/vault.yml.example. Empty = app runs, but password-reset emails fail to send.
+mail_host: "{{ vault_mail_host | default('smtp.gmail.com') }}"
+mail_port: "{{ vault_mail_port | default(587) }}"
+mail_username: "{{ vault_mail_username | default('') }}"
+mail_password: "{{ vault_mail_password | default('') }}"
+mail_from: "{{ vault_mail_from | default('') }}"
+
+# Where password-reset links point. Defaults to the app's public IP; set
+# vault_app_frontend_url to https://your-domain once there is one.
+app_frontend_url: "{{ vault_app_frontend_url | default('http://' ~ ansible_host) }}"

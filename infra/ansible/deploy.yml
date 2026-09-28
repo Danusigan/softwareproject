@@ -1,0 +1,67 @@
+# Rolls the app server onto a given image tag. Jenkins runs this on every push to main:
+#
+#   ansible-playbook -i "<app-private-ip>," infra/ansible/deploy.yml -e image_tag=<git-sha>
+#
+# Manual rollback from your machine (WSL), to any earlier commit SHA:
+#
+#   cd infra/ansible
+#   ansible-playbook -l app deploy.yml -e image_tag=<older-git-sha>
+#
+# Needs no secrets: .env on the server is written by site.yml; this only changes the image tag.
+
+- name: Deploy application release
+  hosts: all
+  gather_facts: false
+  vars:
+    app_dir: /opt/lopo
+    compose: docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml
+  tasks:
+    - name: Require image_tag
+      ansible.builtin.assert:
+        that: image_tag is defined and image_tag | length > 0
+        fail_msg: "Pass -e image_tag=<git-sha>"
+
+    - name: Ship current compose file
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../deploy/docker-compose.prod.yml"
+        dest: "{{ app_dir }}/docker-compose.prod.yml"
+        mode: "0644"
+
+    - name: Record the release being deployed
+      ansible.builtin.copy:
+        dest: "{{ app_dir }}/release.env"
+        content: "IMAGE_TAG={{ image_tag }}\n"
+        mode: "0644"
+
+    - name: Pull images
+      ansible.builtin.command: "{{ compose }} pull"
+      args:
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Start containers
+      ansible.builtin.command: "{{ compose }} up -d --remove-orphans"
+      args:
+        chdir: "{{ app_dir }}"
+      changed_when: true
+
+    - name: Wait for backend to report healthy
+      ansible.builtin.command: docker inspect --format={{ '{{' }}.State.Health.Status{{ '}}' }} softwareproject-backend
+      register: backend_health
+      until: backend_health.stdout == "healthy"
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Frontend answers through nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/health
+      register: frontend_health
+      until: frontend_health.status == 200
+      retries: 10
+      delay: 3
+
+    # Keeps a week of old images on disk so a rollback doesn't need to re-download.
+    - name: Remove images older than 7 days that no container uses
+      ansible.builtin.command: docker image prune -af --filter until=168h
+      changed_when: false
