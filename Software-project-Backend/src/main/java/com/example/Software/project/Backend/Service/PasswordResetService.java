@@ -6,6 +6,7 @@ import com.example.Software.project.Backend.Repository.PasswordResetTokenReposit
 import com.example.Software.project.Backend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,9 @@ public class PasswordResetService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -68,7 +72,7 @@ public class PasswordResetService {
         User user = userRepository.findByUsername(resetToken.getUserId())
                 .orElseThrow(() -> new Exception("Account no longer exists."));
 
-        user.setPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
         resetToken.setUsed(true);
