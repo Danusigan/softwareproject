@@ -1,0 +1,129 @@
+# Jenkins itself runs on the host JVM. Builds run Maven/Node/MySQL in throwaway Docker
+# containers (see Jenkinsfile), so no JDK 17/Node/MySQL needs installing here.
+
+- name: Java for Jenkins + Ansible for the deploy stage
+  ansible.builtin.apt:
+    name:
+      - fontconfig
+      - openjdk-21-jre-headless
+      - ansible
+    state: present
+
+- name: Jenkins apt key
+  ansible.builtin.get_url:
+    url: https://pkg.jenkins.io/debian-stable/jenkins.io-2026.key
+    dest: /etc/apt/keyrings/jenkins-keyring.asc
+    mode: "0644"
+
+- name: Jenkins apt repository (LTS)
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+    filename: jenkins
+    state: present
+
+- name: Install Jenkins
+  ansible.builtin.apt:
+    name: jenkins
+    state: present
+    update_cache: true
+
+- name: Let Jenkins run docker
+  ansible.builtin.user:
+    name: jenkins
+    groups: docker
+    append: true
+  notify: Restart jenkins
+
+# Jenkinsfile reads APP_HOST to know where to deploy (app server's private IP).
+- name: Jenkins systemd drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/jenkins.service.d
+    state: directory
+    mode: "0755"
+
+- name: Jenkins service environment
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/jenkins.service.d/lopo.conf
+    content: |
+      [Service]
+      Environment="APP_HOST={{ hostvars['app-server'].private_ip }}"
+    mode: "0644"
+  notify: Restart jenkins
+
+# --- SSH key Jenkins uses to deploy to the app server (authorized there by the app role) ---
+
+- name: Jenkins .ssh directory
+  ansible.builtin.file:
+    path: /var/lib/jenkins/.ssh
+    state: directory
+    owner: jenkins
+    group: jenkins
+    mode: "0700"
+
+- name: Jenkins deploy key
+  ansible.builtin.command: >-
+    ssh-keygen -t ed25519 -N "" -C jenkins-deploy -f /var/lib/jenkins/.ssh/id_ed25519
+  args:
+    creates: /var/lib/jenkins/.ssh/id_ed25519
+
+- name: Deploy key owned by jenkins
+  ansible.builtin.file:
+    path: "/var/lib/jenkins/.ssh/{{ item }}"
+    owner: jenkins
+    group: jenkins
+  loop: [id_ed25519, id_ed25519.pub]
+
+- name: Read deploy public key
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/.ssh/id_ed25519.pub
+  register: deploy_pubkey
+
+- name: Expose public key to the app play
+  ansible.builtin.set_fact:
+    jenkins_deploy_pubkey: "{{ deploy_pubkey.content | b64decode | trim }}"
+
+- name: Scan app server host key
+  ansible.builtin.command: ssh-keyscan -t ed25519 {{ hostvars['app-server'].private_ip }}
+  register: app_host_key
+  changed_when: false
+
+- name: Trust app server host key
+  ansible.builtin.known_hosts:
+    path: /var/lib/jenkins/.ssh/known_hosts
+    name: "{{ hostvars['app-server'].private_ip }}"
+    key: "{{ app_host_key.stdout_lines | reject('match', '^#') | first }}"
+
+- name: known_hosts owned by jenkins
+  ansible.builtin.file:
+    path: /var/lib/jenkins/.ssh/known_hosts
+    owner: jenkins
+    group: jenkins
+    mode: "0644"
+
+- name: Jenkins running and enabled on boot
+  ansible.builtin.service:
+    name: jenkins
+    state: started
+    enabled: true
+
+- name: Apply pending restarts
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for Jenkins to come up
+  ansible.builtin.uri:
+    url: http://127.0.0.1:8080/login
+  register: jenkins_up
+  until: jenkins_up.status == 200
+  retries: 30
+  delay: 5
+
+- name: Read initial admin password (only exists until setup is completed)
+  ansible.builtin.slurp:
+    src: /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_initial_pw
+  failed_when: false
+
+- name: Show initial admin password
+  ansible.builtin.debug:
+    msg: "Unlock Jenkins at http://{{ ansible_host }}:8080 with: {{ jenkins_initial_pw.content | b64decode | trim }}"
+  when: jenkins_initial_pw.content is defined

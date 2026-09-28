@@ -1,0 +1,42 @@
+- name: Set timezone
+  ansible.builtin.command: timedatectl set-timezone {{ timezone }}
+  changed_when: false
+
+- name: Base packages
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - git
+      - unattended-upgrades
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# Security updates install automatically (Ubuntu default, made explicit here).
+- name: Enable unattended security upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    mode: "0644"
+
+# Spring Boot, Maven and Vite builds all spike memory; swap avoids the OOM killer.
+- name: Check for swap file
+  ansible.builtin.stat:
+    path: /swapfile
+  register: swapfile
+
+- name: Create swap file
+  ansible.builtin.shell: |
+    fallocate -l {{ swap_size_mb }}M /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+  when: not swapfile.stat.exists
+
+- name: Persist swap across reboots
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    line: "/swapfile none swap sw 0 0"
