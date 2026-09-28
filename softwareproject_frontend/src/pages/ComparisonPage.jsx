@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import Header from '../components/header';
 import Footer from '../components/footer';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
 const EMPTY_DISTRIBUTION = { labels: ['0-39', '40-49', '50-59', '60-69', '70-79', '80-100'], data: [0, 0, 0, 0, 0, 0] };
 
 const percent = (value) => `${Number(value || 0).toFixed(1)}%`;
