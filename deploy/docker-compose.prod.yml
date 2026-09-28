@@ -29,6 +29,11 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${PROD_DB_PASSWORD}
       SPRING_PROFILES_ACTIVE: prod
       JWT_SECRET: ${JWT_SECRET}
+      # Forgot-password emails: reset links point at APP_FRONTEND_URL (e.g. http://<VM-IP>).
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     depends_on:
       mysql:
         condition: service_healthy
