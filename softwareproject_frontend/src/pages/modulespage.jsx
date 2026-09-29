@@ -26,10 +26,12 @@ export default function ModulesPage() {
 
     const fetchModules = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/modules/all');
-            setModules(res.data);
+            const res = await axios.get('/api/modules/all');
+            // Backend returns {message, data, status} format
+            setModules(res.data.data || []);
         } catch (err) {
             console.error('Error fetching modules:', err);
+            setModules([]);
         } finally {
             setLoading(false);
         }
@@ -56,7 +58,7 @@ export default function ModulesPage() {
         try {
             const token = localStorage.getItem('token');
             await axios.delete(
-                `http://localhost:8080/api/modules/${selectedModule.moduleId}`,
+                `/api/modules/${selectedModule.moduleId}`,
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
                 }
@@ -74,7 +76,7 @@ export default function ModulesPage() {
         try {
             const token = localStorage.getItem('token');
             await axios.put(
-                `http://localhost:8080/api/modules/${selectedModule.moduleId}`,
+                `/api/modules/${selectedModule.moduleId}`,
                 updatedData,
                 {
                     headers: { 'Authorization': `Bearer ${token}` }
