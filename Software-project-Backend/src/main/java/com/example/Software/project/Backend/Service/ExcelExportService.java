@@ -1,0 +1,950 @@
+package com.example.Software.project.Backend.Service;
+
+import com.example.Software.project.Backend.Model.Los;
+import com.example.Software.project.Backend.Model.MarkType;
+import com.example.Software.project.Backend.Model.Student;
+import com.example.Software.project.Backend.Model.StudentMark;
+import com.example.Software.project.Backend.Model.AssessmentItem;
+import com.example.Software.project.Backend.Model.AssessmentTemplate;
+import com.example.Software.project.Backend.Repository.LosRepository;
+import com.example.Software.project.Backend.Repository.StudentMarkRepository;
+import com.example.Software.project.Backend.Repository.AssessmentItemRepository;
+import com.example.Software.project.Backend.Repository.AssessmentTemplateRepository;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+public class ExcelExportService {
+
+    @Autowired
+    private StudentMarkRepository studentMarkRepository;
+
+    @Autowired
+    private LosRepository losRepository;
+
+    @Autowired
+    private AssessmentItemRepository assessmentItemRepository;
+
+    @Autowired
+    private AssessmentTemplateRepository assessmentTemplateRepository;
+
+    /**
+     * Generate Excel file with student marks for selected LOs
+     * @param losIds List of LO IDs to include
+     * @param markType Type of marks (FINAL_EXAM or ASSIGNMENT)
+     * @param batch Batch year/identifier
+     * @param threshold Pass threshold score (default 50)
+     * @return byte array of Excel file
+     */
+    @Transactional(readOnly = true)
+    public byte[] generateMarksExcel(List<String> losIds, String markType, String batch, Integer threshold) throws IOException {
+        if (threshold == null) {
+            threshold = 50;
+        }
+
+        MarkType type = MarkType.valueOf(markType.toUpperCase());
+
+        // Fetch all LOs
+        Map<String, Los> losMap = new HashMap<>();
+        for (String losId : losIds) {
+            Optional<Los> los = losRepository.findById(losId);
+            los.ifPresent(l -> losMap.put(losId, l));
+        }
+
+        // Get distinct students for these LOs
+        List<Student> students = studentMarkRepository
+            .findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // Get all marks for these LOs
+        List<StudentMark> allMarks = studentMarkRepository
+            .findByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // Group marks by student and LO for quick lookup
+        Map<String, Map<String, StudentMark>> marksByStudentAndLo = new HashMap<>();
+        for (StudentMark mark : allMarks) {
+            String studentId = mark.getStudent().getStudentId();
+            String losId = mark.getLos().getId();
+
+            marksByStudentAndLo.computeIfAbsent(studentId, k -> new HashMap<>())
+                .put(losId, mark);
+        }
+
+        // Create workbook
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Marks Report");
+
+            // Define styles
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle passStyle = createPassStyle(workbook);
+            CellStyle failStyle = createFailStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+
+            // Create header row
+            Row headerRow = sheet.createRow(0);
+
+            // First column - Index Number
+            Cell indexHeader = headerRow.createCell(0);
+            indexHeader.setCellValue("Index Number");
+            indexHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            // LO columns
+            int colIndex = 1;
+            for (String losId : losIds) {
+                Los los = losMap.get(losId);
+                Cell loHeader = headerRow.createCell(colIndex);
+                loHeader.setCellValue(los != null ? los.getName() : losId);
+                loHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIndex, 4000);
+                colIndex++;
+            }
+
+            // Add student data rows
+            int rowIndex = 1;
+            for (Student student : students) {
+                Row dataRow = sheet.createRow(rowIndex);
+
+                // Student Index
+                Cell studentIdCell = dataRow.createCell(0);
+                studentIdCell.setCellValue(student.getStudentId());
+                studentIdCell.setCellStyle(dataStyle);
+
+                // Marks for each LO
+                int colIdx = 1;
+                for (String losId : losIds) {
+                    Cell markCell = dataRow.createCell(colIdx);
+
+                    StudentMark mark = marksByStudentAndLo
+                        .getOrDefault(student.getStudentId(), new HashMap<>())
+                        .get(losId);
+
+                    if (mark != null && mark.getScore() != null) {
+                        double score = mark.getScore();
+
+                        // Normalize score to percentage before comparing to threshold
+                        double totalMaxMarks = getTotalMaxMarksForLO(losId, batch, markType);
+                        double scorePercentage;
+                        if (totalMaxMarks > 0) {
+                            scorePercentage = (score / totalMaxMarks) * 100.0;
+                        } else {
+                            scorePercentage = score; // Legacy: assume score is percentage
+                        }
+
+                        String passFailStatus = scorePercentage >= threshold ? "Pass" : "Fail";
+
+                        markCell.setCellValue(passFailStatus + " (" + String.format("%.2f", score) + ")");
+                        markCell.setCellStyle(scorePercentage >= threshold ? passStyle : failStyle);
+                    } else {
+                        markCell.setCellValue("N/A");
+                        markCell.setCellStyle(dataStyle);
+                    }
+
+                    colIdx++;
+                }
+
+                rowIndex++;
+            }
+
+            // Convert to byte array
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Create header cell style (bold, colored background)
+     */
+    private CellStyle createHeaderStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    /**
+     * Create Pass status cell style (green background)
+     */
+    private CellStyle createPassStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.LIGHT_GREEN.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    /**
+     * Create Fail status cell style (red background)
+     */
+    private CellStyle createFailStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.RED.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        Font font = workbook.createFont();
+        font.setColor(IndexedColors.WHITE.getIndex());
+        style.setFont(font);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    /**
+     * Create data cell style (standard formatting)
+     */
+    private CellStyle createDataStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    /**
+     * Generate empty Excel template for mark upload
+     * Users can download this, fill in marks, and re-upload
+     * @param losIds List of LO IDs to include in template
+     * @return byte array of Excel template file
+     */
+    public byte[] generateMarkTemplate(List<String> losIds) throws IOException {
+        return generateMarkTemplate(losIds, null, null, 50, 100, null);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, double maxMarksPerLo, String moduleId) throws IOException {
+        return generateMarkTemplate(losIds, batch, markType, threshold, maxMarksPerLo, moduleId, null);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, double maxMarksPerLo, String moduleId,
+                                       String assignmentLabel) throws IOException {
+        // Build per-LO max marks using the global value
+        Map<String, Double> perLoMaxMarks = new LinkedHashMap<>();
+        for (String id : losIds) perLoMaxMarks.put(id, maxMarksPerLo);
+        return generateMarkTemplate(losIds, batch, markType, threshold, perLoMaxMarks, moduleId, assignmentLabel);
+    }
+
+    public byte[] generateMarkTemplate(List<String> losIds, String batch, String markType,
+                                       double threshold, Map<String, Double> perLoMaxMarks, String moduleId,
+                                       String assignmentLabel) throws IOException {
+        if (perLoMaxMarks == null) perLoMaxMarks = new LinkedHashMap<>();
+        final Map<String, Double> loMaxMap = perLoMaxMarks;
+
+        // Fetch all LOs
+        Map<String, Los> losMap = new HashMap<>();
+        for (String losId : losIds) {
+            Optional<Los> los = losRepository.findById(losId);
+            los.ifPresent(l -> losMap.put(losId, l));
+        }
+
+        // Build LO_MAX_MARKS metadata value: "LO1:50,LO2:30"
+        StringBuilder loMaxMeta = new StringBuilder();
+        for (int i = 0; i < losIds.size(); i++) {
+            if (i > 0) loMaxMeta.append(",");
+            String id = losIds.get(i);
+            double mx = loMaxMap.getOrDefault(id, 100.0);
+            loMaxMeta.append(id).append(":").append((int) mx);
+        }
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Mark Template");
+
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle inputStyle = createInputStyle(workbook);
+
+            // Title row (row 0)
+            Row titleRow = sheet.createRow(0);
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 12);
+            titleFont.setColor(IndexedColors.DARK_BLUE.getIndex());
+            titleStyle.setFont(titleFont);
+            Cell titleCell = titleRow.createCell(0);
+            String assignLabel = (assignmentLabel != null && !assignmentLabel.isBlank()) ? assignmentLabel : "";
+            titleCell.setCellValue("LO-wise Mark Entry Template"
+                + (assignLabel.isEmpty() ? "" : " — " + assignLabel)
+                + " | Batch: " + (batch != null ? batch : "-")
+                + " | Type: " + (markType != null ? markType.replace("_", " ") : "FINAL EXAM"));
+            titleCell.setCellStyle(titleStyle);
+
+            // Header row (row 1): Student Index | LO1 (max=50) | LO2 (max=30) ...
+            Row headerRow = sheet.createRow(1);
+            Cell indexHeader = headerRow.createCell(0);
+            indexHeader.setCellValue("Student Index");
+            indexHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            int colIndex = 1;
+            for (String losId : losIds) {
+                Los los = losMap.get(losId);
+                String loName = los != null ? los.getName() : losId;
+                double maxMark = loMaxMap.getOrDefault(losId, 100.0);
+                Cell loHeader = headerRow.createCell(colIndex);
+                loHeader.setCellValue(loName + " (max=" + (int) maxMark + ")");
+                loHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIndex, 5000);
+                colIndex++;
+            }
+
+            // Data rows (30 empty rows)
+            for (int rowNum = 2; rowNum <= 31; rowNum++) {
+                Row row = sheet.createRow(rowNum);
+                row.createCell(0).setCellStyle(inputStyle);
+                for (int col = 1; col <= losIds.size(); col++) {
+                    row.createCell(col).setCellStyle(inputStyle);
+                }
+            }
+
+            // METADATA sheet
+            writeMetadataSheet(workbook, batch, markType, threshold, loMaxMap, moduleId,
+                               String.join(",", losIds), assignmentLabel, loMaxMeta.toString());
+
+            // Instructions sheet
+            Sheet instrSheet = workbook.createSheet("Instructions");
+            instrSheet.setColumnWidth(0, 18000);
+            int ir = 0;
+
+            Row insTitleRow = instrSheet.createRow(ir++);
+            Cell insTitleCell = insTitleRow.createCell(0);
+            insTitleCell.setCellValue("LO-wise Mark Entry — Instructions");
+            CellStyle insTitleStyle = workbook.createCellStyle();
+            Font insTitleFont = workbook.createFont();
+            insTitleFont.setBold(true); insTitleFont.setFontHeightInPoints((short) 14);
+            insTitleStyle.setFont(insTitleFont);
+            insTitleCell.setCellStyle(insTitleStyle);
+            ir++;
+
+            String[] instructions = {
+                "Assignment: " + (assignLabel.isEmpty() ? "(not set)" : assignLabel),
+                "Batch: " + (batch != null ? batch : "-") + "  |  Type: " + (markType != null ? markType : "FINAL_EXAM"),
+                "",
+                "Max marks per Learning Outcome:",
+            };
+            for (String s : instructions) {
+                instrSheet.createRow(ir++).createCell(0).setCellValue(s);
+            }
+            for (String losId : losIds) {
+                Los los = losMap.get(losId);
+                double mx = loMaxMap.getOrDefault(losId, 100.0);
+                instrSheet.createRow(ir++).createCell(0)
+                    .setCellValue("  • " + (los != null ? los.getName() : losId) + ": max = " + (int) mx + " marks");
+            }
+            ir++;
+            String[] rules = {
+                "Instructions:",
+                "1. Fill 'Student Index' column with student IDs (e.g. EG/2024/5667)",
+                "2. Fill each LO column with the student's raw score for that LO",
+                "3. Each score must be between 0 and the max shown in the column header",
+                "4. Leave a cell empty if a student was absent for that LO",
+                "5. Do NOT modify the header row, title row, or METADATA sheet",
+                "6. Save as .xlsx and upload — all settings are detected automatically",
+            };
+            for (String r : rules) {
+                instrSheet.createRow(ir++).createCell(0).setCellValue(r);
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, double maxMarksPerLo, String moduleId, String loIds) {
+        writeMetadataSheet(workbook, batch, markType, threshold, maxMarksPerLo, moduleId, loIds, null);
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, double maxMarksPerLo, String moduleId, String loIds,
+                                    String assignmentLabel) {
+        writeMetadataSheet(workbook, batch, markType, threshold,
+            (Map<String, Double>) null, moduleId, loIds, assignmentLabel, "");
+    }
+
+    private void writeMetadataSheet(Workbook workbook, String batch, String markType,
+                                    double threshold, Map<String, Double> perLoMaxMarks, String moduleId,
+                                    String loIds, String assignmentLabel, String loMaxMeta) {
+        Sheet meta = workbook.createSheet("METADATA");
+        String[][] entries = {
+            {"TEMPLATE_TYPE",    "LO_WISE"},
+            {"BATCH",            batch != null ? batch : ""},
+            {"MARK_TYPE",        markType != null ? markType : "FINAL_EXAM"},
+            {"THRESHOLD",        String.valueOf((int) threshold)},
+            {"MODULE_ID",        moduleId != null ? moduleId : ""},
+            {"LO_IDS",           loIds != null ? loIds : ""},
+            {"ASSIGNMENT_LABEL", assignmentLabel != null ? assignmentLabel : ""},
+            {"LO_MAX_MARKS",     loMaxMeta != null ? loMaxMeta : ""},
+        };
+        for (int i = 0; i < entries.length; i++) {
+            Row row = meta.createRow(i);
+            row.createCell(0).setCellValue(entries[i][0]);
+            row.createCell(1).setCellValue(entries[i][1]);
+        }
+    }
+
+    /**
+     * Generate Excel file with per-student PO attainment credits
+     * @param attainmentData Data from POAttainmentService.calculateStudentPOCredits()
+     * @return byte array of Excel file
+     */
+    @SuppressWarnings("unchecked")
+    public byte[] generatePOAttainmentExcel(Map<String, Object> attainmentData) throws IOException {
+        List<String> poList = (List<String>) attainmentData.get("poList");
+        List<Map<String, String>> loList = (List<Map<String, String>>) attainmentData.get("loList");
+        if (loList == null) loList = new ArrayList<>();
+
+        Map<String, Integer> maxCredits = (Map<String, Integer>) attainmentData.get("maxCredits");
+        int totalMaxCredit = (int) attainmentData.get("totalMaxCredit");
+        int threshold = (int) attainmentData.get("threshold");
+        List<Map<String, Object>> students = (List<Map<String, Object>>) attainmentData.get("students");
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("PO Attainment");
+
+            // Styles
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle passStyle = createPassStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+            CellStyle failStyle = createFailStyle(workbook);
+
+            // Title row with threshold info
+            Row titleRow = sheet.createRow(0);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("PO Attainment & LO Scores Report (Threshold: " + threshold + "%)");
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            CellStyle titleStyle = workbook.createCellStyle();
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+
+            // Max credits row
+            Row maxRow = sheet.createRow(1);
+            Cell maxLabel = maxRow.createCell(0);
+            maxLabel.setCellValue("Max Credit");
+            maxLabel.setCellStyle(headerStyle);
+
+            int colIdx = 1;
+            // Empty cells for LO columns in max credit row
+            for (int i = 0; i < loList.size(); i++) {
+                Cell cell = maxRow.createCell(colIdx);
+                cell.setCellValue("");
+                cell.setCellStyle(headerStyle);
+                colIdx++;
+            }
+
+            // PO max credits
+            for (String poCode : poList) {
+                Cell cell = maxRow.createCell(colIdx);
+                cell.setCellValue(maxCredits.getOrDefault(poCode, 0));
+                cell.setCellStyle(headerStyle);
+                colIdx++;
+            }
+            Cell maxTotalCell = maxRow.createCell(colIdx);
+            maxTotalCell.setCellValue(totalMaxCredit);
+            maxTotalCell.setCellStyle(headerStyle);
+
+            // Header row
+            Row headerRow = sheet.createRow(2);
+            Cell indexHeader = headerRow.createCell(0);
+            indexHeader.setCellValue("Student Index");
+            indexHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            colIdx = 1;
+            // LO Headers
+            for (Map<String, String> lo : loList) {
+                Cell loHeader = headerRow.createCell(colIdx);
+                loHeader.setCellValue(lo.get("name"));
+                loHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIdx, 4000);
+                colIdx++;
+            }
+
+            // PO Headers
+            for (String poCode : poList) {
+                Cell poHeader = headerRow.createCell(colIdx);
+                poHeader.setCellValue(poCode);
+                poHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIdx, 3500);
+                colIdx++;
+            }
+            Cell totalHeader = headerRow.createCell(colIdx);
+            totalHeader.setCellValue("Total Credit");
+            totalHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(colIdx, 4000);
+
+            // Data rows
+            int rowIndex = 3;
+            for (Map<String, Object> student : students) {
+                Row dataRow = sheet.createRow(rowIndex);
+
+                Cell studentIdCell = dataRow.createCell(0);
+                studentIdCell.setCellValue((String) student.get("studentId"));
+                studentIdCell.setCellStyle(dataStyle);
+
+                int col = 1;
+
+                // LO Scores
+                Map<String, String> loScoresMap = (Map<String, String>) student.get("loScores");
+                for (Map<String, String> lo : loList) {
+                    Cell cell = dataRow.createCell(col);
+                    String scoreLabel = loScoresMap.getOrDefault(lo.get("id"), "N/A");
+                    cell.setCellValue(scoreLabel);
+
+                    if (scoreLabel.startsWith("Pass")) cell.setCellStyle(passStyle);
+                    else if (scoreLabel.startsWith("Fail")) cell.setCellStyle(failStyle);
+                    else cell.setCellStyle(dataStyle);
+
+                    col++;
+                }
+
+                // PO Credits
+                Map<String, Integer> poCredits = (Map<String, Integer>) student.get("poCredits");
+                for (String poCode : poList) {
+                    Cell cell = dataRow.createCell(col);
+                    int credit = poCredits.getOrDefault(poCode, 0);
+                    cell.setCellValue(credit);
+                    cell.setCellStyle(credit > 0 ? passStyle : dataStyle);
+                    col++;
+                }
+
+                Cell totalCell = dataRow.createCell(col);
+                totalCell.setCellValue((int) student.get("totalCredit"));
+                int totalCredit = (int) student.get("totalCredit");
+                totalCell.setCellStyle(totalCredit > 0 ? passStyle : dataStyle);
+
+                rowIndex++;
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Create input cell style for template (light gray background for user input area)
+     */
+    private CellStyle createInputStyle(Workbook workbook) {
+        CellStyle style = workbook.createCellStyle();
+        style.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        style.setAlignment(HorizontalAlignment.CENTER);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        return style;
+    }
+
+    /**
+     * Generate question-wise (assessment item) Excel template for mark entry
+     * Allows defining number of questions, their max marks, and which LO each question maps to
+     * @param templateId Assessment template ID (or null if creating new)
+     * @return byte array of Excel template file
+     */
+    public byte[] generateQuestionMarkTemplate(String templateId) throws IOException {
+        return generateQuestionMarkTemplate(templateId, null, null);
+    }
+
+    /**
+     * Generate question-wise (assessment item) Excel template for mark entry.
+     * Supports explicit question count and question-to-LO mapping input.
+     *
+     * @param templateId Assessment template ID (optional)
+     * @param numberOfQuestions Optional explicit number of question columns
+     * @param questionMappings Optional list of question mapping objects
+     * @return byte array of Excel template file
+     */
+    public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
+                                               List<Map<String, Object>> questionMappings) throws IOException {
+        return generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings, null, null, null);
+    }
+
+    /**
+     * Build question-wise template.
+     * Layout: Student ID (col 0) | Q1 (col 1) | Q2 (col 2) | ...
+     * No "Student Name" column — keeps the sheet lean and avoids LO-name confusion.
+     */
+    public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
+                                               List<Map<String, Object>> questionMappings,
+                                               String batch, String markType, String assignmentLabel) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Question Mark Template");
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle inputStyle = createInputStyle(workbook);
+
+            // Row 0: Title
+            Row titleRow = sheet.createRow(0);
+            Cell titleCell = titleRow.createCell(0);
+            String title = "Question-wise Mark Entry Template";
+            if (assignmentLabel != null && !assignmentLabel.isBlank()) title += " — " + assignmentLabel;
+            titleCell.setCellValue(title);
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            CellStyle titleStyle = workbook.createCellStyle();
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+
+            // Row 2: Column headers — Student ID (col 0), then Q1, Q2, ...
+            Row headerRow = sheet.createRow(2);
+            Cell studentIdHeader = headerRow.createCell(0);
+            studentIdHeader.setCellValue("Student ID");
+            studentIdHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            // Load assessment items if template exists
+            List<AssessmentItem> items = new ArrayList<>();
+            if (templateId != null) {
+                items = assessmentItemRepository.findByAssessmentTemplate_IdOrderByQuestionNumber(templateId);
+            }
+
+            Map<Integer, AssessmentItem> itemByQuestion = new HashMap<>();
+            for (AssessmentItem item : items) {
+                if (item.getQuestionNumber() != null && item.getQuestionNumber() > 0) {
+                    itemByQuestion.put(item.getQuestionNumber(), item);
+                }
+            }
+
+            Map<Integer, Map<String, Object>> mappingByQuestion = new HashMap<>();
+            if (questionMappings != null) {
+                for (Map<String, Object> mapping : questionMappings) {
+                    if (mapping == null) continue;
+                    Object qNumObj = mapping.get("questionNumber");
+                    if (qNumObj == null) continue;
+                    Integer qNum;
+                    try { qNum = Integer.parseInt(qNumObj.toString().trim()); } catch (Exception ex) { continue; }
+                    if (qNum > 0) mappingByQuestion.put(qNum, mapping);
+                }
+            }
+
+            int numQuestions;
+            if (numberOfQuestions != null && numberOfQuestions > 0) {
+                numQuestions = numberOfQuestions;
+            } else if (!mappingByQuestion.isEmpty()) {
+                numQuestions = Collections.max(mappingByQuestion.keySet());
+            } else {
+                numQuestions = Math.max(5, items.size());
+            }
+
+            // Build per-question info for instructions sheet
+            List<String> questionInfoLines = new ArrayList<>();
+
+            for (int q = 1; q <= numQuestions; q++) {
+                // Q columns start at col 1 (no Student Name column)
+                Cell qHeader = headerRow.createCell(q);
+
+                String loName = null;
+                Double maxMarks = null;
+
+                Map<String, Object> mapping = mappingByQuestion.get(q);
+                if (mapping != null) {
+                    Object maxObj = mapping.get("maxMarks");
+                    if (maxObj != null) {
+                        try { maxMarks = Double.parseDouble(maxObj.toString().trim()); } catch (Exception ignored) {}
+                    }
+                    Object loNameObj = mapping.get("loName");
+                    if (loNameObj != null && !loNameObj.toString().trim().isEmpty()) {
+                        loName = loNameObj.toString().trim();
+                    }
+                    if (loName == null) {
+                        Object loIdObj = mapping.get("loId");
+                        if (loIdObj != null && !loIdObj.toString().trim().isEmpty()) {
+                            String loId = loIdObj.toString().trim();
+                            loName = losRepository.findById(loId).map(Los::getName).orElse(loId);
+                        }
+                    }
+                }
+                if (loName == null || maxMarks == null) {
+                    AssessmentItem item = itemByQuestion.get(q);
+                    if (item != null) {
+                        if (loName == null) loName = item.getLosName();
+                        if (maxMarks == null) maxMarks = item.getMaxMarks();
+                    }
+                }
+
+                // Header: "Q1 (max=10)"
+                StringBuilder label = new StringBuilder("Q").append(q);
+                if (maxMarks != null) label.append(" (max=").append(maxMarks.intValue()).append(")");
+                qHeader.setCellValue(label.toString());
+                qHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(q, 4000);
+
+                // Collect info for instructions
+                String info = "  Q" + q + ": max marks = " + (maxMarks != null ? maxMarks.intValue() : "?");
+                if (loName != null) info += " → LO: " + loName;
+                questionInfoLines.add(info);
+            }
+
+            // Data rows — Student ID (col 0), Q marks (col 1..n)
+            for (int rowNum = 3; rowNum <= 30; rowNum++) {
+                Row row = sheet.createRow(rowNum);
+                row.createCell(0).setCellStyle(inputStyle);
+                for (int q = 1; q <= numQuestions; q++) {
+                    Cell markCell = row.createCell(q);
+                    markCell.setCellStyle(inputStyle);
+                    markCell.setCellValue("");
+                }
+            }
+
+            // ── Instructions sheet ──────────────────────────────────────────
+            Sheet instructSheet = workbook.createSheet("Instructions");
+            instructSheet.setColumnWidth(0, 18000);
+            int instrRow = 0;
+
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+            boldFont.setFontHeightInPoints((short) 12);
+            CellStyle boldStyle = workbook.createCellStyle();
+            boldStyle.setFont(boldFont);
+
+            Row instrTitleRow = instructSheet.createRow(instrRow++);
+            Cell instrTitleCell = instrTitleRow.createCell(0);
+            instrTitleCell.setCellValue("Question-wise Mark Entry Instructions");
+            instrTitleCell.setCellStyle(boldStyle);
+            instrRow++;
+
+            String[] instructions = {
+                "TEMPLATE TYPE : Question-wise (marks entered per question, aggregated to LO automatically)",
+                "Assignment     : " + (assignmentLabel != null ? assignmentLabel : "-"),
+                "Batch          : " + (batch != null ? batch : "-"),
+                "Mark Type      : " + (markType != null ? markType : "-"),
+                "",
+                "How to fill:",
+                "  1. Enter Student ID in column A (e.g., EG/2024/5667)",
+                "  2. Enter question marks in columns B, C, D... (Q1, Q2, Q3...)",
+                "  3. Each mark must be between 0 and the max marks shown in the column header",
+                "  4. Marks outside the valid range will REJECT the entire upload with an error",
+                "  5. Leave cells empty for absent/missing questions (not 0)",
+                "  6. Do NOT modify the header row, sheet names, or METADATA sheet",
+                "  7. Upload using the 'Upload Marks' button — type is detected automatically",
+                "",
+                "Question max marks:"
+            };
+            for (String line : instructions) {
+                Row r = instructSheet.createRow(instrRow++);
+                r.createCell(0).setCellValue(line);
+            }
+            for (String qLine : questionInfoLines) {
+                Row r = instructSheet.createRow(instrRow++);
+                r.createCell(0).setCellValue(qLine);
+            }
+
+            // ── METADATA sheet ──────────────────────────────────────────────
+            Sheet meta = workbook.createSheet("METADATA");
+            String[][] entries = {
+                {"TEMPLATE_TYPE",   "QUESTION_WISE"},
+                {"TEMPLATE_ID",     templateId != null ? templateId : ""},
+                {"BATCH",           batch != null ? batch : ""},
+                {"MARK_TYPE",       markType != null ? markType : "FINAL_EXAM"},
+                {"ASSIGNMENT_LABEL", assignmentLabel != null ? assignmentLabel : ""},
+            };
+            for (int i = 0; i < entries.length; i++) {
+                org.apache.poi.ss.usermodel.Row row = meta.createRow(i);
+                row.createCell(0).setCellValue(entries[i][0]);
+                row.createCell(1).setCellValue(entries[i][1]);
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    /** Backward-compat overload — delegates to the full method. */
+    public byte[] generateQuestionMarkTemplate(String templateId, Integer numberOfQuestions,
+                                               List<Map<String, Object>> questionMappings,
+                                               String batch, String markType) throws IOException {
+        return generateQuestionMarkTemplate(templateId, numberOfQuestions, questionMappings, batch, markType, null);
+    }
+
+    /**
+     * Generate marks report with per-LO threshold configuration
+     * @param losIds List of LO IDs
+     * @param markType Type of marks
+     * @param batch Batch identifier
+     * @param loThresholds Map of loId -> threshold (overrides default)
+     * @return byte array of Excel file
+     */
+    public byte[] generateMarksExcelWithPerLoThreshold(List<String> losIds, String markType, String batch,
+                                                       Map<String, Integer> loThresholds) throws IOException {
+        if (loThresholds == null) {
+            loThresholds = new HashMap<>();
+        }
+        // Default threshold for LOs not in map
+        final int DEFAULT_THRESHOLD = 50;
+
+        MarkType type = MarkType.valueOf(markType.toUpperCase());
+
+        // Fetch all LOs
+        Map<String, Los> losMap = new HashMap<>();
+        for (String losId : losIds) {
+            Optional<Los> los = losRepository.findById(losId);
+            los.ifPresent(l -> losMap.put(losId, l));
+        }
+
+        // Get distinct students for these LOs
+        List<Student> students = studentMarkRepository
+            .findDistinctStudentsByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // Get all marks for these LOs
+        List<StudentMark> allMarks = studentMarkRepository
+            .findByLosIdsAndMarkTypeAndBatch(losIds, type, batch);
+
+        // Group marks by student and LO
+        Map<String, Map<String, StudentMark>> marksByStudentAndLo = new HashMap<>();
+        for (StudentMark mark : allMarks) {
+            String studentId = mark.getStudent().getStudentId();
+            String losId = mark.getLos().getId();
+            marksByStudentAndLo.computeIfAbsent(studentId, k -> new HashMap<>())
+                .put(losId, mark);
+        }
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Marks Report - Per LO Threshold");
+
+            CellStyle headerStyle = createHeaderStyle(workbook);
+            CellStyle passStyle = createPassStyle(workbook);
+            CellStyle failStyle = createFailStyle(workbook);
+            CellStyle dataStyle = createDataStyle(workbook);
+
+            // Row 0: Title
+            Row titleRow = sheet.createRow(0);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Marks Report with Per-LO Thresholds");
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 12);
+            CellStyle titleStyle = workbook.createCellStyle();
+            titleStyle.setFont(titleFont);
+            titleCell.setCellStyle(titleStyle);
+
+            // Row 1: Threshold info
+            Row thresholdRow = sheet.createRow(1);
+            Cell threshLabel = thresholdRow.createCell(0);
+            threshLabel.setCellValue("LO Thresholds:");
+            threshLabel.setCellStyle(headerStyle);
+
+            int threshCol = 1;
+            for (String losId : losIds) {
+                int threshold = loThresholds.getOrDefault(losId, DEFAULT_THRESHOLD);
+                Cell threshCell = thresholdRow.createCell(threshCol);
+                threshCell.setCellValue(threshold);
+                threshCell.setCellStyle(headerStyle);
+                threshCol++;
+            }
+
+            // Row 3: Header row
+            Row headerRow = sheet.createRow(3);
+            Cell indexHeader = headerRow.createCell(0);
+            indexHeader.setCellValue("Student Index");
+            indexHeader.setCellStyle(headerStyle);
+            sheet.setColumnWidth(0, 5000);
+
+            int colIndex = 1;
+            for (String losId : losIds) {
+                Los los = losMap.get(losId);
+                Cell loHeader = headerRow.createCell(colIndex);
+                loHeader.setCellValue(los != null ? los.getName() : losId);
+                loHeader.setCellStyle(headerStyle);
+                sheet.setColumnWidth(colIndex, 4000);
+                colIndex++;
+            }
+
+            // Data rows
+            int rowIndex = 4;
+            for (Student student : students) {
+                Row dataRow = sheet.createRow(rowIndex);
+
+                Cell studentIdCell = dataRow.createCell(0);
+                studentIdCell.setCellValue(student.getStudentId());
+                studentIdCell.setCellStyle(dataStyle);
+
+                int colIdx = 1;
+                for (String losId : losIds) {
+                    Cell markCell = dataRow.createCell(colIdx);
+
+                    StudentMark mark = marksByStudentAndLo
+                        .getOrDefault(student.getStudentId(), new HashMap<>())
+                        .get(losId);
+
+                    int threshold = loThresholds.getOrDefault(losId, DEFAULT_THRESHOLD);
+
+                    if (mark != null && mark.getScore() != null) {
+                        double score = mark.getScore();
+
+                        // Normalize score to percentage before comparing to threshold
+                        double totalMaxMarks = getTotalMaxMarksForLO(losId, batch, markType);
+                        double scorePercentage;
+                        if (totalMaxMarks > 0) {
+                            scorePercentage = (score / totalMaxMarks) * 100.0;
+                        } else {
+                            scorePercentage = score; // Legacy: assume score is percentage
+                        }
+
+                        String passFailStatus = scorePercentage >= threshold ? "Pass" : "Fail";
+
+                        markCell.setCellValue(passFailStatus + " (" + String.format("%.2f", score) + ")");
+                        markCell.setCellStyle(scorePercentage >= threshold ? passStyle : failStyle);
+                    } else {
+                        markCell.setCellValue("N/A");
+                        markCell.setCellStyle(dataStyle);
+                    }
+
+                    colIdx++;
+                }
+
+                rowIndex++;
+            }
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+            return output.toByteArray();
+        }
+    }
+
+    /**
+     * Helper method to get total max marks for an LO
+     * Sums up all maxMarks from assessment items for a given LO
+     * @param loId LO ID
+     * @param batch Batch year/identifier
+     * @param markType Type of marks (FINAL_EXAM or ASSIGNMENT)
+     * @return Total max marks, or 0 if no assessment items found
+     */
+    private double getTotalMaxMarksForLO(String loId, String batch, String markType) {
+        List<AssessmentItem> items = assessmentItemRepository
+            .findByLos_IdAndAssessmentTemplate_BatchAndAssessmentTemplate_MarkType(loId, batch, markType.toUpperCase(), MarkType.valueOf(markType.toUpperCase()));
+        return items.stream()
+            .mapToDouble(item -> item.getMaxMarks() != null ? item.getMaxMarks() : 0.0)
+            .sum();
+    }
+}

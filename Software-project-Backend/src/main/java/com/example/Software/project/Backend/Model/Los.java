@@ -1,12 +1,16 @@
 package com.example.Software.project.Backend.Model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
 @Table(name = "los") // Renamed table
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Los {
 
     @Id
@@ -16,38 +20,137 @@ public class Los {
     @Column(name = "name")
     private String name; // The "Lo Name"
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description; // Description of the Learning Outcome
+
+    @Column(name = "batch")
+    private String batch; // e.g., "24", "25" (batch year for marks)
+
+    @Column(name = "attainment_threshold")
+    private Double attainmentThreshold = 50.0; // % below which this LO triggers a CQI action
+
+    // Storing the marks file content inside the DB
+    @Lob
+    @Column(name = "marks_csv_file", columnDefinition = "LONGBLOB")
+    private byte[] marksCsvFile;
+
+    @Column(name = "file_name")
+    private String fileName;
+
+    @Column(name = "created_by")
+    private String createdBy;
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
+    public void softDelete(String deletedByUsername) {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.deletedBy = deletedByUsername;
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+        this.deletedBy = null;
+    }
+
     // Foreign Key to Module
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "module_id", nullable = false)
     @JsonIgnore // Prevent infinite recursion
     private Module module;
 
-    // Relationship to Assignment
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "assignment_id")
-    private Assignment assignment;
-
     // Relationship to OutcomeMapping
     @OneToMany(mappedBy = "learningOutcome", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnore // Prevent recursion
+    @JsonManagedReference
     private List<OutcomeMapping> mappings;
+
+    // Relationship to Student Marks
+    @OneToMany(mappedBy = "los", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @JsonIgnore
+    private List<StudentMark> studentMarks;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 
     // --- Getters and Setters ---
 
     public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public void setId(String id) {
+        // Validate: only capital letters, numbers, and spaces allowed
+        if (id != null && !id.matches("^[A-Z0-9\\s]+$")) {
+            throw new IllegalArgumentException(
+                "Los ID must contain only capital letters, numbers, and spaces (A-Z, 0-9, spaces)"
+            );
+        }
+        this.id = id;
+    }
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
 
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getBatch() { return batch; }
+    public void setBatch(String batch) { this.batch = batch; }
+
+    public Double getAttainmentThreshold() { return attainmentThreshold; }
+    public void setAttainmentThreshold(Double attainmentThreshold) { this.attainmentThreshold = attainmentThreshold; }
+
+    public byte[] getMarksCsvFile() { return marksCsvFile; }
+    public void setMarksCsvFile(byte[] marksCsvFile) { this.marksCsvFile = marksCsvFile; }
+
+    public String getFileName() { return fileName; }
+    public void setFileName(String fileName) { this.fileName = fileName; }
+
+    public String getCreatedBy() { return createdBy; }
+    public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public void setIsDeleted(Boolean isDeleted) { this.isDeleted = isDeleted; }
+
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
+
+    public String getDeletedBy() { return deletedBy; }
+    public void setDeletedBy(String deletedBy) { this.deletedBy = deletedBy; }
+
     public Module getModule() { return module; }
     public void setModule(Module module) { this.module = module; }
 
-    public Assignment getAssignment() { return assignment; }
-    public void setAssignment(Assignment assignment) { this.assignment = assignment; }
-
     public List<OutcomeMapping> getMappings() { return mappings; }
     public void setMappings(List<OutcomeMapping> mappings) { this.mappings = mappings; }
+
+    public List<StudentMark> getStudentMarks() { return studentMarks; }
+    public void setStudentMarks(List<StudentMark> studentMarks) { this.studentMarks = studentMarks; }
 
     // Helper to expose just the module ID in the JSON
     @JsonProperty("moduleId")

@@ -2,34 +2,66 @@ package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
+import com.example.Software.project.Backend.Service.AuditLogService;
+import com.example.Software.project.Backend.Service.ModuleService;
+import com.example.Software.project.Backend.Service.PasswordResetService;
 import com.example.Software.project.Backend.Service.UserService;
+import jakarta.validation.Valid;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:5173", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class UserRestController {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserRestController.class);
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private ModuleService moduleService;
 
     @Autowired
     private AuthenticationManager authenticationManager;
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private Environment environment;
+
+    @Autowired
+    private AuditLogService auditLogService;
+
+    @Autowired
+    private PasswordResetService passwordResetService;
 
     @PostMapping("/login")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
@@ -39,6 +71,9 @@ public class UserRestController {
                     new UsernamePasswordAuthenticationToken(loginUser.getUserID(), loginUser.getPassword())
             );
 
+            // Successful authentication clears any prior failed-attempt count/lockout
+            userService.resetFailedLogins(loginUser.getUserID());
+
             // If authentication is successful, generate JWT
             UserDetails userDetails = (UserDetails) authentication.getPrincipal();
             Optional<User> userOptional = userService.findByUserId(userDetails.getUsername());
@@ -46,7 +81,7 @@ public class UserRestController {
             if (userOptional.isPresent()) {
                 User user = userOptional.get();
                 String userType = user.getUsertype();
-                
+
                 // Validate that user has a valid role
                 if (userType == null || userType.trim().isEmpty()) {
                     Map<String, String> errorResponse = new HashMap<>();
@@ -54,7 +89,7 @@ public class UserRestController {
                     errorResponse.put("status", "ERROR");
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
                 }
-                
+
                 // Validate that usertype is one of the allowed roles
                 String normalizedType = userType.toLowerCase().trim();
                 if (!normalizedType.equals("admin") && !normalizedType.equals("lecture") && !normalizedType.equals("superadmin")) {
@@ -63,13 +98,14 @@ public class UserRestController {
                     errorResponse.put("status", "ERROR");
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
                 }
-                
-                // Normalize usertype to lowercase for consistency
+
+
                 if (userType != null) {
-                    userType = userType.toLowerCase();
+                    userType = userType.toLowerCase().trim();
                 }
-                
+
                 String token = jwtUtil.generateToken(user.getUserID(), userType);
+                auditLogService.log(user.getUserID(), "LOGIN", user.getUserID(), "SUCCESS", null);
 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Login successful");
@@ -84,7 +120,15 @@ public class UserRestController {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "User not found"));
             }
 
+        } catch (org.springframework.security.authentication.LockedException e) {
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "account locked");
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
         } catch (Exception e) {
+            userService.recordFailedLogin(loginUser.getUserID());
+            auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "invalid credentials");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
@@ -92,9 +136,276 @@ public class UserRestController {
         }
     }
 
-    @PostMapping("/add-user")
-    public ResponseEntity<?> addUser(@RequestBody User newUser) {
+    // Step 1 of password reset. Works for all 3 roles (admin/superadmin/lecture) -
+    // they all live in the same User table keyed by email. Always returns a
+    // generic success message so callers can't use it to discover which emails exist.
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Email is required", "status", "ERROR"));
+        }
         try {
+            passwordResetService.requestReset(email.trim());
+        } catch (Exception e) {
+            logger.error("Failed to process forgot-password request for {}", email, e);
+        }
+        return ResponseEntity.ok(Map.of(
+            "message", "If an account with that email exists, a password reset link has been sent.",
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Step 2 of password reset: consumes the emailed token and sets a new password.
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body.get("token");
+        String newPassword = body.get("newPassword");
+        if (token == null || token.isBlank() || newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Token and new password are required", "status", "ERROR"));
+        }
+        if (newPassword.length() < 6) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Password must be at least 6 characters", "status", "ERROR"));
+        }
+        try {
+            passwordResetService.resetPassword(token, newPassword);
+            return ResponseEntity.ok(Map.of("message", "Password reset successful. You can now log in.", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    @PostMapping("/add-admin")
+    public ResponseEntity<?> addAdmin(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
+        try {
+            // Only superadmin can add admins
+            if (!isSuperAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Superadmin can add admins", "status", "ERROR"));
+            }
+
+            // Ensure new user is being created as admin
+            if (newUser.getUsertype() == null || !newUser.getUsertype().toLowerCase().equals("admin")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: New user must be of type 'admin'", "status", "ERROR"));
+            }
+
+            // Get the currently authenticated superadmin user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String creatorUsername = authentication.getName();
+
+            User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=admin");
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Admin user added successfully");
+            response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", "admin");
+            response.put("status", "SUCCESS");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add admin: " + e.getMessage());
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/add-lecture")
+    public ResponseEntity<?> addLecture(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
+        try {
+            // Only admin/superadmin can add lectures
+            if (!isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Admin can add lecturers", "status", "ERROR"));
+            }
+
+            // Ensure new user is being created as lecture
+            if (newUser.getUsertype() == null || !newUser.getUsertype().toLowerCase().equals("lecture")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: New user must be of type 'lecture'", "status", "ERROR"));
+            }
+
+            // Get the currently authenticated admin user
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String creatorUsername = authentication.getName();
+
+            User createdUser = userService.addUser(newUser, creatorUsername);
+            auditLogService.log(creatorUsername, "CREATE_USER", createdUser.getUserID(), "SUCCESS", "role=lecture");
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Lecturer user added successfully");
+            response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", "lecture");
+            response.put("status", "SUCCESS");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Failed to add lecturer: " + e.getMessage());
+            errorResponse.put("status", "ERROR");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    // List lecturers, with their current module assignments, for admin CRUD + the module-assignment picker
+    @GetMapping("/lecturers")
+    public ResponseEntity<?> getAllLecturers(@RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can view lecturers", "status", "ERROR"));
+        }
+
+        List<Map<String, Object>> lecturers = userService.findAllLecturers().stream()
+            .map(u -> Map.of(
+                "username", u.getUserID(),
+                "email", u.getEmail(),
+                "assignedModuleIds", moduleService.getModuleIdsAssignedTo(u.getUserID())
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Lecturers retrieved successfully",
+            "data", lecturers,
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Update a lecturer's email/password (Admin/Superadmin only)
+    @PutMapping("/lecturers/{username}")
+    public ResponseEntity<?> updateLecturer(@PathVariable String username, @RequestBody Map<String, String> body,
+                                             @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can update lecturers", "status", "ERROR"));
+        }
+        try {
+            User updated = userService.updateLecturer(username, body.get("email"), body.get("password"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Lecturer updated successfully",
+                "data", Map.of("username", updated.getUserID(), "email", updated.getEmail()),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Delete a lecturer (Admin/Superadmin only)
+    @DeleteMapping("/lecturers/{username}")
+    public ResponseEntity<?> deleteLecturer(@PathVariable String username, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can delete lecturers", "status", "ERROR"));
+        }
+        try {
+            userService.deleteLecturer(username);
+            return ResponseEntity.ok(Map.of("message", "Lecturer deleted successfully", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Set exactly which modules a lecturer is assigned to (Admin/Superadmin only) -
+    // the reverse direction of PUT /api/modules/{id}'s assignedLecturerUsernames.
+    @PutMapping("/lecturers/{username}/modules")
+    public ResponseEntity<?> setLecturerModules(@PathVariable String username, @RequestBody Map<String, List<String>> body,
+                                                 @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Admin can assign modules", "status", "ERROR"));
+        }
+        try {
+            moduleService.setModulesForLecturer(username, body.get("moduleIds"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Lecturer's module assignments updated successfully",
+                "data", moduleService.getModuleIdsAssignedTo(username),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // List admins, for the superadmin's Manage Admins page (Superadmin only)
+    @GetMapping("/admins")
+    public ResponseEntity<?> getAllAdmins(@RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can view admins", "status", "ERROR"));
+        }
+
+        List<Map<String, Object>> admins = userService.findAllAdmins().stream()
+            .map(u -> Map.<String, Object>of(
+                "username", u.getUserID(),
+                "email", u.getEmail()
+            ))
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Admins retrieved successfully",
+            "data", admins,
+            "status", "SUCCESS"
+        ));
+    }
+
+    // Update an admin's email/password (Superadmin only)
+    @PutMapping("/admins/{username}")
+    public ResponseEntity<?> updateAdmin(@PathVariable String username, @RequestBody Map<String, String> body,
+                                          @RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can update admins", "status", "ERROR"));
+        }
+        try {
+            User updated = userService.updateAdmin(username, body.get("email"), body.get("password"));
+            return ResponseEntity.ok(Map.of(
+                "message", "Admin updated successfully",
+                "data", Map.of("username", updated.getUserID(), "email", updated.getEmail()),
+                "status", "SUCCESS"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    // Delete an admin (Superadmin only)
+    @DeleteMapping("/admins/{username}")
+    public ResponseEntity<?> deleteAdmin(@PathVariable String username, @RequestHeader("Authorization") String token) {
+        if (!isSuperAdmin(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access Denied: Only Superadmin can delete admins", "status", "ERROR"));
+        }
+        try {
+            userService.deleteAdmin(username);
+            return ResponseEntity.ok(Map.of("message", "Admin deleted successfully", "status", "SUCCESS"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    @PostMapping("/add-user")
+    public ResponseEntity<?> addUser(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
+        try {
+            String requestedType = newUser.getUsertype() == null ? "" : newUser.getUsertype().toLowerCase().trim();
+
+            if ("admin".equals(requestedType) && !isSuperAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Superadmin can add admins", "status", "ERROR"));
+            }
+
+            if ("lecture".equals(requestedType) && !isAdmin(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Access Denied: Only Admin can add lecturers", "status", "ERROR"));
+            }
+
+            if (!"admin".equals(requestedType) && !"lecture".equals(requestedType)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Error: userType must be 'admin' or 'lecture'", "status", "ERROR"));
+            }
+
             // Get the currently authenticated user from the SecurityContext
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String creatorUsername = authentication.getName(); // This is the username from the JWT
@@ -103,6 +414,8 @@ public class UserRestController {
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User added successfully");
             response.put("userId", createdUser.getUserID());
+            response.put("email", createdUser.getEmail());
+            response.put("userType", createdUser.getUsertype());
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -114,6 +427,7 @@ public class UserRestController {
     }
 
     @GetMapping("/debug/user/{username}")
+    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
     public ResponseEntity<?> debugGetUser(@PathVariable String username) {
         try {
             Optional<User> userOptional = userService.findByUserId(username);
@@ -136,6 +450,12 @@ public class UserRestController {
 
     @PostMapping("/create-test-user")
     public ResponseEntity<?> createTestUser() {
+        // Dev/test bootstrap helper only — must never be reachable in a non-dev deployment,
+        // since it creates a known-credential admin account with no authentication required.
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("dev"))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
+        }
         try {
             User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();
@@ -151,6 +471,34 @@ public class UserRestController {
             errorResponse.put("message", "Failed to create test user: " + e.getMessage());
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    private boolean isSuperAdmin(String token) {
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && role.equals("superadmin");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isAdmin(String token) {
+        try {
+            String bearerToken = token;
+            if (token != null && token.startsWith("Bearer ")) {
+                bearerToken = token.substring(7);
+            }
+            String role = jwtUtil.extractRole(bearerToken);
+            role = role == null ? null : role.trim().toLowerCase();
+            return role != null && ("admin".equals(role) || "superadmin".equals(role));
+        } catch (Exception e) {
+            return false;
         }
     }
 }

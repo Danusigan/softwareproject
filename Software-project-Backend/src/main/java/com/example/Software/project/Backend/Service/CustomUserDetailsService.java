@@ -28,6 +28,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         // We treat usertype as a role. Spring Security roles usually start with "ROLE_" but it's not strictly required if we handle it manually.
         // For simplicity, we just pass the usertype as an authority.
         return new org.springframework.security.core.userdetails.User(user.getUserID(), user.getPassword(),
+                true, true, true, !user.isCurrentlyLocked(),
                 Collections.singletonList(new SimpleGrantedAuthority(user.getUsertype())));
     }
 }

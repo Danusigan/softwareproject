@@ -21,6 +21,9 @@ public class Student {
     @Column(name = "academic_year")
     private String academicYear;
     
+    @Column(name = "batch")
+    private String batch;
+    
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
     
@@ -83,6 +86,14 @@ public class Student {
     public void setAcademicYear(String academicYear) {
         this.academicYear = academicYear;
     }
+
+    public String getBatch() {
+        return batch;
+    }
+
+    public void setBatch(String batch) {
+        this.batch = batch;
+    }
     
     public LocalDateTime getCreatedAt() {
         return createdAt;
@@ -115,6 +126,7 @@ public class Student {
                 ", studentName='" + studentName + '\'' +
                 ", email='" + email + '\'' +
                 ", academicYear='" + academicYear + '\'' +
+                ", batch='" + batch + '\'' +
                 '}';
     }
 }
