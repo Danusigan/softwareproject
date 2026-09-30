@@ -1,6 +1,7 @@
-# Rolls the app server onto a given image tag. Jenkins runs this on every push to main:
+# Rolls the app server onto a given image tag. GitHub Actions runs this on every push to main
+# (.github/workflows/ci-cd.yml, "deploy" job):
 #
-#   ansible-playbook -i "<app-private-ip>," infra/ansible/deploy.yml -e image_tag=<git-sha>
+#   ansible-playbook -i "<app-public-ip>," -u ubuntu deploy.yml -e image_tag=<git-sha>
 #
 # Manual rollback from your machine (WSL), to any earlier commit SHA:
 #

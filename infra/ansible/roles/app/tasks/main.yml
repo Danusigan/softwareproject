@@ -6,11 +6,18 @@
     group: ubuntu
     mode: "0750"
 
-- name: Authorize Jenkins' deploy key
+# Key used only by the GitHub Actions deploy job (private half is the APP_SSH_KEY secret).
+- name: Authorize GitHub Actions deploy key
   ansible.builtin.lineinfile:
     path: /home/ubuntu/.ssh/authorized_keys
-    line: "{{ hostvars['jenkins-server'].jenkins_deploy_pubkey }}"
-  when: hostvars['jenkins-server'].jenkins_deploy_pubkey is defined
+    line: "{{ lookup('ansible.builtin.file', github_deploy_pubkey_file) }}"
+  when: github_deploy_pubkey_file is file
+
+- name: Remove the old Jenkins deploy key
+  ansible.builtin.lineinfile:
+    path: /home/ubuntu/.ssh/authorized_keys
+    regexp: " jenkins-deploy$"
+    state: absent
 
 # mysql client: used below to create the app DB user, and by admins for
 # mysqldump/restores against RDS (only reachable from this server).
@@ -52,7 +59,7 @@
     tf: "{{ hostvars['localhost'].tf }}"
   no_log: true
 
-# Jenkins' deploy.yml owns this file afterwards; never overwrite the deployed tag here.
+# deploy.yml (GitHub Actions) owns this file afterwards; never overwrite the deployed tag here.
 - name: Initial release marker
   ansible.builtin.copy:
     dest: "{{ app_dir }}/release.env"
@@ -73,7 +80,7 @@
 
 - name: No images on Docker Hub yet
   ansible.builtin.debug:
-    msg: "Images not pushed yet - the first Jenkins build will start the app."
+    msg: "Images not pushed yet - the first GitHub Actions deploy will start the app."
   when: pull.rc != 0
 
 # Recreates containers if .env changed (e.g. new mail settings or rotated secrets).
