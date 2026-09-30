@@ -44,3 +44,4 @@ Some now-deleted setup guides referenced a fixed test fixture: lecturer login `d
 ## Excel export / template endpoints
 
 Several one-off feature-announcement docs for Excel import/export and mark-upload templates were consolidated away (they described features, not living APIs). The current endpoints live in `OBEController`: `/api/obe/marks/upload*`, `/api/obe/export/marks`, `/api/obe/template/marks`, `/api/obe/template/marks-question-wise`, `/api/obe/marks/export/module/{moduleId}`, `/api/obe/export/po-attainment`, `/api/obe/export/marks-per-lo-threshold` — read the controller directly rather than looking for a guide doc.
+host
