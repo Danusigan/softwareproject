@@ -221,11 +221,14 @@ public class CQIService {
             .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
         List<Los> losList = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
 
+        List<CqiAction> removed = new ArrayList<>();
         for (Los los : losList) {
             double loThreshold = los.getAttainmentThreshold() != null ? los.getAttainmentThreshold() : 50.0;
             double passThreshold = studentPassThreshold != null ? studentPassThreshold : loThreshold;
+            double target = batchTarget != null ? batchTarget : loThreshold;
             Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, passThreshold);
             if (attainment == null) continue;
+            removed.addAll(removeStaleUntouchedCqi(moduleId, los.getId(), batch, attainment, target));
             linkNextSemesterResult(moduleId, los.getId(), batch, attainment, studentPassThreshold, batchTarget);
         }
 
@@ -241,7 +244,28 @@ public class CQIService {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("triggered", triggered);
         result.put("triggeredCount", triggered.size());
+        result.put("removedCount", removed.size());
         return result;
+    }
+
+    // When Finalize is clicked and an LO now meets its target, deletes any CQI for that LO+batch that
+    // was auto-triggered earlier but never touched by anyone (e.g. triggered on partial marks, then the
+    // remaining marks lifted the LO). Submitted or approved cycles, and plans an admin returned with a
+    // comment or that hold a lecturer's draft, are never deleted.
+    private List<CqiAction> removeStaleUntouchedCqi(String moduleId, String losId, String batch,
+                                                    double attainment, double target) {
+        if (attainment < target) return List.of();
+        List<CqiAction> stale = cqiActionRepository
+            .findByModule_ModuleIdAndLos_IdAndBatchAndStatusAndSubmittedFalse(moduleId, losId, batch, CqiStatus.PLANNED)
+            .stream()
+            .filter(a -> isBlank(a.getRootCause()) && isBlank(a.getActionPlan()) && isBlank(a.getAdminComment()))
+            .toList();
+        cqiActionRepository.deleteAll(stale);
+        return stale;
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     // ADMIN: Create a PO-level CQI plan directly from batch report (no approval workflow)

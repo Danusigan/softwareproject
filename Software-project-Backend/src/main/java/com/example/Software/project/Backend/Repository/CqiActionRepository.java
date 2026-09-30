@@ -23,6 +23,7 @@ public interface CqiActionRepository extends JpaRepository<CqiAction, Long> {
     List<CqiAction> findByModule_ModuleIdAndLos_Id(String moduleId, String losId);
     List<CqiAction> findByModule_ModuleIdAndLos_IdAndStatusIn(String moduleId, String losId, List<CqiStatus> statuses);
     List<CqiAction> findByCreatedByOrderByCreatedAtDesc(String createdBy);
+    List<CqiAction> findByModule_ModuleIdAndLos_IdAndBatchAndStatusAndSubmittedFalse(String moduleId, String losId, String batch, CqiStatus status);
 
     // PO-level CQI: mirrors the LO-level findByModule_ModuleIdAndLos_IdAndStatusIn open-cycle check
     List<CqiAction> findByModule_ModuleIdAndProgramOutcome_PoIdAndStatusIn(String moduleId, String poId, List<CqiStatus> statuses);

@@ -229,6 +229,52 @@ class MarksToPoPipelineTest {
         assertPoStanding("S1", 5, 1);
     }
 
+    @Test
+    @DisplayName("re-finalizing the same batch deletes an untouched CQI once its LO now meets the target")
+    void refinalizeDeletesUntouchedCqiWhenLoNowMeetsTarget() throws Exception {
+        excelImportService.importMarksBulk(marksSheet(), new String[]{"LO1", "LO2"}, BATCH, "FINAL_EXAM");
+
+        assertEquals(2, cqiService.finalizeModuleAttainment(MODULE, BATCH, 60.0, 60.0).get("triggeredCount"));
+
+        Map<String, Object> second = cqiService.finalizeModuleAttainment(MODULE, BATCH, 70.0, 20.0);
+        assertEquals(0, second.get("triggeredCount"));
+        assertEquals(2, second.get("removedCount"));
+        assertTrue(cqiService.getCqiHistoryForModule(MODULE).isEmpty());
+    }
+
+    @Test
+    @DisplayName("re-finalizing keeps a returned plan (admin comment / lecturer draft) even if the LO now meets the target")
+    void refinalizeKeepsReturnedPlan() throws Exception {
+        excelImportService.importMarksBulk(marksSheet(), new String[]{"LO1", "LO2"}, BATCH, "FINAL_EXAM");
+        cqiService.finalizeModuleAttainment(MODULE, BATCH, 60.0, 60.0);
+        CqiAction returned = cqiService.getCqiHistoryForModule(MODULE).get(0);
+        cqiService.returnPlan(returned.getId(), "admin1", "Please add detail");
+        em.flush();
+
+        Map<String, Object> second = cqiService.finalizeModuleAttainment(MODULE, BATCH, 70.0, 20.0);
+        assertEquals(1, second.get("removedCount"));
+        List<CqiAction> left = cqiService.getCqiHistoryForModule(MODULE);
+        assertEquals(1, left.size());
+        assertEquals(returned.getId(), left.get(0).getId());
+    }
+
+    @Test
+    @DisplayName("re-finalizing never closes a CQI the lecturer already submitted, even if the LO now meets the target")
+    void refinalizeLeavesSubmittedCqiOpen() throws Exception {
+        excelImportService.importMarksBulk(marksSheet(), new String[]{"LO1", "LO2"}, BATCH, "FINAL_EXAM");
+        cqiService.finalizeModuleAttainment(MODULE, BATCH, 60.0, 60.0);
+        for (CqiAction a : cqiService.getCqiHistoryForModule(MODULE)) {
+            a.setSubmitted(true);
+        }
+        em.flush();
+
+        Map<String, Object> second = cqiService.finalizeModuleAttainment(MODULE, BATCH, 70.0, 20.0);
+        assertEquals(0, second.get("removedCount"));
+        for (CqiAction a : cqiService.getCqiHistoryForModule(MODULE)) {
+            assertEquals(CqiStatus.PLANNED, a.getStatus(), a.getLosId());
+        }
+    }
+
     // --- fixture helpers -------------------------------------------------------------------
 
     /** The single CQI action flagged on S1's PO1 contribution from batch 24. */
