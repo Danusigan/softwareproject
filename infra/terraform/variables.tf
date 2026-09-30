@@ -25,9 +25,10 @@ variable "ssh_private_key_path" {
   default     = "~/.ssh/lopo_deploy"
 }
 
-variable "jenkins_instance_type" {
-  type    = string
-  default = "t3.medium"
+variable "github_repo" {
+  description = "owner/name of the GitHub repo whose main-branch workflow may deploy."
+  type        = string
+  default     = "Danusigan/softwareproject"
 }
 
 variable "app_instance_type" {
