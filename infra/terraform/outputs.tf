@@ -4,16 +4,19 @@ resource "local_file" "ansible_inventory" {
   filename        = "${path.module}/../ansible/inventory/hosts.ini"
   file_permission = "0644"
   content = templatefile("${path.module}/templates/hosts.ini.tftpl", {
-    jenkins_public_ip    = aws_eip.jenkins.public_ip
-    jenkins_private_ip   = aws_instance.jenkins.private_ip
     app_public_ip        = aws_eip.app.public_ip
     app_private_ip       = aws_instance.app.private_ip
     ssh_private_key_path = var.ssh_private_key_path
   })
 }
 
-output "jenkins_url" {
-  value = "http://${aws_eip.jenkins.public_ip}:8080"
+# Values for GitHub → Settings → Secrets and variables → Actions → Variables.
+output "github_actions_variables" {
+  value = {
+    AWS_DEPLOY_ROLE_ARN = aws_iam_role.github_deploy.arn
+    APP_SG_ID           = aws_security_group.app.id
+    APP_HOST            = aws_eip.app.public_ip
+  }
 }
 
 output "app_url" {
