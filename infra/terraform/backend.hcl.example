@@ -1,0 +1,6 @@
+# Copy to backend.hcl and set the bucket printed by the bootstrap stack.
+bucket       = "lopo-tfstate-<AWS_ACCOUNT_ID>"
+key          = "lopo/prod/terraform.tfstate"
+region       = "ap-south-1"
+encrypt      = true
+use_lockfile = true

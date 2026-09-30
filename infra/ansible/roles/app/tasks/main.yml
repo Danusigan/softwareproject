@@ -1,0 +1,86 @@
+- name: Application directory
+  ansible.builtin.file:
+    path: "{{ app_dir }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: "0750"
+
+- name: Authorize Jenkins' deploy key
+  ansible.builtin.lineinfile:
+    path: /home/ubuntu/.ssh/authorized_keys
+    line: "{{ hostvars['jenkins-server'].jenkins_deploy_pubkey }}"
+  when: hostvars['jenkins-server'].jenkins_deploy_pubkey is defined
+
+# mysql client: used below to create the app DB user, and by admins for
+# mysqldump/restores against RDS (only reachable from this server).
+- name: MySQL client
+  ansible.builtin.apt:
+    name: mysql-client
+    state: present
+
+- name: Application DB user (least privilege - only the {{ tf.db_name.value }} schema)
+  ansible.builtin.command:
+    cmd: mysql -h {{ tf.db_host.value }} -u {{ tf.db_master_username.value }} --ssl-mode=REQUIRED
+    stdin: |
+      CREATE USER IF NOT EXISTS '{{ db_app_username }}'@'%' IDENTIFIED BY '{{ tf.db_app_password.value }}';
+      ALTER USER '{{ db_app_username }}'@'%' IDENTIFIED BY '{{ tf.db_app_password.value }}';
+      GRANT ALL PRIVILEGES ON `{{ tf.db_name.value }}`.* TO '{{ db_app_username }}'@'%';
+  environment:
+    MYSQL_PWD: "{{ tf.db_master_password.value }}"
+  vars:
+    tf: "{{ hostvars['localhost'].tf }}"
+  changed_when: false
+  no_log: true
+
+- name: Compose file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../deploy/docker-compose.prod.yml"
+    dest: "{{ app_dir }}/docker-compose.prod.yml"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+
+- name: Runtime secrets (.env)
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0600"
+  vars:
+    tf: "{{ hostvars['localhost'].tf }}"
+  no_log: true
+
+# Jenkins' deploy.yml owns this file afterwards; never overwrite the deployed tag here.
+- name: Initial release marker
+  ansible.builtin.copy:
+    dest: "{{ app_dir }}/release.env"
+    content: "IMAGE_TAG=latest\n"
+    owner: ubuntu
+    group: ubuntu
+    mode: "0644"
+    force: false
+
+- name: Pull images
+  ansible.builtin.command: >-
+    docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml pull
+  args:
+    chdir: "{{ app_dir }}"
+  register: pull
+  failed_when: false
+  changed_when: false
+
+- name: No images on Docker Hub yet
+  ansible.builtin.debug:
+    msg: "Images not pushed yet - the first Jenkins build will start the app."
+  when: pull.rc != 0
+
+# Recreates containers if .env changed (e.g. new mail settings or rotated secrets).
+- name: Start / refresh containers
+  ansible.builtin.command: >-
+    docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+  when: pull.rc == 0
+  changed_when: true

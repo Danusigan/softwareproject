@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+
+# Your current public IP (check with: curl -s https://checkip.amazonaws.com) + /32
+admin_cidrs = ["203.0.113.10/32"]
+
+# aws_region            = "ap-south-1"
+# ssh_public_key_path   = "~/.ssh/lopo_deploy.pub"
+# ssh_private_key_path  = "~/.ssh/lopo_deploy"
+# jenkins_instance_type = "t3.medium"
+# app_instance_type     = "t3.small"
+# db_instance_class     = "db.t4g.micro"
+# db_multi_az           = false

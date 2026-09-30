@@ -1,0 +1,56 @@
+# Production stack on the app EC2 server. The database is Amazon RDS (MySQL 8.0), not a
+# container - see infra/terraform/rds.tf.
+#
+# Lives at /opt/lopo on the server, run as:
+#   docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml up -d
+# .env (secrets) is written by Ansible (infra/ansible/roles/app); release.env holds
+# IMAGE_TAG, written by infra/ansible/deploy.yml on every Jenkins deploy.
+
+services:
+  backend:
+    image: docker.io/${DOCKERHUB_NAMESPACE:-danusigan}/lopo-backend:${IMAGE_TAG:-latest}
+    container_name: softwareproject-backend
+    environment:
+      # RDS enforces TLS (require_secure_transport=1).
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:3306/${DB_NAME}?sslMode=REQUIRED&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_PROFILES_ACTIVE: prod
+      JWT_SECRET: ${JWT_SECRET}
+      # Forgot-password emails: reset links point at APP_FRONTEND_URL (e.g. http://<app-IP>).
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    networks:
+      - softwareproject
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health || wget -q --spider http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  frontend:
+    image: docker.io/${DOCKERHUB_NAMESPACE:-danusigan}/lopo-frontend:${IMAGE_TAG:-latest}
+    container_name: softwareproject-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - softwareproject
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  softwareproject:
+    driver: bridge

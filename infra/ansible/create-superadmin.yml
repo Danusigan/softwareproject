@@ -1,0 +1,81 @@
+# Creates the first Superadmin login on a fresh production database (there is no sign-up
+# page, and the dev-only create-test-user endpoint is disabled in prod). Run once, after the
+# first successful deploy (Flyway must have created the tables):
+#
+#   cd infra/ansible
+#   ansible-playbook create-superadmin.yml
+#
+# Everything after that (admins, lecturers) is done from inside the app.
+
+- name: Read DB connection from Terraform state
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: terraform output -json
+      ansible.builtin.command: terraform -chdir={{ playbook_dir }}/../terraform output -json
+      register: tf_raw
+      changed_when: false
+      no_log: true
+
+    - name: Keep outputs as a fact
+      ansible.builtin.set_fact:
+        tf: "{{ tf_raw.stdout | from_json }}"
+      no_log: true
+
+- name: Create Superadmin
+  hosts: app
+  gather_facts: false
+  become: true
+  vars_prompt:
+    - name: sa_username
+      prompt: Superadmin username (used to log in)
+      private: false
+    - name: sa_email
+      prompt: Superadmin email (used for password resets)
+      private: false
+    - name: sa_password
+      prompt: Superadmin password (min. 8 characters)
+      private: true
+      confirm: true
+  vars:
+    tf: "{{ hostvars['localhost'].tf }}"
+  tasks:
+    - name: Validate input
+      ansible.builtin.assert:
+        that:
+          - sa_username is match('^[A-Za-z0-9._-]+$')
+          - sa_email is match('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]+$')
+          - sa_password | length >= 8
+        fail_msg: "Username: letters/digits/._- only; valid email; password at least 8 characters."
+
+    - name: htpasswd (bcrypt hashing)
+      ansible.builtin.apt:
+        name: apache2-utils
+        state: present
+
+    # Same algorithm as the app's BCryptPasswordEncoder; the password goes in via stdin,
+    # never on a command line.
+    - name: Hash password
+      ansible.builtin.command:
+        cmd: htpasswd -niBC 10 ""
+        stdin: "{{ sa_password }}"
+      register: hashed
+      changed_when: false
+      no_log: true
+
+    - name: Insert Superadmin
+      ansible.builtin.command:
+        cmd: >-
+          mysql -h {{ tf.db_host.value }} -u {{ tf.db_master_username.value }}
+          --ssl-mode=REQUIRED {{ tf.db_name.value }}
+        stdin: >-
+          INSERT INTO `user` (User_ID, email, password, user_type, failed_login_attempts)
+          VALUES ('{{ sa_username }}', '{{ sa_email }}',
+                  '{{ hashed.stdout | trim | regex_replace('^:', '') }}', 'Superadmin', 0);
+      environment:
+        MYSQL_PWD: "{{ tf.db_master_password.value }}"
+
+    - name: Done
+      ansible.builtin.debug:
+        msg: "Superadmin '{{ sa_username }}' created - log in at http://{{ ansible_host }}"
