@@ -4,9 +4,13 @@
 admin_cidrs = ["203.0.113.10/32"]
 
 # aws_region            = "ap-south-1"
+# github_repo           = "Danusigan/softwareproject"
 # ssh_public_key_path   = "~/.ssh/lopo_deploy.pub"
 # ssh_private_key_path  = "~/.ssh/lopo_deploy"
-# jenkins_instance_type = "t3.medium"
 # app_instance_type     = "t3.small"
 # db_instance_class     = "db.t4g.micro"
 # db_multi_az           = false
+
+# AWS Free plan accounts: backups are capped at 1 day.
+# db_backup_retention_days = 1
+# db_deletion_protection   = false
