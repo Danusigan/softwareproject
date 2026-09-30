@@ -4,7 +4,7 @@
 # Lives at /opt/lopo on the server, run as:
 #   docker compose --env-file .env --env-file release.env -f docker-compose.prod.yml up -d
 # .env (secrets) is written by Ansible (infra/ansible/roles/app); release.env holds
-# IMAGE_TAG, written by infra/ansible/deploy.yml on every Jenkins deploy.
+# IMAGE_TAG, written by infra/ansible/deploy.yml on every GitHub Actions deploy.
 
 services:
   backend:
