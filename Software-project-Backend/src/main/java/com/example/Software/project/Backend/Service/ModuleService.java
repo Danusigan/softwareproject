@@ -38,13 +38,28 @@ public class ModuleService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private NotificationService notificationService;
+
+    // Create (Admin)
     // Create (Admin)
     public Module createModule(Module module) throws Exception {
+        return createModule(module, null);
+    }
+
+    public Module createModule(Module module, String createdBy) throws Exception {
         if (moduleRepository.existsById(module.getModuleId())) {
             throw new Exception("Module ID already exists");
         }
         module.setAssignedLecturers(resolveLecturers(module.getAssignedLecturerUsernamesInput()));
-        return moduleRepository.save(module);
+        Module saved = moduleRepository.save(module);
+        try {
+            String text = "Created module: " + saved.getModuleId() + " - " + saved.getModuleName();
+            java.util.Set<String> who = new java.util.LinkedHashSet<>(saved.getAssignedLecturerUsernames());
+            if (createdBy != null) who.add(createdBy);
+            notificationService.notifyUsers(who, text);
+        } catch (Exception ignored) { }
+        return saved;
     }
 
     // Read All

@@ -19,6 +19,7 @@ public class OBEController {
 
     @Autowired private ProgramOutcomeRepository poRepo;
     @Autowired private OutcomeMappingRepository mapRepo;
+    @Autowired private NotificationService notificationService;
     @Autowired private LosRepository losRepo;
     @Autowired private ExcelImportService excelService;
     @Autowired private ExcelExportService excelExportService;
@@ -38,17 +39,17 @@ public class OBEController {
     // operation that triggered this lookup should fail.
     private String moduleIdOfLo(String losId) {
         return losRepo.findById(losId)
-                .map(Los::getModule)
-                .map(Module::getModuleId)
-                .orElse(null);
+            .map(Los::getModule)
+            .map(Module::getModuleId)
+            .orElse(null);
     }
 
     private String moduleIdOfTemplate(String templateId) {
         if (templateId == null || templateId.isBlank()) return null;
         return assessmentTemplateRepo.findById(templateId)
-                .map(AssessmentTemplate::getModule)
-                .map(Module::getModuleId)
-                .orElse(null);
+            .map(AssessmentTemplate::getModule)
+            .map(Module::getModuleId)
+            .orElse(null);
     }
 
     // Soft-deletes the template — its assessment_item/student_assessment_score rows stay intact
@@ -160,10 +161,15 @@ public class OBEController {
             for (OutcomeMapping m : mappings) {
                 m.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
 
+                // Record who submitted the mapping so the admin's decision can notify them
+                if (m.getMappedBy() == null || m.getMappedBy().isBlank()) {
+                    try { m.setMappedBy(jwtUtil.extractUsername(token.startsWith("Bearer ") ? token.substring(7) : token)); } catch (Exception ignored) { }
+                }
+
                 // Fetch existing Learning Outcome
                 if (m.getLearningOutcome() != null && m.getLearningOutcome().getId() != null) {
                     Los los = losRepo.findById(m.getLearningOutcome().getId())
-                            .orElseThrow(() -> new RuntimeException("Learning Outcome not found: " + m.getLearningOutcome().getId()));
+                        .orElseThrow(() -> new RuntimeException("Learning Outcome not found: " + m.getLearningOutcome().getId()));
                     m.setLearningOutcome(los);
                 } else {
                     throw new RuntimeException("Learning Outcome ID is required");
@@ -172,7 +178,7 @@ public class OBEController {
                 // Fetch existing Program Outcome
                 if (m.getProgramOutcome() != null && m.getProgramOutcome().getId() != null) {
                     ProgramOutcome po = poRepo.findById(m.getProgramOutcome().getId())
-                            .orElseThrow(() -> new RuntimeException("Program Outcome not found: " + m.getProgramOutcome().getId()));
+                        .orElseThrow(() -> new RuntimeException("Program Outcome not found: " + m.getProgramOutcome().getId()));
                     m.setProgramOutcome(po);
                 } else {
                     throw new RuntimeException("Program Outcome ID is required");
@@ -191,7 +197,14 @@ public class OBEController {
 
         OutcomeMapping mapping = mapRepo.findById(id).orElseThrow();
         mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
-        return ResponseEntity.ok(mapRepo.save(mapping));
+        OutcomeMapping saved = mapRepo.save(mapping);
+        try {
+            String lo = saved.getLearningOutcome() != null ? saved.getLearningOutcome().getId() : "?";
+            String po = saved.getProgramOutcome() != null ? saved.getProgramOutcome().getPoId() : "?";
+            notificationService.notifyUser(saved.getMappedBy(),
+                "Admin accepted your LO-PO mapping request (" + lo + " -> " + po + ").");
+        } catch (Exception ignored) { }
+        return ResponseEntity.ok(saved);
     }
 
     // --- LECTURE: Upload Marks ---
@@ -210,8 +223,8 @@ public class OBEController {
     // --- MARKS: Unified upload — auto-detects LO-wise vs question-wise from METADATA sheet ---
     @PostMapping("/marks/upload")
     public ResponseEntity<?> uploadMarksUnified(
-            @RequestParam("excelFile") MultipartFile file,
-            @RequestHeader("Authorization") String token) {
+        @RequestParam("excelFile") MultipartFile file,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("message", "Access Denied", "status", "ERROR"));
@@ -277,11 +290,11 @@ public class OBEController {
     // --- LECTURE: Upload question-wise marks using a template ---
     @PostMapping("/marks/upload-question-wise")
     public ResponseEntity<?> uploadQuestionWiseMarks(
-            @RequestParam("excelFile") MultipartFile file,
-            @RequestParam(value = "templateId", required = false) String templateId,
-            @RequestParam(value = "batch", required = false) String batch,
-            @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
-            @RequestHeader("Authorization") String token) {
+        @RequestParam("excelFile") MultipartFile file,
+        @RequestParam(value = "templateId", required = false) String templateId,
+        @RequestParam(value = "batch", required = false) String batch,
+        @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("message", "Access Denied: Only Lecturers/Admins can upload marks", "status", "ERROR"));
@@ -292,11 +305,11 @@ public class OBEController {
             // Read embedded metadata from the Excel file (batch, markType, templateId)
             Map<String, String> meta = excelService.readMetadata(file);
             if (meta.containsKey("TEMPLATE_ID") && !meta.get("TEMPLATE_ID").isEmpty()
-                    && (templateId == null || templateId.isBlank())) {
+                && (templateId == null || templateId.isBlank())) {
                 templateId = meta.get("TEMPLATE_ID");
             }
             if (meta.containsKey("BATCH") && !meta.get("BATCH").isEmpty()
-                    && (batch == null || batch.isBlank())) {
+                && (batch == null || batch.isBlank())) {
                 batch = meta.get("BATCH");
             }
             if (meta.containsKey("MARK_TYPE") && !meta.get("MARK_TYPE").isEmpty()) {
@@ -352,9 +365,9 @@ public class OBEController {
     // --- ANALYSIS: LO Pass Rate by Batch ---
     @GetMapping("/analysis/pass-rate/lo/{moduleId}")
     public ResponseEntity<?> getLoPassRate(
-            @PathVariable String moduleId,
-            @RequestParam(defaultValue = "50") double threshold,
-            @RequestHeader("Authorization") String token) {
+        @PathVariable String moduleId,
+        @RequestParam(defaultValue = "50") double threshold,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
@@ -366,13 +379,13 @@ public class OBEController {
     // --- GRAPH GENERATION: Filtered university QA dashboard data ---
     @GetMapping("/graphs/dashboard/{moduleId}")
     public ResponseEntity<?> getDashboardGraphs(
-            @PathVariable String moduleId,
-            @RequestParam(required = false) String batch,
-            @RequestParam(required = false) String markType,
-            @RequestParam(required = false) String loId,
-            @RequestParam(defaultValue = "50") double threshold,
-            @RequestParam(defaultValue = "60") double target,
-            @RequestHeader("Authorization") String token) {
+        @PathVariable String moduleId,
+        @RequestParam(required = false) String batch,
+        @RequestParam(required = false) String markType,
+        @RequestParam(required = false) String loId,
+        @RequestParam(defaultValue = "50") double threshold,
+        @RequestParam(defaultValue = "60") double target,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             MarkType parsedMarkType = null;
@@ -563,11 +576,11 @@ public class OBEController {
     // --- BULK UPLOAD: Upload marks — reads batch/markType from METADATA sheet if present ---
     @PostMapping("/marks/upload-bulk")
     public ResponseEntity<?> uploadMarksBulk(
-            @RequestParam("excelFile") MultipartFile file,
-            @RequestParam(value = "losIds", required = false) String losIdsParam,
-            @RequestParam(value = "batch", required = false) String batch,
-            @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
-            @RequestHeader("Authorization") String token) {
+        @RequestParam("excelFile") MultipartFile file,
+        @RequestParam(value = "losIds", required = false) String losIdsParam,
+        @RequestParam(value = "batch", required = false) String batch,
+        @RequestParam(value = "markType", required = false, defaultValue = "FINAL_EXAM") String markType,
+        @RequestHeader("Authorization") String token) {
 
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -637,11 +650,11 @@ public class OBEController {
     // --- MARKS: Delete one assignment's marks for a module ---
     @DeleteMapping("/marks/assignment/module/{moduleId}")
     public ResponseEntity<?> deleteAssignmentMarks(
-            @PathVariable String moduleId,
-            @RequestParam String batch,
-            @RequestParam String markType,
-            @RequestParam(required = false) String assignmentLabel,
-            @RequestHeader("Authorization") String token) {
+        @PathVariable String moduleId,
+        @RequestParam String batch,
+        @RequestParam String markType,
+        @RequestParam(required = false) String assignmentLabel,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             MarkType type = MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_"));
@@ -670,10 +683,10 @@ public class OBEController {
     // --- MARKS: Delete all marks for a module+batch+markType ---
     @DeleteMapping("/marks/module/{moduleId}")
     public ResponseEntity<?> deleteMarksBatch(
-            @PathVariable String moduleId,
-            @RequestParam String batch,
-            @RequestParam String markType,
-            @RequestHeader("Authorization") String token) {
+        @PathVariable String moduleId,
+        @RequestParam String batch,
+        @RequestParam String markType,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             markRepo().deleteByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase().replace(" ", "_").replace("-", "_")));
@@ -688,11 +701,11 @@ public class OBEController {
     // --- MARKS: Download existing marks for a module+batch+markType as Excel ---
     @GetMapping("/marks/export/module/{moduleId}")
     public ResponseEntity<?> exportBatchMarks(
-            @PathVariable String moduleId,
-            @RequestParam String batch,
-            @RequestParam String markType,
-            @RequestParam(defaultValue = "50") int threshold,
-            @RequestHeader("Authorization") String token) {
+        @PathVariable String moduleId,
+        @RequestParam String batch,
+        @RequestParam String markType,
+        @RequestParam(defaultValue = "50") int threshold,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
             List<String> losIds = markRepo().findLoIdsByModuleIdAndBatchAndMarkType(moduleId, batch, MarkType.valueOf(markType.toUpperCase()));
@@ -799,8 +812,8 @@ public class OBEController {
     // not-achieved verdict and no report; that threshold decision is a separate future feature. ---
     @GetMapping("/po-attainment/student-summary")
     public ResponseEntity<?> getStudentPOSummary(
-            @RequestParam String studentId,
-            @RequestHeader("Authorization") String token) {
+        @RequestParam String studentId,
+        @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("message", "Access Denied: Only Lecturers/Admins can view PO attainment", "status", "ERROR"));
