@@ -3,9 +3,9 @@
 #
 #   cd infra/ansible
 #   ansible-playbook site.yml                          # no mail settings
-#   ansible-playbook site.yml --ask-vault-pass         # with group_vars/all/vault.yml
+#   ansible-playbook site.yml --ask-vault-pass         # with vars/vault.yml
 #
-# Per-push deploys are handled by deploy.yml, which Jenkins runs.
+# Per-push deploys are handled by deploy.yml, which GitHub Actions runs.
 
 - name: Read outputs (incl. secrets) from Terraform state
   hosts: localhost
@@ -23,23 +23,12 @@
         tf: "{{ tf_raw.stdout | from_json }}"
       no_log: true
 
-- name: Base setup (all servers)
-  hosts: all
-  become: true
-  roles:
-    - common
-    - docker
-
-- name: Jenkins server
-  hosts: jenkins
-  become: true
-  roles:
-    - jenkins
-
 - name: Application server
   hosts: app
   become: true
   vars_files:
     - ["vars/vault.yml", "vars/no-vault.yml"] # first one that exists
   roles:
+    - common
+    - docker
     - app

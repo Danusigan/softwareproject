@@ -7,7 +7,7 @@
 #   ansible-playbook site.yml --ask-vault-pass
 #
 # vault.yml is safe to commit ONLY once encrypted (it starts with $ANSIBLE_VAULT).
-# It lives outside group_vars/ on purpose: only site.yml loads it, so Jenkins' deploy.yml
+# It lives outside group_vars/ on purpose: only site.yml loads it, so the GitHub Actions deploy
 # never needs the vault password.
 
 vault_mail_host: smtp.gmail.com
