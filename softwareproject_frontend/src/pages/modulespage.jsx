@@ -192,7 +192,7 @@ export default function ModulesPage() {
             {modalType === 'edit' && selectedModule && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
-                        <div className="p-10">
+                        <div className="p-5 sm:p-10">
                             <div className="flex justify-between items-center mb-10">
                                 <div>
                                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 block">Editor</span>
@@ -262,7 +262,7 @@ export default function ModulesPage() {
             {modalType === 'delete' && selectedModule && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden border border-red-50">
-                        <div className="p-10 text-center">
+                        <div className="p-6 sm:p-10 text-center">
                             <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

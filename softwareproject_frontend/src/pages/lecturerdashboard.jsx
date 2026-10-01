@@ -434,7 +434,7 @@ export default function LecturerDashboard() {
             {showEditLoDialog && editingLo && (
                 <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xl z-[100] flex items-center justify-center p-6 animate-in zoom-in-95 duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden border border-slate-100">
-                        <div className="p-10">
+                        <div className="p-5 sm:p-10">
                             <div className="flex justify-between items-center mb-10">
                                 <div>
                                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 block">Modification</span>

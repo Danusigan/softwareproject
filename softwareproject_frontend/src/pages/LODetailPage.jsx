@@ -188,7 +188,7 @@ export default function LODetailPage() {
                     </div>
                 ) : error ? (
                     <div className="text-center animate-in zoom-in-95 duration-300">
-                        <div className="glass-card p-12 rounded-[2.5rem] border-red-50 max-w-md mx-auto">
+                        <div className="glass-card p-6 sm:p-12 rounded-[2.5rem] border-red-50 max-w-md mx-auto">
                             <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
                                 <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -309,7 +309,7 @@ export default function LODetailPage() {
                             {/* Add Results Card */}
                             <button
                                 onClick={() => navigate(`/lo-detail/${loId}/add-results`)}
-                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                                className="glass-card group p-6 sm:p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                                     <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
@@ -336,7 +336,7 @@ export default function LODetailPage() {
                             {/* Comparison Card */}
                             <button
                                 onClick={() => navigate(`/lo-detail/${loId}/comparisons`)}
-                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                                className="glass-card group p-6 sm:p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                                     <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">
@@ -363,7 +363,7 @@ export default function LODetailPage() {
                             {/* Lecturer Dashboard Card */}
                             <button
                                 onClick={() => navigate('/lecturer-dashboard')}
-                                className="glass-card group p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
+                                className="glass-card group p-6 sm:p-10 rounded-[3rem] text-left hover:bg-white transition-all duration-500 hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-2 border-slate-100 relative overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
                                     <svg className="w-32 h-32 text-indigo-900" fill="currentColor" viewBox="0 0 24 24">

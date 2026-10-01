@@ -419,9 +419,9 @@ export default function ComparisonPage() {
                 </form>
 
                 {loading ? (
-                    <div className="glass-card rounded-[2rem] p-16 text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" /><p className="mt-5 text-sm font-bold text-slate-500">Generating quality analysis...</p></div>
+                    <div className="glass-card rounded-[2rem] p-6 sm:p-16 text-center"><div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" /><p className="mt-5 text-sm font-bold text-slate-500">Generating quality analysis...</p></div>
                 ) : error ? (
-                    <div role="alert" className="rounded-[2rem] border border-red-200 bg-red-50 p-10 text-center"><h2 className="text-xl font-black text-red-800">Analysis unavailable</h2><p className="mt-2 text-sm text-red-700">{error}</p></div>
+                    <div role="alert" className="rounded-[2rem] border border-red-200 bg-red-50 p-6 sm:p-10 text-center"><h2 className="text-xl font-black text-red-800">Analysis unavailable</h2><p className="mt-2 text-sm text-red-700">{error}</p></div>
                 ) : dashboard ? (
                     <div className={`space-y-8 transition-opacity ${refreshing ? 'opacity-60' : 'opacity-100'}`} aria-busy={refreshing}>
                         {warnings.length > 0 && <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50 p-5"><h2 className="text-sm font-black text-amber-900">Data quality notice</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul></div>}
