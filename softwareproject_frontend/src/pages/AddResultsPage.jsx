@@ -155,7 +155,7 @@ export default function AddResultsPage() {
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="w-full max-w-4xl glass-card rounded-[2rem] relative overflow-hidden flex flex-col items-center py-12 px-8 sm:px-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="w-full max-w-4xl glass-card rounded-[2rem] relative overflow-hidden flex flex-col items-center py-8 px-5 sm:py-12 sm:px-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
                 {/* Close Button */}
                 <button
@@ -210,7 +210,7 @@ export default function AddResultsPage() {
                         </label>
                         <button
                             type="button"
-                            className={`w-full group p-10 border-2 border-dashed rounded-[2rem] transition-all duration-300 flex flex-col items-center justify-center cursor-pointer
+                            className={`w-full group p-6 sm:p-10 border-2 border-dashed rounded-[2rem] transition-all duration-300 flex flex-col items-center justify-center cursor-pointer
                                 ${dragActive ? 'border-indigo-500 bg-indigo-50/30' : 'border-slate-200 hover:border-indigo-400 bg-white/30'}`}
                             onDragEnter={handleDrag}
                             onDragLeave={handleDrag}

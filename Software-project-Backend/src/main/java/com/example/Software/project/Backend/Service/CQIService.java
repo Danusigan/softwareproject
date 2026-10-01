@@ -44,10 +44,19 @@ public class CQIService {
             Double attainment = attainmentService.calculateLoAttainmentForBatch(los.getId(), batch, passThreshold);
             if (attainment == null || attainment >= target) continue;
 
-            boolean alreadyOpen = !cqiActionRepository
-                .findByModule_ModuleIdAndLos_IdAndStatusIn(moduleId, los.getId(), OPEN_STATUSES)
-                .isEmpty();
-            if (alreadyOpen) continue;
+            List<CqiAction> open = cqiActionRepository
+                .findByModule_ModuleIdAndLos_IdAndStatusIn(moduleId, los.getId(), OPEN_STATUSES);
+            if (!open.isEmpty()) {
+                for (CqiAction existing : open) {
+                    if (existing.getStatus() == CqiStatus.PLANNED && !existing.isSubmitted()
+                            && batch.equals(existing.getBatch())) {
+                        existing.setAttainmentScore(attainment);
+                        existing.setTargetScore(target);
+                        cqiActionRepository.save(existing);
+                    }
+                }
+                continue;
+            }
 
             CqiAction action = new CqiAction();
             action.setModule(module);

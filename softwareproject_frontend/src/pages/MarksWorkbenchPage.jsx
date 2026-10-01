@@ -401,7 +401,7 @@ export default function MarksWorkbenchPage() {
         )}
 
         {loading ? (
-          <div className="glass-card rounded-[2.5rem] p-16 text-center">
+          <div className="glass-card rounded-[2.5rem] p-6 sm:p-16 text-center">
             <div className="relative mx-auto w-16 h-16 mb-6">
               <div className="w-16 h-16 border-4 border-indigo-100 rounded-full" />
               <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute inset-0" />
@@ -409,7 +409,7 @@ export default function MarksWorkbenchPage() {
             <p className="text-slate-500 font-bold">Loading…</p>
           </div>
         ) : !moduleData ? (
-          <div className="glass-card rounded-[2.5rem] p-12 text-center">
+          <div className="glass-card rounded-[2.5rem] p-6 sm:p-12 text-center">
             <h2 className="heading-lg mb-3">Module not found</h2>
             <button type="button" onClick={() => navigate(-1)} className="btn-primary">Go back</button>
           </div>
@@ -600,7 +600,7 @@ export default function MarksWorkbenchPage() {
                 </div>
 
                 {batchAssignments.length === 0 ? (
-                  <div className="glass-card rounded-[2rem] p-12 text-center border-2 border-dashed border-slate-200">
+                  <div className="glass-card rounded-[2rem] p-6 sm:p-12 text-center border-2 border-dashed border-slate-200">
                     <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -761,7 +761,7 @@ export default function MarksWorkbenchPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
                   {/* Option A — Download Template */}
                   <button type="button" onClick={() => setUploadMode('download-template')}
-                    className="group glass-card rounded-[2.5rem] p-10 text-left hover:shadow-xl hover:border-indigo-300 transition-all duration-300 space-y-4">
+                    className="group glass-card rounded-[2.5rem] p-6 sm:p-10 text-left hover:shadow-xl hover:border-indigo-300 transition-all duration-300 space-y-4">
                     <div className="w-16 h-16 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -779,7 +779,7 @@ export default function MarksWorkbenchPage() {
 
                   {/* Option B — Upload Marks */}
                   <button type="button" onClick={() => setUploadMode('upload-marks')}
-                    className="group glass-card rounded-[2.5rem] p-10 text-left hover:shadow-xl hover:border-emerald-300 transition-all duration-300 space-y-4">
+                    className="group glass-card rounded-[2.5rem] p-6 sm:p-10 text-left hover:shadow-xl hover:border-emerald-300 transition-all duration-300 space-y-4">
                     <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                       <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
@@ -998,9 +998,9 @@ export default function MarksWorkbenchPage() {
                   <h2 className="heading-xl">Upload Marks File</h2>
                   <p className="text-slate-500 mt-2">The system reads assignment label, LO mapping, mark type, and max marks directly from the file — no extra configuration needed.</p>
                 </div>
-                <section className="glass-card rounded-[2.5rem] p-10 border-slate-100 space-y-6">
+                <section className="glass-card rounded-[2.5rem] p-6 sm:p-10 border-slate-100 space-y-6">
                   <button type="button"
-                    className={`w-full group p-12 border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-emerald-500 bg-emerald-50/30':'border-slate-200 hover:border-emerald-400 bg-white/30'}`}
+                    className={`w-full group p-6 sm:p-12 border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-emerald-500 bg-emerald-50/30':'border-slate-200 hover:border-emerald-400 bg-white/30'}`}
                     onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                     onClick={()=>fileInputRef.current?.click()}>
                     <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls"/>

@@ -96,7 +96,7 @@ export default function CqiReviewPage() {
         )}
 
         {loading ? (
-          <div className="glass-card rounded-[2.5rem] p-16 text-center">
+          <div className="glass-card rounded-[2.5rem] p-6 sm:p-16 text-center">
             <div className="relative mx-auto w-16 h-16 mb-6">
               <div className="w-16 h-16 border-4 border-indigo-100 rounded-full" />
               <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin absolute inset-0" />
@@ -104,7 +104,7 @@ export default function CqiReviewPage() {
             <p className="text-slate-500 font-bold">Loading…</p>
           </div>
         ) : pending.length === 0 && history.length === 0 ? (
-          <div className="glass-card rounded-[2.5rem] p-16 text-center">
+          <div className="glass-card rounded-[2.5rem] p-6 sm:p-16 text-center">
             <h2 className="heading-lg mb-2">No CQI plans found</h2>
             <p className="text-slate-500">Submitted CQI action plans for Learning Outcomes will show up here.</p>
           </div>

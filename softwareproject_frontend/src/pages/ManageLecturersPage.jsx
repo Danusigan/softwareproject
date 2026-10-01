@@ -233,8 +233,8 @@ export default function ManageLecturersPage() {
                         No lecturers match "{lecturerFilter}".
                     </div>
                 ) : (
-                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                        <table className="w-full text-left">
+                    <div className="bg-white rounded-xl shadow-lg overflow-x-auto">
+                        <table className="w-full text-left min-w-[560px]">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
                                     <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Username</th>

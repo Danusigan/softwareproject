@@ -243,6 +243,33 @@ class MarksToPoPipelineTest {
     }
 
     @Test
+    @DisplayName("re-finalizing refreshes the score of a still-failing unsubmitted CQI without creating a second one, and leaves a submitted one alone")
+    void refinalizeRefreshesUnsubmittedCqiScoreOnly() throws Exception {
+        excelImportService.importMarksBulk(marksSheet(), new String[]{"LO1", "LO2"}, BATCH, "FINAL_EXAM");
+        // Pass mark 60 -> both LOs at 50%; target 60 -> both CQIs triggered at 50%.
+        cqiService.finalizeModuleAttainment(MODULE, BATCH, 60.0, 60.0);
+        List<CqiAction> before = cqiService.getCqiHistoryForModule(MODULE);
+        CqiAction submitted = before.stream().filter(a -> "LO1".equals(a.getLosId())).findFirst().orElseThrow();
+        submitted.setSubmitted(true);
+        em.flush();
+
+        // Pass mark 80 -> only S1 passes LO1 and only S3 passes LO2: both LOs at 25%, below target 80.
+        Map<String, Object> second = cqiService.finalizeModuleAttainment(MODULE, BATCH, 80.0, 80.0);
+        assertEquals(0, second.get("triggeredCount"));
+        List<CqiAction> after = cqiService.getCqiHistoryForModule(MODULE);
+        assertEquals(2, after.size());
+        for (CqiAction a : after) {
+            if ("LO1".equals(a.getLosId())) {
+                assertEquals(50.0, a.getAttainmentScore(), 1e-9, "submitted CQI keeps its original baseline");
+                assertEquals(60.0, a.getTargetScore(), 1e-9);
+            } else {
+                assertEquals(25.0, a.getAttainmentScore(), 1e-9, "unsubmitted CQI is refreshed to the current attainment");
+                assertEquals(80.0, a.getTargetScore(), 1e-9, "unsubmitted CQI picks up the current target");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("re-finalizing keeps a returned plan (admin comment / lecturer draft) even if the LO now meets the target")
     void refinalizeKeepsReturnedPlan() throws Exception {
         excelImportService.importMarksBulk(marksSheet(), new String[]{"LO1", "LO2"}, BATCH, "FINAL_EXAM");
