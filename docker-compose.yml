@@ -33,6 +33,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-appuser}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-password}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
     ports:
       - "8080:8080"
     depends_on:

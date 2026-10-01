@@ -166,9 +166,13 @@ export default function LoginPage() {
                 setError('Login failed. Incorrect username or password.');
             } else if (err.response?.status === 403) {
                 setError('Access denied.');
-            } else {
-                setError('Login failed. Please check your credentials.');
-            }
+           } else if (!err.response) {
+               setError('Cannot reach the server. Please make sure the backend is running.');
+           } else if (err.response.status >= 500) {
+               setError('Server error. Please check that the backend and database are running.');
+           } else {
+               setError('Login failed. Please check your credentials.');
+           }
         } finally {
             setIsLoading(false);
         }

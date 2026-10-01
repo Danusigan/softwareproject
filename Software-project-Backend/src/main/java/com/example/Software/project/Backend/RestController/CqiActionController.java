@@ -20,7 +20,7 @@ public class CqiActionController {
     @Autowired private CQIService cqiService;
     @Autowired private ModuleRepository moduleRepository;
     @Autowired private JwtUtil jwtUtil;
-    
+
 
     // --- LECTURE: List own CQI actions (any status) ---
     @GetMapping("/my-plans")
