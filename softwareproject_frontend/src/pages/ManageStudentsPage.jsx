@@ -187,7 +187,15 @@ export default function ManageStudentsPage() {
                 {students.map(s => (
                   <tr key={s.studentId} className="hover:bg-gray-50">
                     <td className="px-6 py-3 text-sm font-medium text-gray-800">{s.studentId}</td>
-                    <td className="px-6 py-3 text-sm text-gray-600">{s.studentName}</td>
+                                       <td className="px-6 py-3 text-sm">
+                                         <button
+                                           type="button"
+                                           onClick={() => navigate(`/student-profile?id=${encodeURIComponent(s.studentId)}`)}
+                                           className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                         >
+                                           {s.studentName}
+                                         </button>
+                                       </td>
                     <td className="px-6 py-3 text-sm text-gray-600">{s.email || '—'}</td>
                     <td className="px-6 py-3 text-sm text-gray-600">{s.academicYear || '—'}</td>
                     <td className="px-6 py-3 text-sm">

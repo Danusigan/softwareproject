@@ -66,10 +66,15 @@ export default function Header() {
             {user ? (
               /* Logged in user */
               <div className="flex items-center gap-6 pl-8 border-l border-white/20">
-                <div className="text-right hidden sm:block">
-                  <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest leading-none mb-1">Account</p>
-                  <p className="text-sm font-black text-white">{user.username}</p>
-                </div>
+                               <Link to="/profile" className="flex items-center gap-3 group/profile" aria-label="Open my profile">
+                                 <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-sm font-black text-white group-hover/profile:bg-white/30 transition-colors">
+                                   {(user.username || '?').slice(0, 2).toUpperCase()}
+                                 </div>
+                                 <div className="text-right hidden sm:block">
+                                   <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest leading-none mb-1">My profile</p>
+                                   <p className="text-sm font-black text-white">{user.username}</p>
+                                 </div>
+                               </Link>
 
                 <button
                   onClick={handleLogout}
