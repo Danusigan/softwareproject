@@ -21,6 +21,7 @@ public class CqiActionController {
     @Autowired private ModuleRepository moduleRepository;
     @Autowired private JwtUtil jwtUtil;
 
+
     // --- LECTURE: List own CQI actions (any status) ---
     @GetMapping("/my-plans")
     public ResponseEntity<?> getMyPlans(@RequestHeader("Authorization") String token) {
