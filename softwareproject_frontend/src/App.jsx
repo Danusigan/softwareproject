@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import BatchReportsPage from './pages/BatchReportsPage'
 import StudentReportsPage from './pages/StudentReportsPage'
@@ -31,11 +31,10 @@ import { setupAxiosInterceptors } from './services/axiosSetup'
 function AppRoutes() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // ✅ Setup axios interceptors for token management
-    setupAxiosInterceptors(navigate);
+  useLayoutEffect(() => {
+      // ✅ Setup axios interceptors for token management
+      setupAxiosInterceptors(navigate);
   }, [navigate]);
-
   return (
     <Routes>
       <Route path="/batch-reports" element={<ProtectedRoute><BatchReportsPage /></ProtectedRoute>} />
