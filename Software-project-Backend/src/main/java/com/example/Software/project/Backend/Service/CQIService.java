@@ -20,6 +20,7 @@ public class CQIService {
     @Autowired private ProgramOutcomeRepository programOutcomeRepository;
     @Autowired private AttainmentService attainmentService;
     @Autowired private StudentPoCreditRepository studentPoCreditRepository;
+    @Autowired private NotificationService notificationService;
 
     // Triggers a new CQI action for every LO in the module whose batch attainment fell below
     // its stored threshold, unless one is already open (PLANNED or IN_PROGRESS) for that LO.
@@ -70,9 +71,21 @@ public class CQIService {
             if (lecturers != null && !lecturers.isEmpty()) {
                 action.setCreatedBy(lecturers.get(0));
             }
-            triggered.add(cqiActionRepository.save(action));
+            CqiAction saved = cqiActionRepository.save(action);
+            triggered.add(saved);
+            notifyCqiTriggered(module, saved, "LO " + los.getId());
         }
         return triggered;
+    }
+
+    // Puts an "action triggered" message on the lecturers' profile pages
+    private void notifyCqiTriggered(Module module, CqiAction action, String target) {
+        try {
+            java.util.Set<String> who = new java.util.LinkedHashSet<>(module.getAssignedLecturerUsernames());
+            if (action.getCreatedBy() != null) who.add(action.getCreatedBy());
+            notificationService.notifyUsers(who, "CQI action triggered for " + target
+                + " in module " + module.getModuleId() + " (batch " + action.getBatch() + ")");
+        } catch (Exception ignored) { }
     }
 
     // PO-level counterpart to checkAndTriggerCQI: for every Program Outcome that has saved
@@ -129,7 +142,9 @@ public class CQIService {
             if (lecturers != null && !lecturers.isEmpty()) {
                 action.setCreatedBy(lecturers.get(0));
             }
-            triggered.add(cqiActionRepository.save(action));
+            CqiAction saved = cqiActionRepository.save(action);
+            triggered.add(saved);
+            notifyCqiTriggered(module, saved, "PO " + po.getPoId());
         }
         return triggered;
     }

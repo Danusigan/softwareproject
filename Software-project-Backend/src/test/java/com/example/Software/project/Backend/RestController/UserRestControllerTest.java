@@ -1,6 +1,7 @@
 package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.User;
+import com.example.Software.project.Backend.Repository.UserAccessRepository;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.ModuleService;
@@ -54,6 +55,7 @@ class UserRestControllerTest {
     @MockBean private JwtUtil jwtUtil;
     @MockBean private AuditLogService auditLogService;
     @MockBean private PasswordResetService passwordResetService;
+    @MockBean private UserAccessRepository userAccessRepository;
 
     private org.springframework.security.core.userdetails.User principalFor(String username) {
         return new org.springframework.security.core.userdetails.User(

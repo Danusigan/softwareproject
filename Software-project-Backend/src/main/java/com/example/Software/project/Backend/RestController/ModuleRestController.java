@@ -31,7 +31,7 @@ public class ModuleRestController {
                     "status", "ERROR"
                 ));
             }
-            com.example.Software.project.Backend.Model.Module createdModule = moduleService.createModule(module);
+            com.example.Software.project.Backend.Model.Module createdModule = moduleService.createModule(module, username(token));
             return ResponseEntity.ok(Map.of(
                 "message", "Module created successfully",
                 "data", createdModule,

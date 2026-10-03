@@ -50,6 +50,8 @@ class OBEControllerTest {
     @MockBean private StudentAssessmentScoreRepository studentAssessmentScoreRepo;
     @MockBean private ModuleRepository moduleRepo;
     @MockBean private StudentMarkRepository studentMarkRepository;
+    @MockBean private UserAccessRepository userAccessRepository;
+    @MockBean private NotificationService notificationService;
 
     // ---- role gate ----
 

@@ -1,6 +1,7 @@
 package com.example.Software.project.Backend.RestController;
 
 import com.example.Software.project.Backend.Model.OutcomeMapping;
+import com.example.Software.project.Backend.Repository.UserAccessRepository;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
 import com.example.Software.project.Backend.Service.LOPOMappingService;
@@ -49,6 +50,8 @@ class LOPOMappingRestControllerTest {
 
     @MockBean
     private AuditLogService auditLogService;
+    @MockBean
+    private UserAccessRepository userAccessRepository;
 
     @Test
     @DisplayName("GET /admin/pending is rejected with 403 for a lecturer token")

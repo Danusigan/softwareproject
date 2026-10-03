@@ -27,6 +27,9 @@ public class LOPOMappingService {
     @Autowired
     private LosRepository losRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
     // Module-based mapping templates for smart suggestions
     private final Map<String, Map<String, Integer>> MODULE_TEMPLATES = new HashMap<String, Map<String, Integer>>() {{
         // Software Engineering Modules
@@ -39,7 +42,7 @@ public class LOPOMappingService {
         put("DATABASE", Map.of(
             "PO1", 2, "PO2", 2, "PO3", 3, "PO5", 2
         ));
-        
+
         // Mathematics Modules
         put("MATHEMATICS", Map.of(
             "PO1", 3, "PO2", 3, "PO4", 1, "PO12", 2
@@ -47,7 +50,7 @@ public class LOPOMappingService {
         put("STATISTICS", Map.of(
             "PO1", 3, "PO2", 3, "PO4", 2, "PO12", 1
         ));
-        
+
         // Engineering Core
         put("ENGINEERING_MECHANICS", Map.of(
             "PO1", 3, "PO2", 2, "PO4", 2
@@ -55,7 +58,7 @@ public class LOPOMappingService {
         put("ELECTRONICS", Map.of(
             "PO1", 3, "PO3", 2, "PO5", 3
         ));
-        
+
         // Project/Management
         put("PROJECT_MANAGEMENT", Map.of(
             "PO9", 3, "PO10", 3, "PO11", 3, "PO6", 2, "PO12", 2
@@ -63,7 +66,7 @@ public class LOPOMappingService {
         put("CAPSTONE_PROJECT", Map.of(
             "PO3", 3, "PO6", 2, "PO7", 2, "PO8", 2, "PO9", 3, "PO10", 3, "PO11", 3, "PO12", 2
         ));
-        
+
         // Communication/Liberal Arts
         put("COMMUNICATION", Map.of(
             "PO10", 3, "PO6", 2, "PO8", 1, "PO12", 2
@@ -71,7 +74,7 @@ public class LOPOMappingService {
         put("ETHICS", Map.of(
             "PO8", 3, "PO6", 2, "PO7", 2, "PO12", 1
         ));
-        
+
         // Research/Investigation
         put("RESEARCH_METHODS", Map.of(
             "PO4", 3, "PO2", 2, "PO10", 2, "PO12", 3
@@ -84,13 +87,13 @@ public class LOPOMappingService {
     public Map<String, Integer> getSuggestedMappings(String moduleId, String loDescription) {
         // Get module type based on module name/ID
         String moduleType = determineModuleType(moduleId);
-        
+
         // Get base template
         Map<String, Integer> suggestions = new HashMap<>(MODULE_TEMPLATES.getOrDefault(moduleType, new HashMap<>()));
-        
+
         // Enhance suggestions based on LO description keywords
         enhanceSuggestionsBasedOnDescription(suggestions, loDescription);
-        
+
         // Ensure we have 2-5 meaningful mappings
         return validateAndAdjustSuggestions(suggestions);
     }
@@ -100,7 +103,7 @@ public class LOPOMappingService {
      */
     private String determineModuleType(String moduleId) {
         String id = moduleId.toUpperCase();
-        
+
         if (id.contains("SE") || id.contains("SOFT")) return "SOFTWARE_ENGINEERING";
         if (id.contains("PROG") || id.contains("CS")) return "PROGRAMMING";
         if (id.contains("DB") || id.contains("DATA")) return "DATABASE";
@@ -113,7 +116,7 @@ public class LOPOMappingService {
         if (id.contains("COM") || id.contains("ENG")) return "COMMUNICATION";
         if (id.contains("ETH") || id.contains("PHI")) return "ETHICS";
         if (id.contains("RES") || id.contains("THE")) return "RESEARCH_METHODS";
-        
+
         return "SOFTWARE_ENGINEERING"; // Default
     }
 
@@ -122,44 +125,44 @@ public class LOPOMappingService {
      */
     private void enhanceSuggestionsBasedOnDescription(Map<String, Integer> suggestions, String description) {
         if (description == null) return;
-        
+
         String desc = description.toLowerCase();
-        
+
         // Design-related keywords
         if (desc.contains("design") || desc.contains("create") || desc.contains("develop")) {
             suggestions.put("PO3", Math.max(suggestions.getOrDefault("PO3", 0), 3));
         }
-        
+
         // Analysis keywords
         if (desc.contains("analyz") || desc.contains("evaluat") || desc.contains("assess")) {
             suggestions.put("PO2", Math.max(suggestions.getOrDefault("PO2", 0), 3));
         }
-        
+
         // Investigation keywords
         if (desc.contains("research") || desc.contains("investigat") || desc.contains("experiment")) {
             suggestions.put("PO4", Math.max(suggestions.getOrDefault("PO4", 0), 3));
         }
-        
+
         // Tools keywords
         if (desc.contains("tool") || desc.contains("software") || desc.contains("technology")) {
             suggestions.put("PO5", Math.max(suggestions.getOrDefault("PO5", 0), 2));
         }
-        
+
         // Communication keywords
         if (desc.contains("present") || desc.contains("report") || desc.contains("communicat")) {
             suggestions.put("PO10", Math.max(suggestions.getOrDefault("PO10", 0), 2));
         }
-        
+
         // Teamwork keywords
         if (desc.contains("team") || desc.contains("group") || desc.contains("collaborat")) {
             suggestions.put("PO9", Math.max(suggestions.getOrDefault("PO9", 0), 2));
         }
-        
+
         // Ethics keywords
         if (desc.contains("ethic") || desc.contains("responsible") || desc.contains("professional")) {
             suggestions.put("PO8", Math.max(suggestions.getOrDefault("PO8", 0), 2));
         }
-        
+
         // Society keywords
         if (desc.contains("society") || desc.contains("social") || desc.contains("impact")) {
             suggestions.put("PO6", Math.max(suggestions.getOrDefault("PO6", 0), 2));
@@ -172,13 +175,13 @@ public class LOPOMappingService {
     private Map<String, Integer> validateAndAdjustSuggestions(Map<String, Integer> suggestions) {
         // Remove zero weights
         suggestions.entrySet().removeIf(entry -> entry.getValue() <= 0);
-        
+
         // If too few suggestions, add some defaults
         if (suggestions.size() < 2) {
             suggestions.put("PO1", 2); // Engineering Knowledge
             suggestions.put("PO12", 1); // Lifelong Learning
         }
-        
+
         // If too many suggestions, keep only top 5
         if (suggestions.size() > 5) {
             return suggestions.entrySet().stream()
@@ -191,7 +194,7 @@ public class LOPOMappingService {
                     LinkedHashMap::new
                 ));
         }
-        
+
         return suggestions;
     }
 
@@ -201,20 +204,20 @@ public class LOPOMappingService {
     public List<OutcomeMapping> createMappings(String loId, Map<String, Integer> mappings, String mappedBy, String remarks) {
         Los los = losRepository.findById(loId)
             .orElseThrow(() -> new RuntimeException("Learning Outcome not found: " + loId));
-        
+
         // Validate mappings
         validateMappings(mappings);
-        
+
         List<OutcomeMapping> savedMappings = new ArrayList<>();
-        
+
         for (Map.Entry<String, Integer> entry : mappings.entrySet()) {
             String poId = entry.getKey();
             Integer weight = entry.getValue();
-            
+
             if (weight > 0) { // Only create mappings with positive weight
                 ProgramOutcome po = poRepository.findById(poId)
                     .orElseThrow(() -> new RuntimeException("Program Outcome not found: " + poId));
-                
+
                 OutcomeMapping mapping = new OutcomeMapping();
                 mapping.setLearningOutcome(los);
                 mapping.setProgramOutcome(po);
@@ -222,11 +225,11 @@ public class LOPOMappingService {
                 mapping.setMappedBy(mappedBy);
                 mapping.setLecturerRemarks(remarks);
                 mapping.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
-                
+
                 savedMappings.add(mappingRepository.save(mapping));
             }
         }
-        
+
         return savedMappings;
     }
 
@@ -236,23 +239,23 @@ public class LOPOMappingService {
     private void validateMappings(Map<String, Integer> mappings) {
         // Remove zero/negative weights
         mappings.entrySet().removeIf(entry -> entry.getValue() <= 0);
-        
+
         // Must have at least 2 mappings
         if (mappings.size() < 2) {
             throw new IllegalArgumentException("Learning Outcome must map to at least 2 Program Outcomes");
         }
-        
+
         // Must not exceed 5 mappings
         if (mappings.size() > 5) {
             throw new IllegalArgumentException("Learning Outcome cannot map to more than 5 Program Outcomes");
         }
-        
+
         // Must have at least one mapping with weight 3 (primary focus)
         boolean hasPrimaryFocus = mappings.values().stream().anyMatch(weight -> weight >= 3);
         if (!hasPrimaryFocus) {
             throw new IllegalArgumentException("Learning Outcome must have at least one primary focus (weight 3) mapping");
         }
-        
+
         // Validate weight range
         mappings.values().forEach(weight -> {
             if (weight < 1 || weight > 3) {
@@ -292,18 +295,36 @@ public class LOPOMappingService {
     }
 
     /**
+     * Notify the lecturer who created the mapping about the admin's decision.
+     * Failures are swallowed so a notification problem never breaks the approval/rejection itself.
+     */
+    private void notifyMappingDecision(OutcomeMapping m, String verb) {
+        try {
+            String lo = m.getLearningOutcome() != null ? m.getLearningOutcome().getId() : "?";
+            String po = m.getProgramOutcome() != null ? m.getProgramOutcome().getPoId() : "?";
+            String text = verb + " your LO-PO mapping request (" + lo + " -> " + po + ")"
+                + (m.getAdminRemarks() != null && !m.getAdminRemarks().isBlank()
+                ? ". Remarks: " + m.getAdminRemarks()
+                : ".");
+            notificationService.notifyUser(m.getMappedBy(), text);
+        } catch (Exception ignored) { }
+    }
+
+    /**
      * Approve mapping (Admin only)
      */
     public OutcomeMapping approveMapping(Long mappingId, String reviewedBy, String adminRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
             .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
-        
+
         mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
         mapping.setReviewedBy(reviewedBy);
         mapping.setAdminRemarks(adminRemarks);
         mapping.setReviewedAt(LocalDateTime.now());
-        
-        return mappingRepository.save(mapping);
+
+        OutcomeMapping saved = mappingRepository.save(mapping);
+        notifyMappingDecision(saved, "Admin accepted");
+        return saved;
     }
 
     /**
@@ -312,13 +333,15 @@ public class LOPOMappingService {
     public OutcomeMapping rejectMapping(Long mappingId, String reviewedBy, String adminRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
             .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
-        
+
         mapping.setStatus(OutcomeMapping.ApprovalStatus.REJECTED);
         mapping.setReviewedBy(reviewedBy);
         mapping.setAdminRemarks(adminRemarks);
         mapping.setReviewedAt(LocalDateTime.now());
-        
-        return mappingRepository.save(mapping);
+
+        OutcomeMapping saved = mappingRepository.save(mapping);
+        notifyMappingDecision(saved, "Admin rejected");
+        return saved;
     }
 
     /**
@@ -329,15 +352,16 @@ public class LOPOMappingService {
         List<OutcomeMapping> pendingMappings = mappings.stream()
             .filter(mapping -> mapping.getStatus() == OutcomeMapping.ApprovalStatus.PENDING)
             .toList();
-        
+
         for (OutcomeMapping mapping : pendingMappings) {
             mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
             mapping.setReviewedBy(reviewedBy);
             mapping.setAdminRemarks(adminRemarks);
             mapping.setReviewedAt(LocalDateTime.now());
             mappingRepository.save(mapping);
+            notifyMappingDecision(mapping, "Admin accepted");
         }
-        
+
         return pendingMappings;
     }
 
@@ -347,11 +371,11 @@ public class LOPOMappingService {
     public OutcomeMapping updateMapping(Long mappingId, Integer newWeight, String lecturerRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
             .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
-        
+
         if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED) {
             throw new IllegalArgumentException("Cannot update approved mappings");
         }
-        
+
         mapping.setWeight(newWeight);
         mapping.setLecturerRemarks(lecturerRemarks);
 
@@ -364,7 +388,7 @@ public class LOPOMappingService {
         }
 
         mapping.setUpdatedAt(LocalDateTime.now());
-        
+
         return mappingRepository.save(mapping);
     }
 
@@ -410,18 +434,18 @@ public class LOPOMappingService {
      */
     public Map<String, Object> getMappingStatistics(String moduleId) {
         List<OutcomeMapping> mappings = getMappingsForModule(moduleId);
-        
+
         long totalMappings = mappings.size();
         long pendingMappings = mappings.stream().filter(m -> m.getStatus() == OutcomeMapping.ApprovalStatus.PENDING).count();
         long approvedMappings = mappings.stream().filter(m -> m.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED).count();
         long rejectedMappings = mappings.stream().filter(m -> m.getStatus() == OutcomeMapping.ApprovalStatus.REJECTED).count();
-        
+
         // PO coverage analysis
         Set<String> coveredPOs = mappings.stream()
             .filter(m -> m.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED)
             .map(m -> m.getProgramOutcome().getPoId())
             .collect(Collectors.toSet());
-        
+
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalMappings", totalMappings);
         stats.put("pendingMappings", pendingMappings);
@@ -430,7 +454,7 @@ public class LOPOMappingService {
         stats.put("coveredPOs", coveredPOs.size());
         stats.put("coveredPOsList", coveredPOs);
         stats.put("mappingCompleteness", coveredPOs.size() * 100.0 / 12); // Percentage of 12 POs covered
-        
+
         return stats;
     }
 
@@ -439,30 +463,30 @@ public class LOPOMappingService {
      */
     public Map<String, Object> getModuleMappingReport(String moduleId) {
         Map<String, Object> report = new HashMap<>();
-        
+
         // Basic statistics
         report.put("statistics", getMappingStatistics(moduleId));
-        
+
         // All mappings grouped by LO
         List<OutcomeMapping> allMappings = getMappingsForModule(moduleId);
         Map<String, List<OutcomeMapping>> mappingsByLO = allMappings.stream()
             .collect(Collectors.groupingBy(mapping -> mapping.getLearningOutcome().getId()));
-        
+
         report.put("mappingsByLO", mappingsByLO);
-        
+
         // PO coverage matrix
         Map<String, Map<String, Integer>> poMatrix = new HashMap<>();
         for (OutcomeMapping mapping : allMappings) {
             if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED) {
                 String loId = mapping.getLearningOutcome().getId();
                 String poId = mapping.getProgramOutcome().getPoId();
-                
+
                 poMatrix.computeIfAbsent(loId, k -> new HashMap<>()).put(poId, mapping.getWeight());
             }
         }
-        
+
         report.put("poMatrix", poMatrix);
-        
+
         return report;
     }
 
@@ -478,31 +502,31 @@ public class LOPOMappingService {
                 .filter(m -> m.getStatus().toString().equalsIgnoreCase(status))
                 .collect(Collectors.toList());
         }
-        
+
         // Filter by module if provided
         if (moduleId != null && !moduleId.isEmpty()) {
             mappings = mappings.stream()
                 .filter(m -> m.getLearningOutcome().getModule().getModuleId().equals(moduleId))
                 .collect(Collectors.toList());
         }
-        
+
         // Filter by batch if provided
         if (batch != null && !batch.isEmpty()) {
             mappings = mappings.stream()
-                .filter(m -> m.getLearningOutcome().getBatch() != null && 
-                            m.getLearningOutcome().getBatch().equals(batch))
+                .filter(m -> m.getLearningOutcome().getBatch() != null &&
+                    m.getLearningOutcome().getBatch().equals(batch))
                 .collect(Collectors.toList());
         }
-        
+
         // Search by LO name if provided
         if (search != null && !search.isEmpty()) {
             String searchLower = search.toLowerCase();
             mappings = mappings.stream()
                 .filter(m -> m.getLearningOutcome().getName().toLowerCase().contains(searchLower) ||
-                            m.getLearningOutcome().getId().toLowerCase().contains(searchLower))
+                    m.getLearningOutcome().getId().toLowerCase().contains(searchLower))
                 .collect(Collectors.toList());
         }
-        
+
         return mappings;
     }
 
@@ -533,12 +557,12 @@ public class LOPOMappingService {
     public double calculateCoveragePercentage() {
         long totalPOs = poRepository.count();
         if (totalPOs == 0) return 0.0;
-        
+
         List<OutcomeMapping> approvedMappings = excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED));
         Set<String> uniquePOs = approvedMappings.stream()
             .map(m -> m.getProgramOutcome().getPoId())
             .collect(Collectors.toSet());
-        
+
         return (uniquePOs.size() * 100.0) / totalPOs;
     }
 }

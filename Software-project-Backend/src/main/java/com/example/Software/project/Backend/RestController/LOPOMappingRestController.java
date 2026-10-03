@@ -140,13 +140,13 @@ public class LOPOMappingRestController {
             }
 
             Map<String, Integer> suggestions = mappingService.getSuggestedMappings(moduleId, loDescription);
-            
+
             // Enrich with PO details
             Map<String, Object> enrichedSuggestions = new HashMap<>();
             for (Map.Entry<String, Integer> entry : suggestions.entrySet()) {
                 String poId = entry.getKey();
                 Integer weight = entry.getValue();
-                
+
                 Map<String, Object> poInfo = new HashMap<>();
                 poService.getPOById(poId).ifPresent(po -> {
                     poInfo.put("poId", po.getPoId());
@@ -155,7 +155,7 @@ public class LOPOMappingRestController {
                     poInfo.put("category", po.getCategory());
                     poInfo.put("suggestedWeight", weight);
                 });
-                
+
                 if (!poInfo.isEmpty()) {
                     enrichedSuggestions.put(poId, poInfo);
                 }
@@ -180,7 +180,7 @@ public class LOPOMappingRestController {
 
             String username = extractUsername(token);
             String remarks = (String) request.getOrDefault("remarks", "");
-            
+
             @SuppressWarnings("unchecked")
             Map<String, Integer> mappings = (Map<String, Integer>) request.get("mappings");
 
@@ -208,7 +208,7 @@ public class LOPOMappingRestController {
         }
     }
 
-    // Get mappings for a module  
+    // Get mappings for a module
     @GetMapping("/module/{moduleId}")
     public ResponseEntity<?> getMappingsForModule(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {

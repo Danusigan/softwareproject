@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
 import BatchReportsPage from './pages/BatchReportsPage'
 import StudentReportsPage from './pages/StudentReportsPage'
@@ -22,6 +22,8 @@ import ManageLecturersPage from './pages/ManageLecturersPage'
 import ManageStudentsPage from './pages/ManageStudentsPage'
 import ManageAdminsPage from './pages/ManageAdminsPage'
 import MyCqiPlansPage from './pages/MyCqiPlansPage'
+import LecturerProfilePage from './pages/LecturerProfilePage'
+import StudentProfilePage from './pages/StudentProfilePage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { setupAxiosInterceptors } from './services/axiosSetup'
 
@@ -29,11 +31,10 @@ import { setupAxiosInterceptors } from './services/axiosSetup'
 function AppRoutes() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // ✅ Setup axios interceptors for token management
-    setupAxiosInterceptors(navigate);
+  useLayoutEffect(() => {
+      // ✅ Setup axios interceptors for token management
+      setupAxiosInterceptors(navigate);
   }, [navigate]);
-
   return (
     <Routes>
       <Route path="/batch-reports" element={<ProtectedRoute><BatchReportsPage /></ProtectedRoute>} />
@@ -172,6 +173,22 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <LecturerProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student-profile"
+              element={
+                <ProtectedRoute>
+                  <StudentProfilePage />
+                </ProtectedRoute>
+              }
+            />
     </Routes>
   );
 }

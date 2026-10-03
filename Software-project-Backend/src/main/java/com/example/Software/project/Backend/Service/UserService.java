@@ -18,10 +18,8 @@ public class UserService {
 
     // Min 8 chars, at least one lowercase, one uppercase, one digit — per Phase 4 decision.
     private static final java.util.regex.Pattern PASSWORD_POLICY =
-            java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
+        java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
 
-    // Ensure the UserRepository has the findByUsername method:
-    // Optional<User> findByUsername(String username);
     @Autowired
     private UserRepository userRepository;
 
@@ -60,13 +58,8 @@ public class UserService {
 
     /**
      * Authenticates a user using their username and password.
-     * This is the core logic used by the /api/auth/login endpoint.
-     * * @param username The User ID (username) of the user.
-     * @param password The password of the user.
-     * @return An Optional containing the User if authentication is successful, otherwise Optional.empty().
      */
     public Optional<User> authenticateUser(String username, String password) {
-        // CORRECTED: Find the user by their actual field name (username)
         Optional<User> userOptional = userRepository.findByUsername(username);
 
         if (userOptional.isPresent()) {
@@ -79,12 +72,9 @@ public class UserService {
         return Optional.empty();
     }
 
-
     public Optional<User> findByUserId(String username) {
-
         return userRepository.findByUsername(username);
     }
-
 
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
@@ -95,6 +85,26 @@ public class UserService {
      */
     public Optional<User> findByUsertype(String usertype) {
         return userRepository.findByUsertype(usertype);
+    }
+
+    /**
+     * Lets a logged-in user change their own password. Verifies the current password,
+     * enforces the password policy, and stores the new one BCrypt-encoded.
+     */
+    public void changePassword(String username, String currentPassword, String newPassword) {
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect.");
+        }
+        if (newPassword == null || !PASSWORD_POLICY.matcher(newPassword).matches()) {
+            throw new IllegalArgumentException(
+                "New password must be at least 8 characters and include an uppercase letter, a lowercase letter and a number.");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
+        userRepository.save(user);
     }
 
     /**
@@ -109,7 +119,7 @@ public class UserService {
      */
     public User updateLecturer(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not a lecturer");
         }
@@ -128,7 +138,7 @@ public class UserService {
      */
     public void deleteLecturer(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not a lecturer");
         }
@@ -148,7 +158,7 @@ public class UserService {
      */
     public User updateAdmin(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new Exception("Admin not found: " + username));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not an admin");
         }
@@ -166,7 +176,7 @@ public class UserService {
      */
     public void deleteAdmin(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new Exception("Admin not found: " + username));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not an admin");
         }
@@ -213,9 +223,9 @@ public class UserService {
 
         return userRepository.save(newUser);
     }
-    
+
     /**
-     * Creates a test user with plain text password - for development/testing only
+     * Creates a test user - for development/testing only
      */
     public User createTestUser(String username, String password, String email, String userType) throws Exception {
         // Check if user already exists
@@ -225,13 +235,13 @@ public class UserService {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new Exception("Email already exists");
         }
-        
+
         User testUser = new User();
         testUser.setUserID(username);
         testUser.setPassword(passwordEncoder.encode(password));
         testUser.setEmail(email);
         testUser.setUsertype(userType);
-        
+
         return userRepository.save(testUser);
     }
 }

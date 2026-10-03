@@ -15,6 +15,7 @@ import java.util.Optional;
 @Repository
 public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> {
     List<StudentMark> findByLos_Id(String losId);
+    List<StudentMark> findByStudent_StudentId(String studentId);
     List<StudentMark> findByLos_IdOrderByIdDesc(String losId);
 
     Optional<StudentMark> findByStudentAndLos_IdAndBatchAndMarkType(Student student, String losId, String batch, MarkType markType);
