@@ -382,9 +382,9 @@ export default function LOPOMappingManagementPage() {
 
             <Header />
 
-            <main className="flex-1 max-w-7xl mx-auto px-6 py-12 w-full relative z-10">
+            <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full relative z-10">
                 {/* Header */}
-                <div className="flex justify-between items-center mb-8">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
                     <div>
                         <h1 className="heading-xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
                             LO-PO Mapping Management
@@ -394,7 +394,7 @@ export default function LOPOMappingManagementPage() {
                         </p>
                     </div>
                     
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-3">
                         <Link 
                             to="/modules" 
                             className="btn-secondary"
@@ -891,7 +891,7 @@ export default function LOPOMappingManagementPage() {
                 )}
 
                 {mappings.length === 0 && (
-                    <div className="glass-card rounded-2xl p-12 text-center">
+                    <div className="glass-card rounded-2xl p-6 sm:p-12 text-center">
                         <svg className="w-16 h-16 text-slate-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
