@@ -5,6 +5,7 @@ import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Service.ModuleService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
@@ -17,7 +18,11 @@ import static org.mockito.Mockito.*;
 // build only the entities this test actually touches.
 @DataJpaTest(properties={"spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.flyway.enabled=false","spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.datasource.url=jdbc:h2:mem:batch-report;MODE=MySQL;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
         "logging.level.org.springframework=WARN","logging.level.org.hibernate=WARN"},showSql=false)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import(BatchReportRepository.class)
 class BatchReportRepositoryTest {
     @Autowired TestEntityManager em;

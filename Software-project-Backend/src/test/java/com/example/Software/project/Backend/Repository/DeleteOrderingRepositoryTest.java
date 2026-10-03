@@ -5,6 +5,7 @@ import com.example.Software.project.Backend.Model.Module; // disambiguate from j
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 
@@ -25,7 +26,11 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @DataJpaTest(properties = {"spring.jpa.database-platform=org.hibernate.dialect.H2Dialect",
         "spring.flyway.enabled=false", "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.datasource.url=jdbc:h2:mem:delete-ordering;MODE=MySQL;NON_KEYWORDS=USER;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.datasource.username=sa",
         "logging.level.org.springframework=WARN", "logging.level.org.hibernate=WARN"}, showSql = false)
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class DeleteOrderingRepositoryTest {
 
     @Autowired TestEntityManager em;
