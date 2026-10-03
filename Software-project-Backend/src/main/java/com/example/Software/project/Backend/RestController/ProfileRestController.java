@@ -4,6 +4,7 @@ import com.example.Software.project.Backend.Model.Message;
 import com.example.Software.project.Backend.Model.UserAccess;
 import com.example.Software.project.Backend.Repository.MessageRepository;
 import com.example.Software.project.Backend.Repository.UserAccessRepository;
+import com.example.Software.project.Backend.Service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +17,22 @@ public class ProfileRestController {
 
     private final UserAccessRepository accessRepo;
     private final MessageRepository messageRepo;
+    private final UserService userService;
 
-    public ProfileRestController(UserAccessRepository a, MessageRepository m) {
+    public ProfileRestController(UserAccessRepository a, MessageRepository m, UserService userService) {
         this.accessRepo = a;
         this.messageRepo = m;
+        this.userService = userService;
+    }
+
+    @PostMapping("/profile/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body, Authentication auth) {
+        try {
+            userService.changePassword(auth.getName(), body.get("currentPassword"), body.get("newPassword"));
+            return ResponseEntity.ok(Map.of("message", "Password changed.", "status", "SUCCESS"));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
     }
 
     @GetMapping("/profile/login-activity")
@@ -55,8 +68,6 @@ public class ProfileRestController {
     public ResponseEntity<List<Message>> inbox(Authentication auth) {
         return ResponseEntity.ok(messageRepo.findByRecipientOrderBySentAtDesc(auth.getName()));
     }
-
-    // ---- NEW: notifications ----
 
     @GetMapping("/messages/unread-count")
     public ResponseEntity<?> unreadCount(Authentication auth) {
