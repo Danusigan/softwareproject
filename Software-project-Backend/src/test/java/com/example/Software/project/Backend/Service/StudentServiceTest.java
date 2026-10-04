@@ -28,6 +28,9 @@ import static org.mockito.Mockito.when;
 class StudentServiceTest {
 
     @Mock private StudentRepository studentRepository;
+    @Mock private com.example.Software.project.Backend.Repository.StudentMarkRepository studentMarkRepository;
+    @Mock private com.example.Software.project.Backend.Repository.StudentAssessmentScoreRepository assessmentScoreRepository;
+    @Mock private com.example.Software.project.Backend.Repository.StudentPoCreditRepository poCreditRepository;
 
     @InjectMocks
     private StudentService service;
@@ -168,5 +171,68 @@ class StudentServiceTest {
         List<Student> filtered = service.list("24", null);
         assertEquals(1, filtered.size());
         assertEquals("EN001", filtered.get(0).getStudentId());
+    }
+
+    @Test
+    @DisplayName("list hides soft-deleted students")
+    void listHidesSoftDeleted() {
+        Student s1 = new Student(); s1.setStudentId("EN001"); s1.setStudentName("A");
+        Student s2 = new Student(); s2.setStudentId("EN002"); s2.setStudentName("B"); s2.softDelete("admin");
+        when(studentRepository.findAll()).thenReturn(List.of(s1, s2));
+        assertEquals(1, service.list(null, null).size());
+    }
+
+    @Test
+    @DisplayName("create rejects a duplicate Student ID")
+    void createRejectsDuplicate() {
+        when(studentRepository.findById("EN001")).thenReturn(Optional.of(new Student()));
+        Student in = new Student(); in.setStudentId("EN001"); in.setStudentName("A");
+        assertThrows(IllegalArgumentException.class, () -> service.create(in));
+    }
+
+    @Test
+    @DisplayName("create saves a trimmed new student")
+    void createSavesStudent() {
+        when(studentRepository.findById("EN001")).thenReturn(Optional.empty());
+        when(studentRepository.save(any(Student.class))).thenAnswer(i -> i.getArgument(0));
+        Student in = new Student(); in.setStudentId(" EN001 "); in.setStudentName("A"); in.setBatch("24");
+        Student saved = service.create(in);
+        assertEquals("EN001", saved.getStudentId());
+        assertEquals("24", saved.getBatch());
+    }
+
+    @Test
+    @DisplayName("restore brings a soft-deleted student back; listDeleted shows only archived ones")
+    void restoreSoftDeleted() {
+        Student s = new Student(); s.setStudentId("EN001"); s.setStudentName("A"); s.softDelete("admin");
+        Student live = new Student(); live.setStudentId("EN002"); live.setStudentName("B");
+        when(studentRepository.findAll()).thenReturn(List.of(s, live));
+        when(studentRepository.findById("EN001")).thenReturn(Optional.of(s));
+        when(studentRepository.findById("EN002")).thenReturn(Optional.of(live));
+        when(studentRepository.save(any(Student.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertEquals(1, service.listDeleted().size());
+        assertFalse(service.restore("EN001").getIsDeleted());
+        assertThrows(IllegalArgumentException.class, () -> service.restore("EN002"));
+    }
+
+    @Test
+    @DisplayName("delete hard-deletes a student with no marks")
+    void deleteHardWhenNoData() {
+        Student s = new Student(); s.setStudentId("EN001"); s.setStudentName("A");
+        when(studentRepository.findById("EN001")).thenReturn(Optional.of(s));
+        assertEquals("HARD", service.delete("EN001", "admin"));
+        org.mockito.Mockito.verify(studentRepository).delete(s);
+    }
+
+    @Test
+    @DisplayName("delete soft-deletes a student who has marks")
+    void deleteSoftWhenHasMarks() {
+        Student s = new Student(); s.setStudentId("EN001"); s.setStudentName("A");
+        when(studentRepository.findById("EN001")).thenReturn(Optional.of(s));
+        when(studentMarkRepository.existsByStudent_StudentId("EN001")).thenReturn(true);
+        assertEquals("SOFT", service.delete("EN001", "admin"));
+        assertTrue(s.getIsDeleted());
+        org.mockito.Mockito.verify(studentRepository, org.mockito.Mockito.never()).delete(any(Student.class));
     }
 }

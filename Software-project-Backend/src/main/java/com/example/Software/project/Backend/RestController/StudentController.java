@@ -73,12 +73,67 @@ public class StudentController {
     @GetMapping
     public ResponseEntity<?> list(@RequestParam(required = false) String batch,
                                    @RequestParam(required = false) String academicYear,
+                                   @RequestParam(defaultValue = "false") boolean deleted,
                                    @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         }
-        List<Student> students = studentService.list(batch, academicYear);
+        List<Student> students = deleted ? studentService.listDeleted() : studentService.list(batch, academicYear);
         return ResponseEntity.ok(Map.of("message", "OK", "status", "SUCCESS", "data", students));
+    }
+
+    // Student IDs contain slashes (EG/2024/6555), so they travel in the body / query string, not the path.
+    @PostMapping
+    public ResponseEntity<?> create(@RequestBody Student body, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return forbidden();
+        try {
+            Student s = studentService.create(body);
+            return ResponseEntity.ok(Map.of("message", "Student added.", "status", "SUCCESS", "data", s));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    @PutMapping
+    public ResponseEntity<?> update(@RequestParam("id") String id, @RequestBody Student body,
+                                    @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return forbidden();
+        try {
+            Student s = studentService.update(id, body);
+            return ResponseEntity.ok(Map.of("message", "Student updated.", "status", "SUCCESS", "data", s));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    @DeleteMapping
+    public ResponseEntity<?> delete(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return forbidden();
+        try {
+            String bearer = token.startsWith("Bearer ") ? token.substring(7) : token;
+            String mode = studentService.delete(id, jwtUtil.extractUsername(bearer));
+            String msg = "SOFT".equals(mode)
+                    ? "Student has marks/records, so they were archived (soft-deleted) instead of removed."
+                    : "Student deleted.";
+            return ResponseEntity.ok(Map.of("message", msg, "status", "SUCCESS", "mode", mode));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    @PostMapping("/restore")
+    public ResponseEntity<?> restore(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
+        if (!isAdmin(token)) return forbidden();
+        try {
+            Student s = studentService.restore(id);
+            return ResponseEntity.ok(Map.of("message", "Student restored.", "status", "SUCCESS", "data", s));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+        }
+    }
+
+    private ResponseEntity<?> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
     }
 
     private boolean isAdmin(String token) {

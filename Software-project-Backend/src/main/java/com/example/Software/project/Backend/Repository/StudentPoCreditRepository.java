@@ -12,6 +12,7 @@ import java.util.List;
 
 @Repository
 public interface StudentPoCreditRepository extends JpaRepository<StudentPoCredit, Long> {
+    boolean existsByStudent_StudentId(String studentId);
 
     // Overwrite-in-place: called before re-saving a module/batch's credits so a recalculation
     // replaces the previous result rather than accumulating alongside it.

@@ -14,6 +14,7 @@ import java.util.Optional;
 
 @Repository
 public interface StudentMarkRepository extends JpaRepository<StudentMark, Long> {
+    boolean existsByStudent_StudentId(String studentId);
     List<StudentMark> findByLos_Id(String losId);
     List<StudentMark> findByStudent_StudentId(String studentId);
     List<StudentMark> findByLos_IdOrderByIdDesc(String losId);
