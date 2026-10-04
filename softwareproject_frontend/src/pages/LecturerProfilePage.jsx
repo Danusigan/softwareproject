@@ -8,6 +8,9 @@ import ProfileView from '../components/ProfileView'
 export default function LecturerProfilePage() {
   const navigate = useNavigate()
   const user = authService.getUserInfo() || {}
+  const role = (user.userType || '').toLowerCase().trim()
+  const isLecturer = role === 'lecture'
+  const roleLabel = { lecture: 'Lecturer', admin: 'Admin', superadmin: 'Super Admin' }[role] || 'User'
   const [modules, setModules] = useState([])
   const [activity, setActivity] = useState(null)
   const [inbox, setInbox] = useState([])
@@ -30,26 +33,29 @@ export default function LecturerProfilePage() {
     try { setInbox(await getInbox()) } catch { /* blank */ }
   }
 
-  useEffect(() => { loadModules(); loadActivity(); loadInbox() }, [])
+  useEffect(() => {
+    loadActivity()
+    if (isLecturer) { loadModules(); loadInbox() }
+  }, [])
 
   return (
     <ProfileView
       name={user.username}
-      subtitle="Lecturer"
+      subtitle={roleLabel}
       details={[
         { label: 'Username', value: user.username },
         { label: 'Email address', value: user.email },
-        { label: 'Role', value: 'Lecturer' },
+        { label: 'Role', value: roleLabel },
       ]}
-      modules={modules}
+      modules={isLecturer ? modules : undefined}
       loading={loading}
       error={error}
       loginActivity={activity}
-      inbox={inbox}
+      inbox={isLecturer ? inbox : undefined}
       onMarkRead={async id => { await markRead(id); loadInbox() }}
       onMarkAllRead={async () => { await markAllRead(); loadInbox() }}
       onChangePassword={changePassword}
-      onCreateModule={async form => { await axios.post('/api/modules/create', form); await loadModules() }}
+      onCreateModule={isLecturer ? async form => { await axios.post('/api/modules/create', form); await loadModules() } : undefined}
       onModuleClick={m => navigate(`/marks-workbench/${m.moduleId}`)}
     />
   )

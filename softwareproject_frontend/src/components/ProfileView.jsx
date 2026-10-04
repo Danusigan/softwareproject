@@ -115,7 +115,7 @@ export default function ProfileView({
               ))}
             </Card>
 
-            <Card
+            {modules && <Card
               title="Course details"
               action={onCreateModule && (
                 <button onClick={() => setModOpen(true)} className="text-sm px-3 py-1 rounded-lg bg-orange-500 text-white font-semibold hover:bg-orange-600">
@@ -132,7 +132,7 @@ export default function ProfileView({
                   {m.moduleId} {m.moduleName || m.name}
                 </button>
               ))}
-            </Card>
+            </Card>}
           </div>
 
           <div>
