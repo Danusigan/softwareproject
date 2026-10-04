@@ -44,9 +44,15 @@ public class ProfileRestController {
 
         Map<String, Object> out = new HashMap<>();
         UserAccess ua = accessRepo.findById(target).orElse(null);
-        out.put("firstAccess", ua != null ? ua.getFirstAccess() : null);
-        out.put("lastAccess", ua != null ? ua.getLastAccess() : null);
+        out.put("firstAccess", ua != null ? withOffset(ua.getFirstAccess()) : null);
+        out.put("lastAccess", ua != null ? withOffset(ua.getLastAccess()) : null);
         return ResponseEntity.ok(out);
+    }
+
+    // Timestamps are stored as server-local LocalDateTime; send an explicit offset so the
+    // browser doesn't misread them in its own timezone.
+    private static String withOffset(java.time.LocalDateTime t) {
+        return t == null ? null : t.atZone(java.time.ZoneId.systemDefault()).toOffsetDateTime().toString();
     }
 
     @PostMapping("/messages")
