@@ -1,7 +1,11 @@
 package com.example.Software.project.Backend.Service;
 
 import com.example.Software.project.Backend.Model.Student;
+import com.example.Software.project.Backend.Repository.StudentAssessmentScoreRepository;
+import com.example.Software.project.Backend.Repository.StudentMarkRepository;
+import com.example.Software.project.Backend.Repository.StudentPoCreditRepository;
 import com.example.Software.project.Backend.Repository.StudentRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +29,15 @@ public class StudentService {
 
     @Autowired
     private StudentRepository studentRepository;
+
+    @Autowired
+    private StudentMarkRepository studentMarkRepository;
+
+    @Autowired
+    private StudentAssessmentScoreRepository assessmentScoreRepository;
+
+    @Autowired
+    private StudentPoCreditRepository poCreditRepository;
 
     // Matches student_po_credit's narrowed column widths (V3__student_po_credit.sql) - a
     // student/batch that doesn't fit there would otherwise only fail later, silently, the first
@@ -90,6 +103,7 @@ public class StudentService {
                     created++;
                 } else {
                     updated++;
+                    if (Boolean.TRUE.equals(student.getIsDeleted())) student.restore();
                 }
                 student.setStudentName(studentName);
                 if (email != null) student.setEmail(email);
@@ -150,10 +164,101 @@ public class StudentService {
     public List<Student> list(String batch, String academicYear) {
         List<Student> students = studentRepository.findAll();
         return students.stream()
+                .filter(s -> !Boolean.TRUE.equals(s.getIsDeleted()))
                 .filter(s -> batch == null || batch.isBlank() || batch.equals(s.getBatch()))
                 .filter(s -> academicYear == null || academicYear.isBlank() || academicYear.equals(s.getAcademicYear()))
                 .sorted(Comparator.comparing(Student::getStudentId))
                 .toList();
+    }
+
+    /** Soft-deleted (archived) students, sorted by Student ID. */
+    public List<Student> listDeleted() {
+        return studentRepository.findAll().stream()
+                .filter(s -> Boolean.TRUE.equals(s.getIsDeleted()))
+                .sorted(Comparator.comparing(Student::getStudentId))
+                .toList();
+    }
+
+    /** Brings a soft-deleted student back into the roster. */
+    public Student restore(String studentId) {
+        Student s = studentRepository.findById(studentId)
+                .filter(x -> Boolean.TRUE.equals(x.getIsDeleted()))
+                .orElseThrow(() -> new IllegalArgumentException("Deleted student " + studentId + " not found"));
+        s.restore();
+        return studentRepository.save(s);
+    }
+
+    /** Adds one student by hand (same rules as an Excel row). */
+    public Student create(Student in) {
+        String id = clean(in.getStudentId());
+        String name = clean(in.getStudentName());
+        if (id == null) throw new IllegalArgumentException("Student ID is required");
+        if (name == null) throw new IllegalArgumentException("Student Name is required");
+        if (id.length() > MAX_STUDENT_ID_LENGTH) throw new IllegalArgumentException("Student ID exceeds " + MAX_STUDENT_ID_LENGTH + " characters");
+        String batch = clean(in.getBatch());
+        if (batch != null && batch.length() > MAX_BATCH_LENGTH) throw new IllegalArgumentException("Batch exceeds " + MAX_BATCH_LENGTH + " characters");
+        Student existing = studentRepository.findById(id).orElse(null);
+        if (existing != null) {
+            throw new IllegalArgumentException(Boolean.TRUE.equals(existing.getIsDeleted())
+                    ? "Student " + id + " was previously deleted. Re-import them via Excel to restore."
+                    : "Student " + id + " already exists");
+        }
+        Student s = new Student();
+        s.setStudentId(id);
+        s.setStudentName(name);
+        s.setEmail(clean(in.getEmail()));
+        s.setAcademicYear(clean(in.getAcademicYear()));
+        s.setBatch(batch);
+        return studentRepository.save(s);
+    }
+
+    /** Edits name/email/academic year/batch. Student ID is the key and cannot change. */
+    public Student update(String studentId, Student in) {
+        Student s = studentRepository.findById(studentId)
+                .filter(x -> !Boolean.TRUE.equals(x.getIsDeleted()))
+                .orElseThrow(() -> new IllegalArgumentException("Student " + studentId + " not found"));
+        String name = clean(in.getStudentName());
+        if (name == null) throw new IllegalArgumentException("Student Name is required");
+        String batch = clean(in.getBatch());
+        if (batch != null && batch.length() > MAX_BATCH_LENGTH) throw new IllegalArgumentException("Batch exceeds " + MAX_BATCH_LENGTH + " characters");
+        s.setStudentName(name);
+        s.setEmail(clean(in.getEmail()));
+        s.setAcademicYear(clean(in.getAcademicYear()));
+        s.setBatch(batch);
+        return studentRepository.save(s);
+    }
+
+    /**
+     * Deletes a student. One with any marks, assessment scores or PO credits (or otherwise
+     * referenced, e.g. progress reports) is soft-deleted so history stays intact; one with no
+     * data is removed outright. Returns "SOFT" or "HARD".
+     */
+    public String delete(String studentId, String actor) {
+        Student s = studentRepository.findById(studentId)
+                .filter(x -> !Boolean.TRUE.equals(x.getIsDeleted()))
+                .orElseThrow(() -> new IllegalArgumentException("Student " + studentId + " not found"));
+        boolean hasData = studentMarkRepository.existsByStudent_StudentId(studentId)
+                || assessmentScoreRepository.existsByStudent_StudentId(studentId)
+                || poCreditRepository.existsByStudent_StudentId(studentId);
+        if (!hasData) {
+            try {
+                studentRepository.delete(s);
+                studentRepository.flush();
+                return "HARD";
+            } catch (DataIntegrityViolationException e) {
+                // referenced elsewhere (e.g. qa_* progress tables) - fall back to soft delete
+                s = studentRepository.findById(studentId).orElse(s);
+            }
+        }
+        s.softDelete(actor);
+        studentRepository.save(s);
+        return "SOFT";
+    }
+
+    private static String clean(String v) {
+        if (v == null) return null;
+        v = v.trim();
+        return v.isEmpty() ? null : v;
     }
 
     private boolean isRowBlank(Row row) {

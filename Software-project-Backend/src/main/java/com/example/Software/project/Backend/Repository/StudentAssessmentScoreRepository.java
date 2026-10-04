@@ -15,6 +15,7 @@ import java.util.Optional;
 
 @Repository
 public interface StudentAssessmentScoreRepository extends JpaRepository<StudentAssessmentScore, Long> {
+    boolean existsByStudent_StudentId(String studentId);
 
     List<StudentAssessmentScore> findByAssessmentItem_Los_Id(String loId);
 

@@ -30,6 +30,30 @@ public class Student {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
     
+    @Column(name = "is_deleted", nullable = false)
+    private Boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private String deletedBy;
+
+    public void softDelete(String deletedByUsername) {
+        this.isDeleted = true;
+        this.deletedAt = LocalDateTime.now();
+        this.deletedBy = deletedByUsername;
+    }
+
+    public void restore() {
+        this.isDeleted = false;
+        this.deletedAt = null;
+        this.deletedBy = null;
+    }
+
+    public Boolean getIsDeleted() { return isDeleted; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<StudentMark> studentMarks;
     
