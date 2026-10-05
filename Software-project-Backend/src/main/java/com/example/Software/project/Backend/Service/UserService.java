@@ -127,7 +127,7 @@ public class UserService {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
-            user.setPassword(password);
+            user.setPassword(passwordEncoder.encode(password));
         }
         return userRepository.save(user);
     }
@@ -166,7 +166,7 @@ public class UserService {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
-            user.setPassword(password);
+            user.setPassword(passwordEncoder.encode(password));
         }
         return userRepository.save(user);
     }
