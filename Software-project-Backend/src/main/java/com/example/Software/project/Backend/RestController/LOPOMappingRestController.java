@@ -40,7 +40,7 @@ public class LOPOMappingRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            String userRole = normalizeRole(com.example.Software.project.Backend.Security.CurrentUser.role());
             return "lecture".equals(userRole)
                 || "lecturer".equals(userRole)
                 || isAdmin(token);
@@ -53,7 +53,7 @@ public class LOPOMappingRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            String userRole = normalizeRole(com.example.Software.project.Backend.Security.CurrentUser.role());
             return "admin".equals(userRole) || "superadmin".equals(userRole);
         } catch (Exception e) {
             return false;
@@ -88,6 +88,7 @@ public class LOPOMappingRestController {
 
     // Get all LO-PO mappings
     @GetMapping("/all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getAllMappings', {'moduleId': #p0, 'status': #p1, 'batch': #p2, 'search': #p3, 'token': #p4})")
     public ResponseEntity<?> getAllMappings(
             @RequestParam(required = false) String moduleId,
             @RequestParam(required = false) String status,
@@ -108,6 +109,7 @@ public class LOPOMappingRestController {
 
     // Get LO-PO mapping statistics
     @GetMapping("/statistics")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingStatistics', {'token': #p0})")
     public ResponseEntity<?> getMappingStatistics(@RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -130,6 +132,7 @@ public class LOPOMappingRestController {
 
     // Get mapping suggestions for an LO
     @GetMapping("/suggestions")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingSuggestions', {'moduleId': #p0, 'loDescription': #p1, 'token': #p2})")
     public ResponseEntity<?> getMappingSuggestions(
             @RequestParam String moduleId,
             @RequestParam(required = false) String loDescription,
@@ -169,6 +172,7 @@ public class LOPOMappingRestController {
 
     // Create mappings for an LO
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.createMappings', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> createMappings(
             @RequestParam String loId,
             @RequestBody Map<String, Object> request,
@@ -195,6 +199,7 @@ public class LOPOMappingRestController {
 
     // Get mappings for an LO
     @GetMapping("/lo/{loId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingsForLO', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingsForLO(@PathVariable String loId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -210,6 +215,7 @@ public class LOPOMappingRestController {
 
     // Get mappings for a module
     @GetMapping("/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingsForModule', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingsForModule(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -225,6 +231,7 @@ public class LOPOMappingRestController {
 
     // Update mapping (if not approved)
     @PutMapping("/{mappingId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.updateMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> updateMapping(
             @PathVariable Long mappingId,
             @RequestBody Map<String, Object> request,
@@ -248,6 +255,7 @@ public class LOPOMappingRestController {
 
     // Delete mapping (if not approved) — soft delete, recoverable via admin restore
     @DeleteMapping("/{mappingId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.deleteMapping', {'mappingId': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -265,6 +273,7 @@ public class LOPOMappingRestController {
 
     // Get all soft-deleted mappings (Admin only — archive view)
     @GetMapping("/admin/deleted")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getDeletedMappings', {'token': #p0})")
     public ResponseEntity<?> getDeletedMappings(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -279,6 +288,7 @@ public class LOPOMappingRestController {
 
     // Restore a soft-deleted mapping (Admin only)
     @PutMapping("/admin/{mappingId}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.restoreMapping', {'mappingId': #p0, 'token': #p1})")
     public ResponseEntity<?> restoreMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -296,6 +306,7 @@ public class LOPOMappingRestController {
 
     // Get mapping statistics for a module
     @GetMapping("/statistics/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingStatistics', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingStatistics(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -313,6 +324,7 @@ public class LOPOMappingRestController {
 
     // Get all pending mappings for review
     @GetMapping("/admin/pending")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getPendingMappings', {'token': #p0})")
     public ResponseEntity<?> getPendingMappings(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -328,6 +340,7 @@ public class LOPOMappingRestController {
 
     // Approve mapping
     @PutMapping("/admin/{mappingId}/approve")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.approveMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> approveMapping(
             @PathVariable Long mappingId,
             @RequestBody(required = false) Map<String, String> request,
@@ -350,6 +363,7 @@ public class LOPOMappingRestController {
 
     // Reject mapping
     @PutMapping("/admin/{mappingId}/reject")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.rejectMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> rejectMapping(
             @PathVariable Long mappingId,
             @RequestBody Map<String, String> request,
@@ -376,6 +390,7 @@ public class LOPOMappingRestController {
 
     // Bulk approve mappings for an LO
     @PutMapping("/admin/lo/{loId}/approve-all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.bulkApproveMappingsForLO', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> bulkApproveMappingsForLO(
             @PathVariable String loId,
             @RequestBody(required = false) Map<String, String> request,
@@ -400,6 +415,7 @@ public class LOPOMappingRestController {
 
     // Get comprehensive mapping report for a module
     @GetMapping("/admin/report/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getModuleMappingReport', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleMappingReport(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -417,6 +433,7 @@ public class LOPOMappingRestController {
 
     // Get all available Program Outcomes for mapping interface
     @GetMapping("/program-outcomes")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getProgramOutcomes', {'token': #p0})")
     public ResponseEntity<?> getProgramOutcomes(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<com.example.Software.project.Backend.Model.ProgramOutcome> pos = poService.getAllActivePOs();
@@ -428,6 +445,7 @@ public class LOPOMappingRestController {
 
     // Health check for mapping system
     @GetMapping("/health")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.healthCheck', {:})")
     public ResponseEntity<?> healthCheck() {
         try {
             List<OutcomeMapping> pendingMappings = mappingService.getPendingMappings();

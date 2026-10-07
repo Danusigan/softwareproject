@@ -14,21 +14,30 @@ public class ProgressController {
     private final ProgressConfiguration configuration;
     private final ProgressPdf pdf;
     public ProgressController(ProgressService service,ProgressConfiguration configuration,ProgressPdf pdf) {this.service=service;this.configuration=configuration;this.pdf=pdf;}
-    @GetMapping("/students") public ResponseEntity<?> search(@RequestParam(defaultValue="") String q,Authentication auth) {return ok(service.search(q,auth));}
+    @GetMapping("/students") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.search', {'q': #p0, 'auth': #p1})")
+    public ResponseEntity<?> search(@RequestParam(defaultValue="") String q,Authentication auth) {return ok(service.search(q,auth));}
     // studentId is a query parameter, not a path segment: student IDs contain slashes
     // (e.g. "EG/2022/4001"), and Tomcat rejects an encoded slash inside a path segment.
-    @PostMapping("/students/snapshots") public ResponseEntity<?> generate(@RequestParam String studentId,Authentication auth) {return ok(service.generate(studentId,auth));}
-    @GetMapping("/snapshots/{reference}") public ResponseEntity<?> snapshot(@PathVariable String reference,Authentication auth) {return ok(service.snapshot(reference,auth,"PREVIEW"));}
-    @GetMapping("/snapshots/{reference}/pdf") public ResponseEntity<?> pdf(@PathVariable String reference,Authentication auth) {
+    @PostMapping("/students/snapshots") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.generate', {'studentId': #p0, 'auth': #p1})")
+    public ResponseEntity<?> generate(@RequestParam String studentId,Authentication auth) {return ok(service.generate(studentId,auth));}
+    @GetMapping("/snapshots/{reference}") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.snapshot', {'reference': #p0, 'auth': #p1})")
+    public ResponseEntity<?> snapshot(@PathVariable String reference,Authentication auth) {return ok(service.snapshot(reference,auth,"PREVIEW"));}
+    @GetMapping("/snapshots/{reference}/pdf") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.pdf', {'reference': #p0, 'auth': #p1})")
+    public ResponseEntity<?> pdf(@PathVariable String reference,Authentication auth) {
         var report=service.snapshot(reference,auth,"DOWNLOAD_PDF");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION,ContentDisposition.attachment().filename("student-progress-"+reference+".pdf").build().toString()).body(pdf.render(report));
     }
-    @GetMapping("/configuration") public ResponseEntity<?> catalog(Authentication auth) {return ok(configuration.catalog(auth));}
-    @PostMapping("/configuration/curricula") public ResponseEntity<?> curriculum(@RequestBody ProgressConfiguration.Curriculum body,Authentication auth) {configuration.curriculum(body,auth);return saved();}
-    @PutMapping("/configuration/student-programmes") public ResponseEntity<?> profile(@RequestBody ProgressConfiguration.Profile body,Authentication auth) {configuration.profile(body,auth);return saved();}
-    @PostMapping("/configuration/offerings") public ResponseEntity<?> offering(@RequestBody ProgressConfiguration.Offering body,Authentication auth) {configuration.offering(body,auth);return saved();}
-    @PutMapping("/configuration/enrolments") public ResponseEntity<?> enrolment(@RequestBody ProgressConfiguration.Enrolment body,Authentication auth) {configuration.enrolment(body,auth);return saved();}
+    @GetMapping("/configuration") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.catalog', {'auth': #p0})")
+    public ResponseEntity<?> catalog(Authentication auth) {return ok(configuration.catalog(auth));}
+    @PostMapping("/configuration/curricula") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.curriculum', {'body': #p0, 'auth': #p1})")
+    public ResponseEntity<?> curriculum(@RequestBody ProgressConfiguration.Curriculum body,Authentication auth) {configuration.curriculum(body,auth);return saved();}
+    @PutMapping("/configuration/student-programmes") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.profile', {'body': #p0, 'auth': #p1})")
+    public ResponseEntity<?> profile(@RequestBody ProgressConfiguration.Profile body,Authentication auth) {configuration.profile(body,auth);return saved();}
+    @PostMapping("/configuration/offerings") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.offering', {'body': #p0, 'auth': #p1})")
+    public ResponseEntity<?> offering(@RequestBody ProgressConfiguration.Offering body,Authentication auth) {configuration.offering(body,auth);return saved();}
+    @PutMapping("/configuration/enrolments") @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgressController.enrolment', {'body': #p0, 'auth': #p1})")
+    public ResponseEntity<?> enrolment(@RequestBody ProgressConfiguration.Enrolment body,Authentication auth) {configuration.enrolment(body,auth);return saved();}
     private ResponseEntity<?> saved() {return ok(Map.of("message","Configuration saved"));}
     private ResponseEntity<?> ok(Object body) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);}
     @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<?> invalid(IllegalArgumentException e) {return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(Map.of("message",e.getMessage()==null?"Invalid report input":e.getMessage()));}

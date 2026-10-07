@@ -45,6 +45,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("UserRestController login and access-control tests")
 class UserRestControllerTest {
+    private void authenticate(String role) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.TestingAuthenticationToken("staff", null, role));
+    }
+    @org.junit.jupiter.api.BeforeEach @org.junit.jupiter.api.AfterEach
+    void clearAuthentication() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
+    // These slice tests isolate controller validation; RbacIntegrationTest exercises the real policy.
+    @MockBean(name="accessPolicy") private com.example.Software.project.Backend.Security.AccessPolicy accessPolicy;
+    @org.junit.jupiter.api.BeforeEach void permitPolicyInSlice() {
+        when(accessPolicy.allow(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap())).thenReturn(true);
+    }
+
 
     @Autowired
     private MockMvc mockMvc;
@@ -135,7 +148,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("GET /lecturers is rejected with 403 for a lecturer token")
     void getLecturers_rejectsLecturerToken() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
 
         mockMvc.perform(get("/api/auth/lecturers").header("Authorization", "Bearer lecturer.jwt"))
             .andExpect(status().isForbidden());
@@ -144,7 +157,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("GET /lecturers succeeds for an admin token")
     void getLecturers_allowsAdminToken() throws Exception {
-        when(jwtUtil.extractRole("admin.jwt")).thenReturn("admin");
+        authenticate("admin");
         User lecturer = new User("lect1", "lect1@example.com", "hashed", "lecture");
         when(userService.findAllLecturers()).thenReturn(List.of(lecturer));
         when(moduleService.getModuleIdsAssignedTo("lect1")).thenReturn(Collections.emptyList());
@@ -158,7 +171,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("GET /admins is rejected with 403 for a plain admin token (superadmin-only)")
     void getAdmins_rejectsAdminToken() throws Exception {
-        when(jwtUtil.extractRole("admin.jwt")).thenReturn("admin");
+        authenticate("admin");
 
         mockMvc.perform(get("/api/auth/admins").header("Authorization", "Bearer admin.jwt"))
             .andExpect(status().isForbidden());
@@ -167,7 +180,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("GET /admins succeeds for a superadmin token")
     void getAdmins_allowsSuperAdminToken() throws Exception {
-        when(jwtUtil.extractRole("superadmin.jwt")).thenReturn("superadmin");
+        authenticate("superadmin");
         when(userService.findAllAdmins()).thenReturn(Collections.emptyList());
 
         mockMvc.perform(get("/api/auth/admins").header("Authorization", "Bearer superadmin.jwt"))
@@ -178,7 +191,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("POST /add-admin is rejected with 403 for a plain admin token (superadmin-only)")
     void addAdmin_rejectsAdminToken() throws Exception {
-        when(jwtUtil.extractRole("admin.jwt")).thenReturn("admin");
+        authenticate("admin");
 
         mockMvc.perform(post("/api/auth/add-admin")
                 .header("Authorization", "Bearer admin.jwt")
@@ -191,7 +204,7 @@ class UserRestControllerTest {
     @Test
     @DisplayName("POST /add-admin rejects with 400 when the payload's usertype isn't 'admin'")
     void addAdmin_rejectsWrongUserType() throws Exception {
-        when(jwtUtil.extractRole("superadmin.jwt")).thenReturn("superadmin");
+        authenticate("superadmin");
 
         mockMvc.perform(post("/api/auth/add-admin")
                 .header("Authorization", "Bearer superadmin.jwt")

@@ -158,7 +158,7 @@ public class CQIService {
             lecturerUsername.equals(action.getCreatedBy())
             || (moduleLecturers != null && moduleLecturers.contains(lecturerUsername))
         );
-        if (!owns) {
+        if (!owns && !com.example.Software.project.Backend.Security.CurrentUser.admin()) {
             throw new RuntimeException("You do not have access to this CQI action");
         }
 
@@ -230,7 +230,13 @@ public class CQIService {
     }
 
     public List<CqiAction> getMyPlans(String lecturerUsername) {
-        return cqiActionRepository.findByCreatedByOrderByCreatedAtDesc(lecturerUsername);
+        return cqiActionRepository.findAll().stream().filter(action ->
+                com.example.Software.project.Backend.Security.CurrentUser.admin()
+                || (action.getModule() != null && !Boolean.TRUE.equals(action.getModule().getIsDeleted())
+                    && !Boolean.TRUE.equals(action.getIsDeleted()) && action.getModule().getAssignedLecturerUsernames().contains(lecturerUsername)))
+                .sorted(java.util.Comparator.comparing(CqiAction::getCreatedAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .toList();
     }
 
     // Entry point for POST /api/cqi/finalize/{moduleId}: for every LO in the module, links this

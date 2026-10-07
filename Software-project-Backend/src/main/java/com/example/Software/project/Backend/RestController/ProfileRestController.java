@@ -26,6 +26,7 @@ public class ProfileRestController {
     }
 
     @PostMapping("/profile/change-password")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.changePassword', {'body': #p0, 'auth': #p1})")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body, Authentication auth) {
         try {
             userService.changePassword(auth.getName(), body.get("currentPassword"), body.get("newPassword"));
@@ -36,6 +37,7 @@ public class ProfileRestController {
     }
 
     @GetMapping("/profile/login-activity")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.loginActivity', {'username': #p0, 'auth': #p1})")
     public ResponseEntity<?> loginActivity(@RequestParam(required = false) String username, Authentication auth) {
         String target = auth.getName();
         boolean isAdmin = auth.getAuthorities().stream()
@@ -56,6 +58,7 @@ public class ProfileRestController {
     }
 
     @PostMapping("/messages")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.send', {'body': #p0, 'auth': #p1})")
     public ResponseEntity<?> send(@RequestBody Map<String, String> body, Authentication auth) {
         String recipient = body.get("recipient");
         String content = body.get("content");
@@ -71,16 +74,19 @@ public class ProfileRestController {
     }
 
     @GetMapping("/messages/inbox")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.inbox', {'auth': #p0})")
     public ResponseEntity<List<Message>> inbox(Authentication auth) {
         return ResponseEntity.ok(messageRepo.findByRecipientOrderBySentAtDesc(auth.getName()));
     }
 
     @GetMapping("/messages/unread-count")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.unreadCount', {'auth': #p0})")
     public ResponseEntity<?> unreadCount(Authentication auth) {
         return ResponseEntity.ok(Map.of("count", messageRepo.countByRecipientAndReadFlagFalse(auth.getName())));
     }
 
     @PutMapping("/messages/{id}/read")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.markRead', {'id': #p0, 'auth': #p1})")
     public ResponseEntity<?> markRead(@PathVariable Long id, Authentication auth) {
         return messageRepo.findById(id)
             .filter(m -> m.getRecipient().equals(auth.getName()))
@@ -93,6 +99,7 @@ public class ProfileRestController {
     }
 
     @PutMapping("/messages/read-all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProfileRestController.markAllRead', {'auth': #p0})")
     public ResponseEntity<?> markAllRead(Authentication auth) {
         List<Message> list = messageRepo.findByRecipientOrderBySentAtDesc(auth.getName());
         list.forEach(m -> m.setReadFlag(true));

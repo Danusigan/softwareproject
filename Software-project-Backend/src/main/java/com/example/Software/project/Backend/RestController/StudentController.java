@@ -34,6 +34,7 @@ public class StudentController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/upload")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.upload', {'file': #p0, 'token': #p1})")
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file,
                                      @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
@@ -54,6 +55,7 @@ public class StudentController {
     }
 
     @GetMapping("/template")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.template', {'token': #p0})")
     public ResponseEntity<?> template(@RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
@@ -71,6 +73,7 @@ public class StudentController {
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.list', {'batch': #p0, 'academicYear': #p1, 'deleted': #p2, 'token': #p3})")
     public ResponseEntity<?> list(@RequestParam(required = false) String batch,
                                    @RequestParam(required = false) String academicYear,
                                    @RequestParam(defaultValue = "false") boolean deleted,
@@ -84,6 +87,7 @@ public class StudentController {
 
     // Student IDs contain slashes (EG/2024/6555), so they travel in the body / query string, not the path.
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.create', {'body': #p0, 'token': #p1})")
     public ResponseEntity<?> create(@RequestBody Student body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
@@ -95,6 +99,7 @@ public class StudentController {
     }
 
     @PutMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.update', {'id': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> update(@RequestParam("id") String id, @RequestBody Student body,
                                     @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
@@ -107,6 +112,7 @@ public class StudentController {
     }
 
     @DeleteMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.delete', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> delete(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
@@ -122,6 +128,7 @@ public class StudentController {
     }
 
     @PostMapping("/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.restore', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> restore(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
@@ -142,7 +149,7 @@ public class StudentController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {

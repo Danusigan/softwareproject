@@ -72,13 +72,11 @@ public class ModuleService {
         return moduleRepository.findByModuleIdAndIsDeletedFalse(id);
     }
 
-    // Read All visible to a lecturer: unassigned modules stay visible to everyone
-    // (so modules created before this feature existed don't suddenly disappear);
-    // assigning at least one lecturer scopes that module to just them.
+    // Lecturers must be explicitly assigned. Unassigned modules remain administrator-only.
     public List<Module> getModulesForLecturer(String username) {
         return moduleRepository.findByIsDeletedFalse().stream()
-                .filter(m -> m.getAssignedLecturers() == null || m.getAssignedLecturers().isEmpty()
-                        || m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
+                .filter(m -> m.getAssignedLecturers() != null
+                        && m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
                 .collect(Collectors.toList());
     }
 

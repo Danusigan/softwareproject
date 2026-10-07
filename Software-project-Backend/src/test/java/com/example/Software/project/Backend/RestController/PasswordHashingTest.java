@@ -54,10 +54,12 @@ class PasswordHashingTest {
     @MockBean private AuditLogService audit;
     @MockBean private EmailService email;
     @MockBean private UserAccessRepository access;
+    @MockBean(name="accessPolicy") private com.example.Software.project.Backend.Security.AccessPolicy accessPolicy;
     private Map<String, User> stored;
 
     @BeforeEach
     void setUp() {
+        when(accessPolicy.allow(anyString(), org.mockito.ArgumentMatchers.anyMap())).thenReturn(true);
         stored = new HashMap<>();
         when(repository.findByUsername(anyString())).thenAnswer(call ->
                 Optional.ofNullable(stored.get(call.getArgument(0))));

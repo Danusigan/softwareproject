@@ -291,7 +291,15 @@ public class LOPOMappingService {
     private List<OutcomeMapping> excludeDeleted(List<OutcomeMapping> mappings) {
         return mappings.stream()
             .filter(m -> !Boolean.TRUE.equals(m.getIsDeleted()))
+            .filter(this::visibleToCurrentUser)
             .collect(Collectors.toList());
+    }
+
+    private boolean visibleToCurrentUser(OutcomeMapping mapping) {
+        if (!"lecture".equals(com.example.Software.project.Backend.Security.CurrentUser.role())) return true;
+        var module = mapping.getLearningOutcome() == null ? null : mapping.getLearningOutcome().getModule();
+        return module != null && !Boolean.TRUE.equals(module.getIsDeleted()) && module.getAssignedLecturers() != null && module.getAssignedLecturers().stream()
+                .anyMatch(u -> u.getUserID().equals(com.example.Software.project.Backend.Security.CurrentUser.username()));
     }
 
     /**
@@ -534,21 +542,21 @@ public class LOPOMappingService {
      * Get total mappings count
      */
     public long getTotalMappingsCount() {
-        return mappingRepository.count();
+        return excludeDeleted(mappingRepository.findAll()).size();
     }
 
     /**
      * Get pending mappings count
      */
     public long getPendingMappingsCount() {
-        return mappingRepository.countByStatus(OutcomeMapping.ApprovalStatus.PENDING);
+        return excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.PENDING)).size();
     }
 
     /**
      * Get approved mappings count
      */
     public long getApprovedMappingsCount() {
-        return mappingRepository.countByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        return excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).size();
     }
 
     /**

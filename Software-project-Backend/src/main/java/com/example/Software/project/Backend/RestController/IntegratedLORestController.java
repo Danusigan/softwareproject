@@ -36,7 +36,7 @@ public class IntegratedLORestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "lecture".equalsIgnoreCase(userRole) || isAdmin(token);
         } catch (Exception e) {
             return false;
@@ -47,7 +47,7 @@ public class IntegratedLORestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "admin".equalsIgnoreCase(userRole) || "superadmin".equalsIgnoreCase(userRole);
         } catch (Exception e) {
             return false;
@@ -82,6 +82,7 @@ public class IntegratedLORestController {
      * Create Learning Outcome with PO mappings in one transaction
      */
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.createLOWithMappings', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> createLOWithMappings(
             @RequestBody Map<String, Object> request,
             @RequestHeader("Authorization") String token) {
@@ -137,6 +138,7 @@ public class IntegratedLORestController {
      * Get LO creation form data (suggestions based on module)
      */
     @GetMapping("/form-data/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getCreateFormData', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getCreateFormData(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -164,6 +166,7 @@ public class IntegratedLORestController {
      * Get comprehensive LO details with mappings
      */
     @GetMapping("/{loId}/details")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getLOWithMappings', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getLOWithMappings(@PathVariable String loId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -195,6 +198,7 @@ public class IntegratedLORestController {
      * Update LO mappings (if not approved)
      */
     @PutMapping("/{loId}/mappings")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.updateLOMappings', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> updateLOMappings(
             @PathVariable String loId,
             @RequestBody Map<String, Object> request,
@@ -243,6 +247,7 @@ public class IntegratedLORestController {
      * Get module overview with all LOs and their mapping status
      */
     @GetMapping("/module/{moduleId}/overview")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getModuleOverview', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleOverview(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {

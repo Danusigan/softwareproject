@@ -24,6 +24,7 @@ public class CqiActionController {
 
     // --- LECTURE: List own CQI actions (any status) ---
     @GetMapping("/my-plans")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.getMyPlans', {'token': #p0})")
     public ResponseEntity<?> getMyPlans(@RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only", "status", "ERROR"));
         try {
@@ -36,6 +37,7 @@ public class CqiActionController {
 
     // --- LECTURE: Submit/fill in a CQI plan ---
     @PostMapping("/{id}/submit")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.submitPlan', {'id': #p0, 'dto': #p1, 'token': #p2})")
     public ResponseEntity<?> submitPlan(@PathVariable Long id, @RequestBody CqiPlanDTO dto, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only", "status", "ERROR"));
         try {
@@ -48,6 +50,7 @@ public class CqiActionController {
 
     // --- ADMIN: Review queue ---
     @GetMapping("/pending")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.getPending', {'token': #p0})")
     public ResponseEntity<?> getPending(@RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -59,6 +62,7 @@ public class CqiActionController {
 
     // --- ADMIN: Approved/completed LO plans (review history) ---
     @GetMapping("/lo/history")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.getLoHistory', {'token': #p0})")
     public ResponseEntity<?> getLoHistory(@RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -70,6 +74,7 @@ public class CqiActionController {
 
     // --- ADMIN: Approve a submitted plan ---
     @PutMapping("/{id}/approve")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.approvePlan', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> approvePlan(@PathVariable Long id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -82,6 +87,7 @@ public class CqiActionController {
 
     // --- ADMIN: Return a plan for revision ---
     @PutMapping("/{id}/return")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.returnPlan', {'id': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> returnPlan(@PathVariable Long id, @RequestBody Map<String, String> body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -95,6 +101,7 @@ public class CqiActionController {
 
     // --- ADMIN or owning LECTURE: Full CQI history for a module (accreditation evidence) ---
     @GetMapping("/module/{moduleId}/history")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.getModuleHistory', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleHistory(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token) && !ownsModule(token, moduleId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Access denied", "status", "ERROR"));
@@ -108,6 +115,7 @@ public class CqiActionController {
 
     // --- LECTURE/ADMIN: Finalize a batch's LO attainment for a module — links/triggers CQI ---
     @PostMapping("/finalize/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.finalize', {'moduleId': #p0, 'batch': #p1, 'studentPassThreshold': #p2, 'batchTarget': #p3, 'token': #p4})")
     public ResponseEntity<?> finalize(@PathVariable String moduleId, @RequestParam String batch,
                                       @RequestParam(required = false) Double studentPassThreshold,
                                       @RequestParam(required = false) Double batchTarget,
@@ -131,6 +139,7 @@ public class CqiActionController {
     // Normally piggybacks on /finalize, but exposed standalone for re-checking after PO
     // attainment is recalculated without redoing the LO-level finalize.
     @PostMapping("/trigger-po/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.triggerPoCqi', {'moduleId': #p0, 'batch': #p1, 'poTargetPercent': #p2, 'token': #p3})")
     public ResponseEntity<?> triggerPoCqi(@PathVariable String moduleId, @RequestParam String batch,
                                           @RequestParam(required = false) Double poTargetPercent,
                                           @RequestHeader("Authorization") String token) {
@@ -155,6 +164,7 @@ public class CqiActionController {
 
     // --- ADMIN: Create CQI plan for PO directly from batch report (no approval workflow) ---
     @PostMapping("/po/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.createPoCqiPlan', {'body': #p0, 'token': #p1})")
     public ResponseEntity<?> createPoCqiPlan(@RequestBody Map<String, Object> body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -178,6 +188,7 @@ public class CqiActionController {
 
     // --- ADMIN: List all CQI plans for a batch ---
     @GetMapping("/batch/{batch}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.getCqiPlansForBatch', {'batch': #p0, 'token': #p1})")
     public ResponseEntity<?> getCqiPlansForBatch(@PathVariable String batch, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -190,6 +201,7 @@ public class CqiActionController {
 
     // --- ADMIN: Update CQI plan status ---
     @PutMapping("/{id}/status")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.updateCqiPlanStatus', {'id': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> updateCqiPlanStatus(@PathVariable Long id, @RequestBody Map<String, String> body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -203,6 +215,7 @@ public class CqiActionController {
 
     // --- ADMIN: Update CQI plan details ---
     @PutMapping("/{id}/details")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('CqiActionController.updateCqiPlanDetails', {'id': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> updateCqiPlanDetails(@PathVariable Long id, @RequestBody Map<String, Object> body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
         try {
@@ -251,7 +264,7 @@ public class CqiActionController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {
@@ -265,7 +278,7 @@ public class CqiActionController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("lecture") || role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {

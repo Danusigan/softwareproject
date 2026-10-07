@@ -33,7 +33,7 @@ public class ProgramOutcomeRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "admin".equalsIgnoreCase(userRole) || "superadmin".equalsIgnoreCase(userRole);
         } catch (Exception e) {
             return false;
@@ -61,6 +61,7 @@ public class ProgramOutcomeRestController {
 
     // Create new PO (Admin only)
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.createPO', {'po': #p0, 'token': #p1})")
     public ResponseEntity<?> createPO(@RequestBody ProgramOutcome po, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -84,6 +85,7 @@ public class ProgramOutcomeRestController {
 
     // Update PO (Admin only)
     @PutMapping("/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.updatePO', {'poId': #p0, 'poDetails': #p1, 'token': #p2})")
     public ResponseEntity<?> updatePO(@PathVariable String poId, @RequestBody ProgramOutcome poDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -104,6 +106,7 @@ public class ProgramOutcomeRestController {
 
     // Soft delete PO (Admin only)
     @DeleteMapping("/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.deletePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> deletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -124,7 +127,7 @@ public class ProgramOutcomeRestController {
 
     // Hard delete PO (SuperAdmin only — irreversible, more destructive than the other admin-level actions here)
     @DeleteMapping("/{poId}/permanent")
-    @PreAuthorize("hasAuthority('superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.hardDeletePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> hardDeletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -145,6 +148,7 @@ public class ProgramOutcomeRestController {
 
     // Restore PO (Admin only)
     @PutMapping("/{poId}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.restorePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> restorePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -162,6 +166,7 @@ public class ProgramOutcomeRestController {
 
     // Initialize default POs (Admin only)
     @PostMapping("/initialize-defaults")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.initializeDefaultPOs', {'token': #p0})")
     public ResponseEntity<?> initializeDefaultPOs(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -178,6 +183,7 @@ public class ProgramOutcomeRestController {
 
     // Reorder POs (Admin only)
     @PutMapping("/reorder")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.reorderPOs', {'poIds': #p0, 'token': #p1})")
     public ResponseEntity<?> reorderPOs(@RequestBody List<String> poIds, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -195,7 +201,7 @@ public class ProgramOutcomeRestController {
 
     // Get all active POs
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getAllActivePOs', {'token': #p0})")
     public ResponseEntity<?> getAllActivePOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> pos = poService.getAllActivePOs();
@@ -207,6 +213,7 @@ public class ProgramOutcomeRestController {
 
     // Get all POs including inactive (Admin only)
     @GetMapping("/all-including-inactive")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getAllPOs', {'token': #p0})")
     public ResponseEntity<?> getAllPOs(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -222,7 +229,7 @@ public class ProgramOutcomeRestController {
 
     // Get PO by ID
     @GetMapping("/{poId}")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getPOById', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             Optional<ProgramOutcome> po = poService.getPOById(poId);
@@ -238,7 +245,7 @@ public class ProgramOutcomeRestController {
 
     // Get default Washington Accord POs
     @GetMapping("/defaults")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getDefaultPOs', {'token': #p0})")
     public ResponseEntity<?> getDefaultPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
@@ -250,7 +257,7 @@ public class ProgramOutcomeRestController {
 
     // Get custom POs
     @GetMapping("/custom")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getCustomPOs', {'token': #p0})")
     public ResponseEntity<?> getCustomPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> customPOs = poService.getCustomPOs();
@@ -262,7 +269,7 @@ public class ProgramOutcomeRestController {
 
     // Get POs by category
     @GetMapping("/by-category/{category}")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getPOsByCategory', {'category': #p0, 'token': #p1})")
     public ResponseEntity<?> getPOsByCategory(@PathVariable String category, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             // This would require a new method in service
@@ -277,6 +284,7 @@ public class ProgramOutcomeRestController {
 
     // Health check endpoint
     @GetMapping("/health")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.healthCheck', {:})")
     public ResponseEntity<?> healthCheck() {
         try {
             long totalPOs = poService.getAllPOs().size();

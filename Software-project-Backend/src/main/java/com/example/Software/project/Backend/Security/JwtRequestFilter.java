@@ -52,15 +52,21 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
+            try {
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            if (jwtUtil.validateToken(jwt, userDetails.getUsername())) {
+            if (userDetails.isEnabled() && userDetails.isAccountNonExpired()
+                    && userDetails.isAccountNonLocked() && userDetails.isCredentialsNonExpired()
+                    && jwtUtil.validateToken(jwt, userDetails.getUsername())) {
 
                 UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 usernamePasswordAuthenticationToken
                         .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+            }
+            } catch (org.springframework.security.core.AuthenticationException | io.jsonwebtoken.JwtException | IllegalArgumentException e) {
+                SecurityContextHolder.clearContext();
             }
         }
         chain.doFilter(request, response);

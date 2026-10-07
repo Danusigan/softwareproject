@@ -50,6 +50,7 @@ public class ExcelImportService {
     private ObjectMapper objectMapper;
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch, String markType) {
         try {
             Los los = losRepository.findById(losId)
@@ -162,16 +163,19 @@ public class ExcelImportService {
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType) {
         return importMarksBulk(file, losIds, batch, markType, null, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType, String assignmentLabel) {
         return importMarksBulk(file, losIds, batch, markType, assignmentLabel, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType,
                                   String assignmentLabel, Map<String, Double> perLoMaxMarks) {
         try {
@@ -339,21 +343,25 @@ public class ExcelImportService {
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch) {
         return importMarksOBEFormat(losId, file, batch, "FINAL_EXAM");
     }
 
     // Backward compatibility - defaults to null batch
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importMarksOBEFormat(String losId, MultipartFile file) {
         return importMarksOBEFormat(losId, file, null);
     }
 
     // Alias for standard import if needed, or different logic
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importStudentMarksFromExcel(String losId, MultipartFile file) {
         return importMarksOBEFormat(losId, file, null);
     }
 
     // Backward compatibility
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p1})")
     public void importMarks(MultipartFile file, String losId) throws Exception {
         importMarksOBEFormat(losId, file, null);
     }
@@ -363,11 +371,13 @@ public class ExcelImportService {
      * Expected Excel layout: Student ID | Student Name | Q1 | Q2 | ...
      */
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importTemplate(#p1)")
     public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType) {
         return importQuestionWiseMarks(file, templateId, batch, markType, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importTemplate(#p1)")
     public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType, String assignmentLabel) {
         try {
             if (templateId == null || templateId.trim().isEmpty()) {

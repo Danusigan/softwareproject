@@ -31,6 +31,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("OBEController access-control and validation tests")
 class OBEControllerTest {
+    private void authenticate(String role) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.TestingAuthenticationToken("staff", null, role));
+    }
+    @org.junit.jupiter.api.BeforeEach @org.junit.jupiter.api.AfterEach
+    void clearAuthentication() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
+    // These slice tests isolate controller validation; RbacIntegrationTest exercises the real policy.
+    @MockBean(name="accessPolicy") private com.example.Software.project.Backend.Security.AccessPolicy accessPolicy;
+    @org.junit.jupiter.api.BeforeEach void permitPolicyInSlice() {
+        when(accessPolicy.allow(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyMap())).thenReturn(true);
+    }
+
 
     @Autowired
     private MockMvc mockMvc;
@@ -58,7 +71,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /po/create is rejected with 403 for a lecturer token (admin-only endpoint)")
     void createPO_rejectsLecturerToken() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
 
         mockMvc.perform(post("/api/obe/po/create")
                 .header("Authorization", "Bearer lecturer.jwt")
@@ -70,7 +83,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /export/marks is rejected with 403 without a lecturer/admin token")
     void exportMarks_rejectsUnauthorizedToken() throws Exception {
-        when(jwtUtil.extractRole("student.jwt")).thenReturn("student");
+        authenticate("student");
 
         mockMvc.perform(post("/api/obe/export/marks")
                 .header("Authorization", "Bearer student.jwt")
@@ -84,7 +97,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /export/marks rejects an empty losIds list with 400")
     void exportMarks_rejectsEmptyLosIds() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
 
         mockMvc.perform(post("/api/obe/export/marks")
                 .header("Authorization", "Bearer lecturer.jwt")
@@ -97,7 +110,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /export/marks rejects a threshold outside 0-100 with 400")
     void exportMarks_rejectsOutOfRangeThreshold() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
 
         mockMvc.perform(post("/api/obe/export/marks")
                 .header("Authorization", "Bearer lecturer.jwt")
@@ -110,7 +123,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /export/marks rejects an invalid markType with 400")
     void exportMarks_rejectsInvalidMarkType() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
 
         mockMvc.perform(post("/api/obe/export/marks")
                 .header("Authorization", "Bearer lecturer.jwt")
@@ -123,7 +136,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /export/marks returns the generated workbook as a downloadable file for a valid request")
     void exportMarks_returnsWorkbookForValidRequest() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
         when(excelExportService.generateMarksExcel(anyList(), eq("FINAL_EXAM"), eq("20"), eq(50)))
             .thenReturn(new byte[]{1, 2, 3});
 
@@ -140,7 +153,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /po-attainment is rejected with 403 for a non-lecturer token")
     void poAttainment_rejectsUnauthorizedToken() throws Exception {
-        when(jwtUtil.extractRole("student.jwt")).thenReturn("student");
+        authenticate("student");
 
         mockMvc.perform(post("/api/obe/po-attainment")
                 .header("Authorization", "Bearer student.jwt")
@@ -152,7 +165,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /po-attainment returns 200 with the calculated credits for a lecturer token")
     void poAttainment_succeedsForLecturer() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
         when(poAttainmentService.calculateStudentPOCredits(anyList(), eq("20"), eq(50), eq(0.0)))
             .thenReturn(Map.of("students", Collections.emptyList()));
 
@@ -169,7 +182,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /marks/upload-bulk is rejected with 403 without a lecturer/admin token")
     void uploadBulk_rejectsUnauthorizedToken() throws Exception {
-        when(jwtUtil.extractRole("student.jwt")).thenReturn("student");
+        authenticate("student");
 
         mockMvc.perform(multipart("/api/obe/marks/upload-bulk")
                 .file("excelFile", "content".getBytes())
@@ -182,7 +195,7 @@ class OBEControllerTest {
     @Test
     @DisplayName("POST /marks/upload-bulk rejects the request with 400 when losIds cannot be determined")
     void uploadBulk_rejectsWhenLosIdsMissing() throws Exception {
-        when(jwtUtil.extractRole("lecturer.jwt")).thenReturn("lecture");
+        authenticate("lecture");
         when(excelService.readMetadata(any())).thenReturn(Collections.emptyMap());
 
         mockMvc.perform(multipart("/api/obe/marks/upload-bulk")

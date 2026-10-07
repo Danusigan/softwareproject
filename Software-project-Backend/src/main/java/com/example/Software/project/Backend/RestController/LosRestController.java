@@ -49,6 +49,7 @@ public class LosRestController {
 
     // Create (Lecture Only) - Add to Module
     @PostMapping("/{moduleId}/add")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.addLos', {'moduleId': #p0, 'los': #p1, 'token': #p2})")
     public ResponseEntity<?> addLos(@PathVariable String moduleId, @RequestBody Los los, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -76,6 +77,7 @@ public class LosRestController {
 
     // Read All by Module ID (The main way to get Los)
     @GetMapping("/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getLosByModuleId', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getLosByModuleId(@PathVariable String moduleId, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             java.util.List<Los> losList = losService.getLosByModuleId(moduleId);
@@ -95,6 +97,7 @@ public class LosRestController {
 
     // Read One
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getLosById', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> getLosById(@PathVariable String id, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             java.util.Optional<Los> los = losService.getLosById(id);
@@ -121,6 +124,7 @@ public class LosRestController {
 
     // Update (Lecture Only)
     @PutMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.updateLos', {'id': #p0, 'losDetails': #p1, 'token': #p2})")
     public ResponseEntity<?> updateLos(@PathVariable String id, @RequestBody Los losDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -148,6 +152,7 @@ public class LosRestController {
 
     // Delete (Lecture Only) — soft delete; LO moves to the archive, recoverable via /restore
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.deleteLos', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteLos(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -172,6 +177,7 @@ public class LosRestController {
 
     // Archive (Lecture/Admin) — list soft-deleted Los for a module
     @GetMapping("/module/{moduleId}/deleted")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getDeletedLos', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getDeletedLos(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -195,6 +201,7 @@ public class LosRestController {
 
     // Restore (Lecture/Admin)
     @PutMapping("/{id}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.restoreLos', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> restoreLos(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecture(token)) {
@@ -220,6 +227,7 @@ public class LosRestController {
     // Import student marks directly for a specific LO (Lecture/Admin Only)
     // Only requires Excel file and batch (batch year like 24, 25)
     @PostMapping("/{loId}/marks/import-obe")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.importMarksForLo', {'loId': #p0, 'excelFile': #p1, 'batch': #p2, 'loNumber': #p3, 'token': #p4})")
     public ResponseEntity<?> importMarksForLo(
             @PathVariable String loId,
             @RequestParam("excelFile") MultipartFile excelFile,
@@ -282,6 +290,7 @@ public class LosRestController {
 
     // Update batch number for existing LO marks (Lecture/Admin Only)
     @PutMapping("/{loId}/batch/update")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.updateBatch', {'loId': #p0, 'batchData': #p1, 'token': #p2})")
     public ResponseEntity<?> updateBatch(
             @PathVariable String loId,
             @RequestBody Map<String, String> batchData,
@@ -343,6 +352,7 @@ public class LosRestController {
 
     // Delete batch marks for a specific LO (Lecture/Admin Only)
     @DeleteMapping("/{loId}/batch/{batch}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.deleteBatch', {'loId': #p0, 'batch': #p1, 'token': #p2})")
     public ResponseEntity<?> deleteBatch(
             @PathVariable String loId,
             @PathVariable String batch,
@@ -379,6 +389,7 @@ public class LosRestController {
 
     // Get batches with mark counts for a specific LO (batch-grouped view)
     @GetMapping("/{loId}/batches")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getBatchesByLo', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getBatchesByLo(
             @PathVariable String loId,
             @RequestHeader(value = "Authorization", required = false) String token) {
@@ -418,6 +429,7 @@ public class LosRestController {
 
     // Get all uploaded marks for a specific LO (legacy - returns all marks)
     @GetMapping("/{loId}/marks")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getMarksByLo', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMarksByLo(
             @PathVariable String loId,
             @RequestHeader(value = "Authorization", required = false) String token) {
@@ -457,6 +469,7 @@ public class LosRestController {
 
     // Update one student mark under an LO
     @PutMapping("/{loId}/marks/{markId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.updateMarkByLo', {'loId': #p0, 'markId': #p1, 'body': #p2, 'token': #p3})")
     public ResponseEntity<?> updateMarkByLo(
             @PathVariable String loId,
             @PathVariable Long markId,
@@ -509,6 +522,7 @@ public class LosRestController {
 
     // Delete one student mark under an LO
     @DeleteMapping("/{loId}/marks/{markId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.deleteMarkByLo', {'loId': #p0, 'markId': #p1, 'token': #p2})")
     public ResponseEntity<?> deleteMarkByLo(
             @PathVariable String loId,
             @PathVariable Long markId,
@@ -547,6 +561,7 @@ public class LosRestController {
 
     // Get marks for a specific batch within an LO
     @GetMapping("/{loId}/batches/{batch}/marks")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.getMarksByLoBatch', {'loId': #p0, 'batch': #p1, 'token': #p2})")
     public ResponseEntity<?> getMarksByLoBatch(
             @PathVariable String loId,
             @PathVariable String batch,
@@ -589,6 +604,7 @@ public class LosRestController {
 
     // Delete all marks for a specific batch within an LO
     @DeleteMapping("/{loId}/batches/{batch}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.deleteBatchByLo', {'loId': #p0, 'batch': #p1, 'token': #p2})")
     public ResponseEntity<?> deleteBatchByLo(
             @PathVariable String loId,
             @PathVariable String batch,
@@ -630,6 +646,7 @@ public class LosRestController {
      * Request JSON shape explained in ExcelExportRequest class below.
      */
     @PostMapping(value = "/export-excel", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LosRestController.exportExcel', {'request': #p0})")
     public ResponseEntity<byte[]> exportExcel(@RequestBody ExcelExportRequest request) throws Exception {
         // validate
         if (request.getLos() == null || request.getLos().isEmpty()) {
@@ -740,7 +757,7 @@ public class LosRestController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && ("lecture".equals(role) || "lecturer".equals(role) || "admin".equals(role) || "superadmin".equals(role));
         } catch (Exception e) {

@@ -25,7 +25,7 @@ public class AssessmentController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("lecture") || role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {
@@ -34,6 +34,7 @@ public class AssessmentController {
     }
 
     @PostMapping("/template")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('AssessmentController.createTemplate', {'payload': #p0, 'token': #p1})")
     public ResponseEntity<?> createTemplate(@RequestBody Map<String, Object> payload, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only"));
         try {
@@ -47,6 +48,7 @@ public class AssessmentController {
     }
 
     @GetMapping("/templates/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('AssessmentController.listTemplatesByModule', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> listTemplatesByModule(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only"));
         try {
@@ -63,6 +65,7 @@ public class AssessmentController {
     }
 
     @GetMapping("/template/{templateId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('AssessmentController.getTemplate', {'templateId': #p0, 'token': #p1})")
     public ResponseEntity<?> getTemplate(@PathVariable String templateId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Lecture only"));
         try {

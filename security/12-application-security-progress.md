@@ -5,13 +5,32 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | Order | Feature | Status |
 |---|---|---|
 | 1 | BCrypt password hashing | Implemented and automated checks passed; ready for user push |
-| 2 | Role-based access control | Pending |
+| 2 | Role-based access control | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 3 | Login lockout | Pending |
 | 4 | Account input validation | Pending |
 | 5 | Excel upload validation | Pending |
 | 6 | Audit logging | Pending |
 | 7 | Environment-based secret protection | Pending |
 | 8 | Safer error handling | Pending |
+
+## Feature 2: role-based access control — 2026-10-07
+
+Implemented the approved role matrix and module ownership rules. See [13-rbac-implementation.md](13-rbac-implementation.md) for permissions, enforcement and commit scope.
+
+Verification:
+
+- Full backend suite: **242 passed**, no failures/errors/skips (`mvn -B test`), including **44 real-policy RBAC integration cases** and the existing BCrypt regression tests.
+- Frontend: **28 passed across 5 files** (`npm test -- --maxWorkers=1`). The initial parallel run timed out while starting workers and ran no tests; the single-worker rerun passed. No test assertions were disabled.
+- Production frontend build passed. Existing plugin deprecation and large-bundle warnings remain non-blocking.
+- Live backend started on port 8080 with local MySQL **obqa**, health UP, Flyway V10 validated with no migration needed.
+- Existing Admin, Lecturer and SuperAdmin credentials passed browser login. Each role's module list matched actual database assignments (2 visible modules per existing account). Module/LO reads, account-management restrictions, mapping/CQI review restrictions, profile and CQI access were verified over real HTTP.
+- Workspace, profile, CQI and both existing modules' marks-workbench browser pages loaded for each role with no uncaught JavaScript errors or failed page API requests. Admin/Lecturer could not open SuperAdmin account-management routes. Changing the lecturer's localStorage role did not grant API privileges.
+- `git diff --check` passed; no unmerged Git entries remained. Backend and frontend were left running on ports 8080 and 5173.
+- Positive mutations and cross-module denial cases use isolated H2 transactions; live obqa verification preserves existing application records and assignments, apart from normal login/access logging.
+
+No credential or environment files are included in the feature commit. Generated build output was restored; local verification scripts and results stay outside the intended source commit. Part 3 has not started.
+
+Suggested commit: `feat(security): enforce role and module access controls`
 
 ## Feature 1: BCrypt password hashing — 2026-10-05
 

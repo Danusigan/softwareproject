@@ -66,6 +66,12 @@ export default function Header() {
             {user ? (
               /* Logged in user */
               <div className="flex items-center gap-6 pl-8 border-l border-white/20">
+                {['admin', 'superadmin'].includes(user.userType?.toLowerCase()) && (
+                  <Link to="/admin-dashboard" className="text-xs font-bold">Administration</Link>
+                )}
+                {['lecture', 'admin', 'superadmin'].includes(user.userType?.toLowerCase()) && (
+                  <Link to="/lecturer-dashboard" className="text-xs font-bold">Module workspace</Link>
+                )}
                                <Link to="/profile" className="flex items-center gap-3 group/profile" aria-label="Open my profile">
                                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-sm font-black text-white group-hover/profile:bg-white/30 transition-colors">
                                    {(user.username || '?').slice(0, 2).toUpperCase()}

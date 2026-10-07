@@ -198,14 +198,15 @@ public class UserService {
 
         if (creatorType == null) creatorType = "";
 
-        // Automatically assign role based on creator
-        if (creatorType.equalsIgnoreCase("Superadmin")) {
-            newUser.setUsertype("Admin");
-        } else if (creatorType.equalsIgnoreCase("Admin")) {
-            newUser.setUsertype("Lecture");
-        } else {
+        String requestedRole = newUser.getUsertype();
+        if (!("superadmin".equalsIgnoreCase(creatorType)
+                && java.util.Set.of("admin", "lecture").contains(requestedRole == null ? "" : requestedRole))
+                && !("admin".equalsIgnoreCase(creatorType) && "lecture".equals(requestedRole))) {
             throw new Exception("You are not authorized to add users");
         }
+        // Lockout state is managed by the server, never by the creation request.
+        newUser.setFailedLoginAttempts(0);
+        newUser.setLockedUntil(null);
 
         // Check if user exists
         if (userRepository.findByUsername(newUser.getUserID()).isPresent()) {

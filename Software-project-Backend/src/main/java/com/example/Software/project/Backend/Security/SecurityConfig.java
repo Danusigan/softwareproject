@@ -38,6 +38,17 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
             .csrf(AbstractHttpConfigurer::disable)
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, exception) -> {
+                    response.setStatus(401);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"status\":\"ERROR\",\"message\":\"Authentication required\"}");
+                })
+                .accessDeniedHandler((request, response, exception) -> {
+                    response.setStatus(403);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"status\":\"ERROR\",\"message\":\"Access denied\"}");
+                }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck
                 .requestMatchers("/api/auth/login").permitAll() // Allow login without token
@@ -45,9 +56,7 @@ public class SecurityConfig {
                 // forgot-password always returns a generic response (no email enumeration);
                 // reset-password is guarded by the single-use emailed token.
                 .requestMatchers("/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
-                // create-test-user stays reachable without a token (used to bootstrap the first
-                // test account) but is gated to the dev profile in the controller itself.
-                .requestMatchers("/api/auth/create-test-user").permitAll()
+                // The development account helper requires an authenticated SuperAdmin (method policy).
                 .anyRequest().authenticated() // Everything else, including other /api/auth/** endpoints, needs a valid token
             )
             .sessionManagement(session -> session

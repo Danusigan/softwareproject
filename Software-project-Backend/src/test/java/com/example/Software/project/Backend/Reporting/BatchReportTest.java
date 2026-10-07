@@ -19,6 +19,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class BatchReportTest {
+    private void authenticate(String role) {
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+            new org.springframework.security.authentication.TestingAuthenticationToken("staff", null, role));
+    }
+    @org.junit.jupiter.api.BeforeEach @org.junit.jupiter.api.AfterEach
+    void clearAuthentication() { org.springframework.security.core.context.SecurityContextHolder.clearContext(); }
+
     private Los lo(String id) {
         Module m=new Module(); m.setModuleId("SE101"); m.setModuleName("Engineering");
         Los lo=new Los(); lo.setId(id); lo.setName("Analysis " + id); lo.setModule(m); return lo;
@@ -124,7 +131,7 @@ class BatchReportTest {
         var service=mock(BatchReportService.class); var jwt=mock(JwtUtil.class);
         var mvc=MockMvcBuilders.standaloneSetup(new BatchReportController(service,new BatchReportPdf(),jwt)).build();
         mvc.perform(get("/api/reports/batches/modules").param("batch","22")).andExpect(status().isUnauthorized());
-        when(jwt.extractUsername("ok")).thenReturn("staff"); when(jwt.validateToken("ok","staff")).thenReturn(true); when(jwt.extractRole("ok")).thenReturn("admin");
+        when(jwt.extractUsername("ok")).thenReturn("staff"); when(jwt.validateToken("ok","staff")).thenReturn(true); authenticate("admin");
         var lo=lo("LO1"); var item=item(lo,1);
         var report=batch(List.of(lo),List.of(item),List.of(score(item,"S1",10)),List.of(),70);
         when(service.generate("22",List.of("SE101"),50,70,70,"admin","staff")).thenReturn(report);

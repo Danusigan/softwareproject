@@ -78,4 +78,18 @@ describe('ProtectedRoute', () => {
 
     expect(screen.getByText('Login Page')).toBeInTheDocument()
   })
+
+  it.each([['superadmin', 'admin'], ['superadmin', 'lecture'], ['admin', 'lecture']])(
+    'allows %s to use %s workflows', (role, requiredRole) => {
+      authService.storeLogin('fake-jwt', 'staff', role)
+      renderProtected(requiredRole)
+      expect(screen.getByText('Protected Content')).toBeInTheDocument()
+    },
+  )
+
+  it('keeps admin-account management exclusive to SuperAdmin', () => {
+    authService.storeLogin('fake-jwt', 'staff', 'admin')
+    renderProtected('superadmin')
+    expect(screen.getByText('Landing Page')).toBeInTheDocument()
+  })
 })
