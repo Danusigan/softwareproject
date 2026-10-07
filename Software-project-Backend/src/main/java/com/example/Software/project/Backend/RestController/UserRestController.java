@@ -124,16 +124,20 @@ public class UserRestController {
         } catch (org.springframework.security.authentication.LockedException e) {
             auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "account locked");
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
+            errorResponse.put("message", "Account temporarily locked after too many failed login attempts. Please try again after the 15-minute lockout expires.");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
-        } catch (Exception e) {
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
             userService.recordFailedLogin(loginUser.getUserID());
             auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "invalid credentials");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Login processing failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Unable to sign in right now. Please try again later.", "status", "ERROR"));
         }
     }
 

@@ -77,6 +77,16 @@ class UserRestControllerTest {
 
     // ---- login ----
 
+    @Test void serverFailureDoesNotCountAsWrongPassword() throws Exception {
+        when(authenticationManager.authenticate(any())).thenThrow(
+            new org.springframework.security.authentication.InternalAuthenticationServiceException("database unavailable"));
+        mockMvc.perform(post("/api/auth/login").contentType("application/json")
+            .content("{\"userID\":\"lecturer1\",\"password\":\"pw\"}"))
+            .andExpect(status().isInternalServerError())
+            .andExpect(jsonPath("$.message").value("Unable to sign in right now. Please try again later."));
+        org.mockito.Mockito.verify(userService,org.mockito.Mockito.never()).recordFailedLogin(org.mockito.ArgumentMatchers.anyString());
+    }
+
     @Test
     @DisplayName("login succeeds and returns a token for a user with a valid role")
     void login_succeedsForValidRole() throws Exception {

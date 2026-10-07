@@ -32,26 +32,32 @@ public class UserService {
      * Records a failed login attempt; locks the account for 15 minutes after 5 consecutive failures.
      * No-op if the username doesn't exist (avoids revealing account existence via lockout side-effects).
      */
+    @org.springframework.transaction.annotation.Transactional
     public void recordFailedLogin(String username) {
-        userRepository.findByUsername(username).ifPresent(user -> {
-            int attempts = user.getFailedLoginAttempts() + 1;
-            user.setFailedLoginAttempts(attempts);
-            if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_DURATION_MINUTES));
-            }
-            userRepository.save(user);
+        if (username == null || username.isBlank()) return;
+        userRepository.lockLoginState(username).ifPresent(state -> {
+            LocalDateTime now = LocalDateTime.now();
+            if (state.getLockedUntil() != null && state.getLockedUntil().isAfter(now)) return;
+            // An expired lock starts a fresh attempt window. Active locks are never extended.
+            int previous = state.getLockedUntil() == null ? state.getFailedLoginAttempts() : 0;
+            int attempts = Math.min(previous + 1, MAX_FAILED_LOGIN_ATTEMPTS);
+            LocalDateTime until = attempts >= MAX_FAILED_LOGIN_ATTEMPTS ? now.plusMinutes(LOCKOUT_DURATION_MINUTES) : null;
+            userRepository.updateLoginState(username, attempts, until);
         });
     }
 
     /**
      * Clears failed-attempt state on successful login.
      */
+    @org.springframework.transaction.annotation.Transactional
     public void resetFailedLogins(String username) {
-        userRepository.findByUsername(username).ifPresent(user -> {
-            if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
-                user.setFailedLoginAttempts(0);
-                user.setLockedUntil(null);
-                userRepository.save(user);
+        userRepository.lockLoginState(username).ifPresent(state -> {
+            // A concurrent failure may have locked the account after password verification.
+            if (state.getLockedUntil() != null && state.getLockedUntil().isAfter(LocalDateTime.now())) {
+                throw new org.springframework.security.authentication.LockedException("Account temporarily locked");
+            }
+            if (state.getFailedLoginAttempts() != 0 || state.getLockedUntil() != null) {
+                userRepository.updateLoginState(username, 0, null);
             }
         });
     }
@@ -65,7 +71,7 @@ public class UserService {
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
-            if (passwordEncoder.matches(password, user.getPassword())) {
+            if (!user.isCurrentlyLocked() && passwordEncoder.matches(password, user.getPassword())) {
                 return Optional.of(user);
             }
         }

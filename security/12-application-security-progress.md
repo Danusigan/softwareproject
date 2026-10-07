@@ -6,12 +6,32 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 |---|---|---|
 | 1 | BCrypt password hashing | Implemented and automated checks passed; ready for user push |
 | 2 | Role-based access control | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 3 | Login lockout | Pending |
+| 3 | Login lockout | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 4 | Account input validation | Pending |
 | 5 | Excel upload validation | Pending |
 | 6 | Audit logging | Pending |
 | 7 | Environment-based secret protection | Pending |
 | 8 | Safer error handling | Pending |
+
+## Feature 3: login lockout — 2026-10-07
+
+Completed the existing five-failure/15-minute lockout implementation. Database row locking now preserves concurrent failure counts, expired locks start a fresh attempt window, active locks cannot be extended by retries or cleared by a late successful-login reset, and infrastructure failures do not count as password failures. See [14-login-lockout.md](14-login-lockout.md).
+
+Verification:
+
+- Focused lockout, controller and BCrypt tests: **30 passed**.
+- Full backend suite: **251 passed**, no failures/errors/skips, including eight lockout integration cases, all RBAC tests and BCrypt regressions.
+- Frontend regression suite: **28 passed** (`npm test -- --maxWorkers=1`). No frontend source changes were required; the existing login form displays the backend lockout message.
+- Updated backend started successfully against local **obqa**. No schema migration or credential configuration change was required.
+- Live MySQL checks on a disposable lecturer account: five incorrect passwords persisted a lock, correct-password attempts returned 423, the pre-lock JWT was rejected, repeated requests preserved the deadline, and concurrent incorrect-password requests stopped at exactly five failures without server errors.
+- Live browser checks: locked login displayed the lockout message without creating a session; after simulated expiry, login succeeded and cleared the failure state. Expiry was simulated by backdating only the disposable account's stored deadline by 16 minutes. The first test used SQL `NOW()`, which did not match JDBC timestamp handling; it was corrected to adjust the stored value directly. No application clock or production lockout duration was changed.
+- Existing Admin, Lecturer and SuperAdmin accounts still signed in with unchanged passwords and loaded their dashboards without failed API requests or uncaught browser errors.
+- All disposable accounts were deleted in cleanup. Original users, passwords, module assignments and application records were preserved; normal login/access/audit records were generated.
+- `git diff --check` passed. Backend and frontend remain available on ports 8080 and 5173.
+
+Suggested commit: `fix(security): make login lockout concurrency safe`
+
+Part 4 (account input validation) has not started. Hand this feature back for the user's commit and push first.
 
 ## Feature 2: role-based access control — 2026-10-07
 
