@@ -16,9 +16,8 @@ public class UserService {
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MINUTES = 15;
 
-    // Min 8 chars, at least one lowercase, one uppercase, one digit — per Phase 4 decision.
-    private static final java.util.regex.Pattern PASSWORD_POLICY =
-        java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
+    @Autowired
+    private AccountValidation accountValidation;
 
     @Autowired
     private UserRepository userRepository;
@@ -103,10 +102,7 @@ public class UserService {
         if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
             throw new IllegalArgumentException("Current password is incorrect.");
         }
-        if (newPassword == null || !PASSWORD_POLICY.matcher(newPassword).matches()) {
-            throw new IllegalArgumentException(
-                "New password must be at least 8 characters and include an uppercase letter, a lowercase letter and a number.");
-        }
+        AccountValidation.password(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
@@ -129,13 +125,14 @@ public class UserService {
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not a lecturer");
         }
-        if (email != null && !email.isBlank()) {
+        validateUpdate(user, email, password);
+        if (email != null) {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
             user.setPassword(passwordEncoder.encode(password));
         }
-        return userRepository.save(user);
+        return saveAccount(user);
     }
 
     /**
@@ -168,13 +165,14 @@ public class UserService {
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
             throw new Exception(username + " is not an admin");
         }
-        if (email != null && !email.isBlank()) {
+        validateUpdate(user, email, password);
+        if (email != null) {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
             user.setPassword(passwordEncoder.encode(password));
         }
-        return userRepository.save(user);
+        return saveAccount(user);
     }
 
     /**
@@ -214,32 +212,34 @@ public class UserService {
         newUser.setFailedLoginAttempts(0);
         newUser.setLockedUntil(null);
 
-        // Check if user exists
-        if (userRepository.findByUsername(newUser.getUserID()).isPresent()) {
+        AccountValidation.username(newUser.getUserID());
+        accountValidation.email(newUser.getEmail());
+        AccountValidation.password(newUser.getPassword());
+        // Mirror case-insensitive identity uniqueness on the local MySQL database.
+        if (userRepository.existsByUsernameIgnoreCase(newUser.getUserID())) {
             throw new Exception("Username already exists");
         }
-        if (userRepository.findByEmail(newUser.getEmail()).isPresent()) {
+        if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(newUser.getEmail(), newUser.getUserID())) {
             throw new Exception("Email already exists");
-        }
-
-        if (newUser.getPassword() == null || !PASSWORD_POLICY.matcher(newUser.getPassword()).matches()) {
-            throw new Exception("Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number");
         }
 
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
 
-        return userRepository.save(newUser);
+        return saveAccount(newUser);
     }
 
     /**
      * Creates a test user - for development/testing only
      */
     public User createTestUser(String username, String password, String email, String userType) throws Exception {
+        AccountValidation.username(username);
+        accountValidation.email(email);
+        AccountValidation.password(password);
         // Check if user already exists
-        if (userRepository.findByUsername(username).isPresent()) {
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             throw new Exception("Username already exists");
         }
-        if (userRepository.findByEmail(email).isPresent()) {
+        if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, username)) {
             throw new Exception("Email already exists");
         }
 
@@ -249,6 +249,25 @@ public class UserService {
         testUser.setEmail(email);
         testUser.setUsertype(userType);
 
-        return userRepository.save(testUser);
+        return saveAccount(testUser);
+    }
+
+    private User saveAccount(User user) {
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // The unique database constraints also protect simultaneous duplicate requests.
+            throw new IllegalArgumentException("Username or email already exists, or the account details conflict with an existing record.");
+        }
+    }
+
+    private void validateUpdate(User user, String email, String password) {
+        // Validate the entire change before mutating the managed entity.
+        if (email != null) {
+            accountValidation.email(email);
+            if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, user.getUserID()))
+                throw new IllegalArgumentException("Email already exists");
+        }
+        if (password != null && !password.isBlank()) AccountValidation.password(password);
     }
 }

@@ -1,3 +1,4 @@
+import { passwordError, PASSWORD_RULE } from '../utils/accountValidation'
 import { useState } from 'react'
 import Header from './header'
 import Footer from './footer'
@@ -68,7 +69,7 @@ export default function ProfileView({
 
   const submitPassword = async () => {
     if (!pw.current || !pw.next) { setPwMsg({ type: 'error', text: 'Fill in all fields.' }); return }
-    if (pw.next.length < 8) { setPwMsg({ type: 'error', text: 'New password must be at least 8 characters.' }); return }
+    if (passwordError(pw.next)) { setPwMsg({ type: 'error', text: passwordError(pw.next) }); return }
     if (pw.next !== pw.confirm) { setPwMsg({ type: 'error', text: 'New passwords do not match.' }); return }
     setPwBusy(true); setPwMsg({ type: '', text: '' })
     try {
@@ -168,6 +169,7 @@ export default function ProfileView({
 
             {onChangePassword && (
               <Card title="Reset password">
+                <p className="text-xs text-gray-500 mb-2">{PASSWORD_RULE}</p>
                 <input type="password" placeholder="Current password" value={pw.current}
                   onChange={e => setPw({ ...pw, current: e.target.value })} className={inputCls} />
                 <input type="password" placeholder="New password (min 8 characters)" value={pw.next}

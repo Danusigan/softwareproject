@@ -7,11 +7,26 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | 1 | BCrypt password hashing | Implemented and automated checks passed; ready for user push |
 | 2 | Role-based access control | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 3 | Login lockout | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 4 | Account input validation | Pending |
+| 4 | Account input validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 5 | Excel upload validation | Pending |
 | 6 | Audit logging | Pending |
 | 7 | Environment-based secret protection | Pending |
 | 8 | Safer error handling | Pending |
+
+## Feature 4: account input validation ? 2026-10-08
+
+Implemented shared backend rules for new account details and password changes, plus frontend validation and guidance. See [15-account-input-validation.md](15-account-input-validation.md) for rules, compatibility and verification.
+
+- Full backend suite: **276 passed**, no failures/errors/skips, including 25 new account-validation integration cases and existing BCrypt, RBAC and lockout coverage.
+- Frontend suite: **34 passed across 6 files** (`npm test -- --maxWorkers=1`); production build passed.
+- Backend and frontend ran against local **obqa**. Real browser forms rejected invalid usernames and weak passwords before submission, and created valid Admin and Lecturer accounts that could log in.
+- Live API/MySQL checks rejected invalid and duplicate edits without changing stored email, password or role. An email-only edit preserved the password. Invalid recovery passwords left the token usable; a valid 72-byte password reset succeeded through the browser and allowed login.
+- Existing Admin, Lecturer and SuperAdmin credentials still worked and loaded their dashboards. Temporary accounts and reset tokens were removed; original accounts were preserved. Normal access/audit records were generated.
+- No schema, local credential or environment changes are included. Generated frontend output was restored; local verification helpers and logs are excluded from the source commit.
+
+Suggested commit: `feat(security): validate account details and password changes`
+
+Stop here for the user's commit/push. Part 5 (Excel upload validation) has not started. Earlier sections below retain their historical verification results.
 
 ## Feature 3: login lockout — 2026-10-07
 

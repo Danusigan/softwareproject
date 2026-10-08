@@ -154,6 +154,8 @@ public class UserRestController {
         }
         try {
             passwordResetService.requestReset(email.trim());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
         } catch (Exception e) {
             logger.error("Failed to process forgot-password request for {}", email, e);
         }
@@ -172,10 +174,6 @@ public class UserRestController {
         if (token == null || token.isBlank() || newPassword == null || newPassword.isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Token and new password are required", "status", "ERROR"));
-        }
-        if (newPassword.length() < 6) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Password must be at least 6 characters", "status", "ERROR"));
         }
         try {
             passwordResetService.resetPassword(token, newPassword);
@@ -293,6 +291,7 @@ public class UserRestController {
                 .body(Map.of("message", "Access Denied: Only Admin can update lecturers", "status", "ERROR"));
         }
         try {
+            com.example.Software.project.Backend.Service.AccountValidation.updateFields(body);
             User updated = userService.updateLecturer(username, body.get("email"), body.get("password"));
             return ResponseEntity.ok(Map.of(
                 "message", "Lecturer updated successfully",
@@ -375,6 +374,7 @@ public class UserRestController {
                 .body(Map.of("message", "Access Denied: Only Superadmin can update admins", "status", "ERROR"));
         }
         try {
+            com.example.Software.project.Backend.Service.AccountValidation.updateFields(body);
             User updated = userService.updateAdmin(username, body.get("email"), body.get("password"));
             return ResponseEntity.ok(Map.of(
                 "message", "Admin updated successfully",
@@ -475,14 +475,14 @@ public class UserRestController {
                 .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
         }
         try {
-            User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
+            User testUser = userService.createTestUser("admin", "TestPassword123!", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Test user created successfully");
             response.put("userId", testUser.getUserID());
             response.put("email", testUser.getEmail());
             response.put("userType", testUser.getUsertype());
             response.put("status", "SUCCESS");
-            response.put("loginInfo", "You can now login with username: admin, password: password123");
+            response.put("loginInfo", "You can now login with username: admin, password: TestPassword123!");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, String> errorResponse = new HashMap<>();

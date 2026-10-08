@@ -29,6 +29,8 @@ public interface UserRepository extends JpaRepository<User, String> {
     Optional<User> findByUsertype(String usertype);
     List<User> findAllByUsertype(String usertype);
     Optional<User> findByEmail(String email);
+    boolean existsByUsernameIgnoreCase(String username);
+    boolean existsByEmailIgnoreCaseAndUsernameNot(String email, String username);
     
     // Add explicit method to find by the username field (which is actually userID)
     // This should work since the field name is 'username' in the entity

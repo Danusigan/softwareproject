@@ -36,11 +36,15 @@ public class PasswordResetService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AccountValidation accountValidation;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
     @Transactional
     public void requestReset(String email) {
+        accountValidation.email(email);
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
             // Don't reveal whether the email exists
@@ -62,6 +66,7 @@ public class PasswordResetService {
 
     @Transactional
     public void resetPassword(String token, String newPassword) throws Exception {
+        AccountValidation.password(newPassword);
         PasswordResetToken resetToken = tokenRepository.findByToken(token)
                 .orElseThrow(() -> new Exception("This reset link is invalid or has expired."));
 

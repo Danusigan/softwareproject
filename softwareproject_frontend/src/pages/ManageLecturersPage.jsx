@@ -1,3 +1,4 @@
+import { passwordError, usernameError, PASSWORD_RULE, USERNAME_RULE } from '../utils/accountValidation';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/header';
@@ -77,6 +78,8 @@ export default function ManageLecturersPage() {
 
     const handleTeacherSubmit = async (e) => {
         e.preventDefault();
+        const invalid = usernameError(teacherData.username) || passwordError(teacherData.password);
+        if (invalid) { setMessage({ type: 'error', text: invalid }); return; }
         setLoading(true);
         setMessage({ type: '', text: '' });
 
@@ -315,6 +318,7 @@ export default function ManageLecturersPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
                             <input
                                 type="text"
+                                minLength={3} maxLength={64} title={USERNAME_RULE}
                                 value={teacherData.username}
                                 onChange={(e) => setTeacherData({ ...teacherData, username: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -326,7 +330,7 @@ export default function ManageLecturersPage() {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                             <input
-                                type="email"
+                                type="email" maxLength={254}
                                 value={teacherData.email}
                                 onChange={(e) => setTeacherData({ ...teacherData, email: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -339,12 +343,14 @@ export default function ManageLecturersPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                             <input
                                 type="password"
+                                minLength={8} title={PASSWORD_RULE}
                                 value={teacherData.password}
                                 onChange={(e) => setTeacherData({ ...teacherData, password: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="Enter Password"
+                                placeholder="Enter Password" aria-describedby="new-password-rules"
                                 required
                             />
+                            <p id="new-password-rules" className="text-xs text-gray-500 mt-2">{PASSWORD_RULE}</p>
                         </div>
 
                         <div>
@@ -355,7 +361,6 @@ export default function ManageLecturersPage() {
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             >
                                 <option value="Lecture">Lecture</option>
-                                <option value="Admin">Admin</option>
                             </select>
                         </div>
 
@@ -411,7 +416,7 @@ export default function ManageLecturersPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                                 <input
-                                    type="email"
+                                    type="email" maxLength={254}
                                     value={lecturerEditData.email}
                                     onChange={(e) => setLecturerEditData({ ...lecturerEditData, email: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"

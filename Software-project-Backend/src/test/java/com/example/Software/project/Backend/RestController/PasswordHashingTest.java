@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Real controllers, services, BCrypt and security filters; only storage and side effects are mocked. */
 @WebMvcTest(UserRestController.class)
 @Import({SecurityConfig.class, JwtRequestFilter.class, JwtUtil.class,
-        CustomUserDetailsService.class, UserService.class, PasswordResetService.class})
+        CustomUserDetailsService.class, UserService.class, PasswordResetService.class, AccountValidation.class})
 class PasswordHashingTest {
     private static final String OLD_PASSWORD = "OriginalPass123!";
     private static final String NEW_PASSWORD = "ReplacementPass456!";
@@ -64,6 +64,11 @@ class PasswordHashingTest {
         when(repository.findByUsername(anyString())).thenAnswer(call ->
                 Optional.ofNullable(stored.get(call.getArgument(0))));
         when(repository.save(any(User.class))).thenAnswer(call -> {
+            User user = call.getArgument(0);
+            stored.put(user.getUserID(), user);
+            return user;
+        });
+        when(repository.saveAndFlush(any(User.class))).thenAnswer(call -> {
             User user = call.getArgument(0);
             stored.put(user.getUserID(), user);
             return user;
