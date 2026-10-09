@@ -43,6 +43,8 @@ class ExcelImportServiceTest {
     @Mock
     private StudentAssessmentScoreRepository studentAssessmentScoreRepository;
 
+    @org.mockito.Spy private FileValidationService fileValidationService = new FileValidationService();
+
     @InjectMocks
     private ExcelImportService excelImportService;
 
@@ -143,14 +145,12 @@ class ExcelImportServiceTest {
     }
 
     @Test
-    @DisplayName("skips rows with a blank student index instead of importing garbage")
-    void skipsBlankStudentIndexRows() throws Exception {
+    @DisplayName("rejects nonblank rows with a missing student index without saving marks")
+    void rejectsMissingStudentIndex() throws Exception {
         MockMultipartFile file = workbookOf("Student Index|LO1", "EN001|55", "|60");
-
-        String result = excelImportService.importMarksBulk(file, LOS_IDS, "20", "FINAL_EXAM");
-
-        assertTrue(result.contains("1"), "blank-index row must not be imported: " + result);
-        verify(markRepository, times(1)).save(any());
+        assertThrows(RuntimeException.class, () -> excelImportService.importMarksBulk(file, LOS_IDS, "20", "FINAL_EXAM"));
+        verify(markRepository, never()).save(any());
+        verify(markRepository, never()).deleteByLos_IdAndBatch(any(), any());
     }
 
     @Test
@@ -209,5 +209,35 @@ class ExcelImportServiceTest {
                 java.util.Map.of("LO001", 10.0)));
 
         assertTrue(ex.getMessage().contains("out of range"), ex.getMessage());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"NaN","Infinity","oops","-Infinity"})
+    void rejectsInvalidMarksBeforeReplacingExistingData(String value) throws Exception {
+        var file=workbookOf("Student Index|LO1", "EN001|50", "EN002|"+value);
+        assertThrows(RuntimeException.class,()->excelImportService.importMarksBulk(file,LOS_IDS,"20","FINAL_EXAM"));
+        verifyNoInteractions(markRepository);
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"Student Index|LO1", "Wrong|LO1", "Student Index|", "Student Index|LO1|Extra"})
+    void rejectsEmptyOrWrongTemplates(String header) throws Exception {
+        var file=workbookOf(header);
+        assertThrows(RuntimeException.class,()->excelImportService.importMarksBulk(file,LOS_IDS,"20","FINAL_EXAM"));
+        verifyNoInteractions(markRepository);
+    }
+    @Test void rejectsDuplicateStudentRows() throws Exception {
+        var file=workbookOf("Student Index|LO1","EN001|50","EN001|60");
+        assertThrows(RuntimeException.class,()->excelImportService.importMarksBulk(file,LOS_IDS,"20","FINAL_EXAM"));
+        verifyNoInteractions(markRepository);
+    }
+    @Test void rejectsNonFiniteMaximumMarks() throws Exception {
+        var file=workbookOf("Student Index|LO1","EN001|50");
+        assertThrows(RuntimeException.class,()->excelImportService.importMarksBulk(file,LOS_IDS,"20","FINAL_EXAM",null,java.util.Map.of("LO001",Double.NaN)));
+        verifyNoInteractions(markRepository);
+    }
+    @Test void emptyMarksTemplateCannotDeletePreviousMarks() throws Exception {
+        var file=workbookOf("Student Index|LO1", "EN001|");
+        assertThrows(RuntimeException.class,()->excelImportService.importMarksBulk(file,LOS_IDS,"20","FINAL_EXAM"));
+        verifyNoInteractions(markRepository);
     }
 }

@@ -32,6 +32,11 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(com.example.Software.project.Backend.Service.FileValidationService.InvalidUpload.class)
+    public ResponseEntity<?> handleInvalidUpload(Exception e) {
+        return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<?> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException e) {
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)

@@ -1,3 +1,4 @@
+import { excelFileError, EXCEL_UPLOAD_HELP } from '../utils/excelValidation'
 import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
@@ -43,17 +44,19 @@ export default function AddResultsPage() {
         setDragActive(false);
         if (e.dataTransfer.files?.[0]) {
             const droppedFile = e.dataTransfer.files[0];
-            if (droppedFile.name.endsWith('.xlsx') || droppedFile.name.endsWith('.xls')) {
+            if (!excelFileError(droppedFile)) {
                 setFile(droppedFile);
             } else {
-                setMessage({ type: 'error', text: 'Please upload an Excel file (.xlsx or .xls).' });
+                setFile(null); setMessage({ type: 'error', text: excelFileError(droppedFile) });
             }
         }
     };
 
     const handleChange = (e) => {
         if (e.target.files?.[0]) {
-            setFile(e.target.files[0]);
+            const selected = e.target.files[0];
+            setFile(excelFileError(selected) ? null : selected);
+            setMessage({ type: excelFileError(selected) ? 'error' : '', text: excelFileError(selected) });
         }
     };
 
@@ -107,22 +110,14 @@ export default function AddResultsPage() {
                 return;
             }
 
+            const error = excelFileError(file);
+            if (error) { setMessage({ type: 'error', text: error }); return; }
             const formData = new FormData();
             formData.append('excelFile', file);
             formData.append('batch', batch);
             formData.append('loNumber', loNumber);
 
-            // If editing with new file, first delete old batch
-            if (isEditMode && location.state.batch) {
-                await axios.delete(
-                    `/api/lospos/${loId}/batch/${location.state.batch}`,
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    }
-                );
-            }
+            if (isEditMode && location.state.batch) formData.append('replaceBatch', location.state.batch);
 
             // Import marks directly for the selected LO
             await axios.post(
@@ -142,7 +137,7 @@ export default function AddResultsPage() {
             console.error('Upload flow failed:', err);
             setMessage({
                 type: 'error',
-                text: err.response?.data?.message || err.response?.data || 'Failed to process results'
+                text: err.response?.data?.error || err.response?.data?.message || err.response?.data || 'Failed to process results'
             });
         } finally {
             setLoading(false);
@@ -224,7 +219,7 @@ export default function AddResultsPage() {
                                 type="file"
                                 className="hidden"
                                 onChange={handleChange}
-                                accept=".xlsx,.xls"
+                                title={EXCEL_UPLOAD_HELP} accept=".xlsx,.xls"
                             />
 
                             <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 text-indigo-600 transition-transform group-hover:scale-110 duration-300">
@@ -244,7 +239,7 @@ export default function AddResultsPage() {
                                     {file ? file.name : (isEditMode && existingFileName ? existingFileName : 'Drop your file here')}
                                 </h3>
                                 <p className="text-slate-500 text-sm">
-                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : (isEditMode && existingFileName ? 'Current file - Upload new to replace' : 'Click to browse or drag & drop (Excel .xlsx/.xls)')}
+                                    {file ? `${(file.size / 1024).toFixed(1)} KB` : (isEditMode && existingFileName ? 'Current file - Upload new to replace' : 'Excel .xlsx/.xls, maximum 5 MB. Paste values instead of formulas.')}
                                 </p>
                             </div>
 

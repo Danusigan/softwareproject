@@ -8,10 +8,29 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | 2 | Role-based access control | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 3 | Login lockout | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 4 | Account input validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 5 | Excel upload validation | Pending |
+| 5 | Excel upload validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 6 | Audit logging | Pending |
 | 7 | Environment-based secret protection | Pending |
 | 8 | Safer error handling | Pending |
+
+## Feature 5: Excel upload validation ? 2026-10-09
+
+Implemented shared workbook validation, template/row checks and transactional replacement handling. See [16-excel-upload-validation.md](16-excel-upload-validation.md) for limits, supported formats and compatibility details.
+
+- Reject empty/oversized files, spoofed or malformed Excel content, unsafe cells, oversized workbook structures, incorrect headers, duplicate/missing student IDs and invalid/non-finite/out-of-range marks.
+- Keep support for `.xls` and `.xlsx` and the application's existing template layouts. An unfilled marks template cannot clear existing results.
+- Replace the older frontend delete-before-upload sequence with one transactional backend replacement, including attachment storage. Invalid student edits, mark replacements and question imports preserve existing data.
+- Final full backend suite: **313 passed**, no failures/errors/skips (`mvn -B test`), including 12 real-controller/persistence upload integration cases, workbook-limit tests and existing BCrypt/RBAC/lockout/input-validation coverage.
+- Frontend: **42 passed across 7 files** (`npm test -- --maxWorkers=1`). Production build passed; existing non-blocking build warnings remain.
+- Live browser and HTTP checks against local **obqa** passed: client-side extension/empty/size rejection, server-side spoofed-file rejection, actual multipart HTTP 413, and successful import of edited student/LO/question templates downloaded from this application.
+- Live database assertions confirmed rejected student edits, invalid and empty marks templates, and failed replacements preserved previous records/scores/attachments. Valid replacements succeeded. All temporary records were deleted and original counts of the eight affected tables were restored; normal access/audit records were generated.
+- Original Admin, Lecturer and SuperAdmin credentials still signed in and loaded their dashboards without uncaught browser errors or failed dashboard API calls.
+- `git diff --check` passed; no unmerged entries or source conflict markers found. Generated frontend output was restored. No schema migration, credential or environment-file change is included.
+- Backend and frontend are running on ports 8080 and 5173. Use **http://localhost:5173/**.
+
+Suggested commit: `feat(security): validate Excel uploads and preserve rejected replacements`
+
+Stop here for the user's commit/push. Part 6 (audit logging) has not started. The sections below retain earlier feature checkpoints.
 
 ## Feature 4: account input validation ? 2026-10-08
 

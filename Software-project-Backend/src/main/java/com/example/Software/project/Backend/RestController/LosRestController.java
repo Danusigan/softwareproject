@@ -233,7 +233,8 @@ public class LosRestController {
             @RequestParam("excelFile") MultipartFile excelFile,
             @RequestParam(value = "batch", required = true) String batch,
             @RequestParam(value = "loNumber", required = false) String loNumber,
-            @RequestHeader("Authorization") String token) {
+            @RequestHeader("Authorization") String token,
+            @RequestParam(value = "replaceBatch", required = false) String replaceBatch) {
         try {
             if (!isLecture(token)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -252,7 +253,7 @@ public class LosRestController {
 
             // Check if batch already exists for this LO
             long existingBatchCount = studentMarkRepository.countByLos_IdAndBatch(loId, batch);
-            if (existingBatchCount > 0) {
+            if (existingBatchCount > 0 && !batch.equals(replaceBatch)) {
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                         .body(Map.of(
                                 "message", "Batch " + batch + " already exists for this Learning Outcome. Please use edit to update existing batch.",
@@ -260,13 +261,8 @@ public class LosRestController {
                         ));
             }
 
-            // Store file info in Los entity (batch is stored per StudentMark record, not on LO)
-            los.setFileName(excelFile.getOriginalFilename());
-            los.setMarksCsvFile(excelFile.getBytes());
-            losService.updateLos(loId, los);
-
-            // Import marks directly to StudentMark (pass batch to service)
-            String result = excelImportService.importMarksOBEFormat(loId, excelFile, batch);
+            // Keep validated marks and their attachment in one transaction.
+            String result = excelImportService.importMarksWithAttachment(loId, excelFile, batch, replaceBatch);
 
             return ResponseEntity.ok(Map.of(
                     "message", "Student marks imported successfully (LO OBE Format)",

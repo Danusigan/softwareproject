@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
         "spring.datasource.username=sa",
         "logging.level.org.springframework=WARN", "logging.level.org.hibernate=WARN"}, showSql = false)
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({ExcelImportService.class, POAttainmentService.class, CQIService.class,
+@Import({FileValidationService.class, ExcelImportService.class, POAttainmentService.class, CQIService.class,
         AttainmentService.class, JacksonAutoConfiguration.class})
 class MarksToPoPipelineTest {
 

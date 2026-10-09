@@ -65,6 +65,7 @@ public class AccessPolicy {
 
     public boolean allow(String operation, Map<String,Object> args) {
         try { return authorize(operation, args); }
+        catch (com.example.Software.project.Backend.Service.FileValidationService.InvalidUpload invalid) { throw invalid; }
         catch (AccessDeniedException | IllegalArgumentException | org.springframework.web.server.ResponseStatusException exception) { return false; }
     }
     public boolean importLos(String[] ids) {
