@@ -9,9 +9,28 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | 3 | Login lockout | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 4 | Account input validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 5 | Excel upload validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 6 | Audit logging | Pending |
+| 6 | Audit logging | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 7 | Environment-based secret protection | Pending |
 | 8 | Safer error handling | Pending |
+
+## Feature 6: audit logging - 2026-10-12
+
+Completed shared request audit coverage, safe event storage, configurable retention and recovery-event logging. See [17-audit-logging.md](17-audit-logging.md) for event scope, transaction/failure behavior and operational settings.
+
+- API mutations, sensitive report/export reads and denied/failed requests now record actor, operation, bounded resource identifiers, outcome, HTTP status, UTC timestamp and a server-generated request ID. Existing semantic login/account/PO/mapping records are retained; password recovery records its account after commit.
+- Request bodies, upload contents, query strings, Authorization headers and response payloads are not copied into audit records. Approval remarks were removed from audit details. Fields are bounded/sanitized; default HTTP body and JDBC bind logging are suppressed.
+- Success service events wait for business commit. Independent audit transactions preserve failure events across rollback. Storage/cleanup failures have sanitized logs and counters and do not poison business commits. Default retention is configurable at 90 days, with daily 03:00 UTC cleanup.
+- Final backend suite: **329 passed**, zero failures/errors/skips (`mvn -B test`), including 10 audit integration tests and 6 filter tests. Tests cover rollback, commit, storage failure/recovery, retention failure/recovery, correlation, actor/outcome, privacy, UTC conversion, sensitive reads and thrown exceptions.
+- Frontend regression suite: **42 passed across 7 files** (`npm test -- --maxWorkers=1`). No frontend source changes were needed for this feature.
+- Live MySQL verification identified and fixed a 5.5-hour JDBC timestamp offset. The audit-only converter now writes the intended UTC instant with the existing UTC JDBC connection; other application timestamps and existing history were not rewritten.
+- Live **obqa** checks passed for account edits, bad input, failed/successful login, denied actions, module assignments, report access and recovery. Stored request IDs, actors, outcomes and UTC timestamps matched actual requests; tested passwords, private email and reset/JWT tokens were absent from the new audit rows.
+- Browser/API upload regressions passed, including actual HTTP 413, downloaded student/LO/question templates, invalid/empty mark rejection and replacement rollback. Each instrumented upload had exactly one HTTP audit event with the matching outcome. Temporary data was removed and original affected-table counts restored.
+- Original Admin, Lecturer and SuperAdmin credentials still logged in and loaded their dashboards without uncaught browser errors or failed dashboard API requests. Temporary account/module/token records were removed; audit/access evidence remains. Retention purging was tested only in H2, not against the user's history.
+- `git diff --check` passed; no unmerged entries remain. No schema migration, local credential-file or generated frontend changes are included. Backend/frontend remain running on ports 8080/5173.
+
+Suggested commit: `feat(security): record safe transactional application audit events`
+
+Stop here for the user's commit/push. Part 7 (environment-based secret protection) has not started. Earlier checkpoints below are historical.
 
 ## Feature 5: Excel upload validation ? 2026-10-09
 

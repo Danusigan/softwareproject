@@ -34,7 +34,7 @@ public class SecurityConfig {
     private CustomUserDetailsService userDetailsService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuditTrailFilter auditTrailFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
             .csrf(AbstractHttpConfigurer::disable)
@@ -63,9 +63,22 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(auditTrailFilter, JwtRequestFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AuditTrailFilter auditTrailFilter(com.example.Software.project.Backend.Service.AuditLogService audit) {
+        return new AuditTrailFilter(audit);
+    }
+
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<AuditTrailFilter> auditFilterRegistration(AuditTrailFilter filter) {
+        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+        registration.setEnabled(false); // Runs only inside the security chain, where the actor is available.
+        return registration;
     }
 
     @Bean

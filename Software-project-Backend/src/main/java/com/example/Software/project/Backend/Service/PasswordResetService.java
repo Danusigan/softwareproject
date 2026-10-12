@@ -25,6 +25,9 @@ public class PasswordResetService {
     private static final long TOKEN_EXPIRY_MINUTES = 30;
 
     @Autowired
+    private AuditLogService auditLogService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -82,5 +85,6 @@ public class PasswordResetService {
 
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
+        auditLogService.log(user.getUserID(), "PASSWORD_RESET", user.getUserID(), "SUCCESS", null);
     }
 }

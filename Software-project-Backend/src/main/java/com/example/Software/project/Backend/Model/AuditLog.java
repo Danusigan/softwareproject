@@ -30,6 +30,7 @@ public class AuditLog {
 
     private String details;
 
+    @jakarta.persistence.Convert(converter = AuditTimestampConverter.class)
     private LocalDateTime timestamp;
 
     public AuditLog() {
@@ -41,7 +42,7 @@ public class AuditLog {
         this.target = target;
         this.outcome = outcome;
         this.details = details;
-        this.timestamp = LocalDateTime.now();
+        this.timestamp = LocalDateTime.now(java.time.ZoneOffset.UTC);
     }
 
     public Long getId() {
