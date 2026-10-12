@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -103,7 +104,8 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getAllMappings(moduleId, status, batch, search);
             return ResponseEntity.ok(createSuccessResponse("Mappings retrieved successfully", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -124,7 +126,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Mapping statistics retrieved", statistics));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving statistics: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving statistics: " + SafeErrors.message(e)));
         }
     }
 
@@ -166,7 +169,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Mapping suggestions generated", enrichedSuggestions));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error generating suggestions: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error generating suggestions: " + SafeErrors.message(e)));
         }
     }
 
@@ -191,9 +195,10 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> createdMappings = mappingService.createMappings(loId, mappings, username, remarks);
             return ResponseEntity.ok(createSuccessResponse("Mappings created successfully", createdMappings));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -209,7 +214,8 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getMappingsForLO(loId);
             return ResponseEntity.ok(createSuccessResponse("Mappings retrieved", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -225,7 +231,8 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getMappingsForModule(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Module mappings retrieved", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -247,9 +254,10 @@ public class LOPOMappingRestController {
             OutcomeMapping updatedMapping = mappingService.updateMapping(mappingId, newWeight, lecturerRemarks);
             return ResponseEntity.ok(createSuccessResponse("Mapping updated successfully", updatedMapping));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating mapping: " + SafeErrors.message(e)));
         }
     }
 
@@ -265,9 +273,10 @@ public class LOPOMappingRestController {
             mappingService.deleteMapping(mappingId, extractUsername(token));
             return ResponseEntity.ok(createSuccessResponse("Mapping moved to archive", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error deleting mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error deleting mapping: " + SafeErrors.message(e)));
         }
     }
 
@@ -282,7 +291,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Deleted mappings retrieved", mappingService.getDeletedMappings()));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving deleted mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving deleted mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -298,9 +308,10 @@ public class LOPOMappingRestController {
             OutcomeMapping restored = mappingService.restoreMapping(mappingId);
             return ResponseEntity.ok(createSuccessResponse("Mapping restored from archive", restored));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error restoring mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error restoring mapping: " + SafeErrors.message(e)));
         }
     }
 
@@ -316,7 +327,8 @@ public class LOPOMappingRestController {
             Map<String, Object> stats = mappingService.getMappingStatistics(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Statistics retrieved", stats));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving statistics: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving statistics: " + SafeErrors.message(e)));
         }
     }
 
@@ -334,7 +346,8 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> pendingMappings = mappingService.getPendingMappings();
             return ResponseEntity.ok(createSuccessResponse("Pending mappings retrieved", pendingMappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving pending mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving pending mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -357,7 +370,8 @@ public class LOPOMappingRestController {
             auditLogService.log(username, "MAPPING_APPROVE", String.valueOf(mappingId), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Mapping approved successfully", approvedMapping));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error approving mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error approving mapping: " + SafeErrors.message(e)));
         }
     }
 
@@ -384,7 +398,8 @@ public class LOPOMappingRestController {
             auditLogService.log(username, "MAPPING_REJECT", String.valueOf(mappingId), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Mapping rejected", rejectedMapping));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error rejecting mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error rejecting mapping: " + SafeErrors.message(e)));
         }
     }
 
@@ -409,7 +424,8 @@ public class LOPOMappingRestController {
                 "mappings", approvedMappings
             )));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error bulk approving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error bulk approving mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -425,7 +441,8 @@ public class LOPOMappingRestController {
             Map<String, Object> report = mappingService.getModuleMappingReport(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Module mapping report generated", report));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error generating report: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error generating report: " + SafeErrors.message(e)));
         }
     }
 
@@ -439,7 +456,8 @@ public class LOPOMappingRestController {
             List<com.example.Software.project.Backend.Model.ProgramOutcome> pos = poService.getAllActivePOs();
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes retrieved", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
@@ -456,7 +474,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO-PO Mapping system is healthy", healthData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Health check failed: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Health check failed: " + SafeErrors.message(e)));
         }
     }
 }

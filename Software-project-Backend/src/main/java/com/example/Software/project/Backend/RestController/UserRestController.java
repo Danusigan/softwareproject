@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -135,8 +136,8 @@ public class UserRestController {
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         } catch (Exception e) {
-            logger.error("Login processing failed", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Unable to sign in right now. Please try again later.", "status", "ERROR"));
         }
     }
@@ -155,9 +156,9 @@ public class UserRestController {
         try {
             passwordResetService.requestReset(email.trim());
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         } catch (Exception e) {
-            logger.error("Failed to process forgot-password request for {}", email, e);
+            SafeErrors.log(e);
         }
         return ResponseEntity.ok(Map.of(
             "message", "If an account with that email exists, a password reset link has been sent.",
@@ -179,7 +180,8 @@ public class UserRestController {
             passwordResetService.resetPassword(token, newPassword);
             return ResponseEntity.ok(Map.of("message", "Password reset successful. You can now log in.", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -213,10 +215,11 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add admin: " + e.getMessage());
+            errorResponse.put("message", "Failed to add admin: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
@@ -250,10 +253,11 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add lecturer: " + e.getMessage());
+            errorResponse.put("message", "Failed to add lecturer: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
@@ -299,7 +303,8 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -315,7 +320,8 @@ public class UserRestController {
             userService.deleteLecturer(username);
             return ResponseEntity.ok(Map.of("message", "Lecturer deleted successfully", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -337,7 +343,8 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -382,7 +389,8 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -398,7 +406,8 @@ public class UserRestController {
             userService.deleteAdmin(username);
             return ResponseEntity.ok(Map.of("message", "Admin deleted successfully", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -436,10 +445,11 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add user: " + e.getMessage());
+            errorResponse.put("message", "Failed to add user: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
@@ -461,7 +471,8 @@ public class UserRestController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "User not found", "status", "ERROR"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -485,10 +496,11 @@ public class UserRestController {
             response.put("loginInfo", "You can now login with username: admin, password: TestPassword123!");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to create test user: " + e.getMessage());
+            errorResponse.put("message", "Failed to create test user: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 

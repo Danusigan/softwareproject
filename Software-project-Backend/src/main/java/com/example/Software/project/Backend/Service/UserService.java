@@ -1,5 +1,7 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
+import com.example.Software.project.Backend.Security.PublicValidationException;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,9 +100,9 @@ public class UserService {
      */
     public void changePassword(String username, String currentPassword, String newPassword) {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Current password is incorrect.");
+            throw new PublicValidationException("Current password is incorrect.");
         }
         AccountValidation.password(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -121,9 +123,9 @@ public class UserService {
      */
     public User updateLecturer(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found"));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not a lecturer");
+            throw new PublicValidationException("The account is not a lecturer");
         }
         validateUpdate(user, email, password);
         if (email != null) {
@@ -141,9 +143,9 @@ public class UserService {
      */
     public void deleteLecturer(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found"));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not a lecturer");
+            throw new PublicValidationException("The account is not a lecturer");
         }
         moduleService.removeLecturerFromAllModules(username);
         userRepository.delete(user);
@@ -161,9 +163,9 @@ public class UserService {
      */
     public User updateAdmin(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not an admin");
+            throw new PublicValidationException("The account is not an admin");
         }
         validateUpdate(user, email, password);
         if (email != null) {
@@ -180,9 +182,9 @@ public class UserService {
      */
     public void deleteAdmin(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not an admin");
+            throw new PublicValidationException("The account is not an admin");
         }
         userRepository.delete(user);
     }
@@ -195,7 +197,7 @@ public class UserService {
     public User addUser(User newUser, String creatorUsername) throws Exception {
         Optional<User> creatorOptional = userRepository.findByUsername(creatorUsername);
         if (creatorOptional.isEmpty()) {
-            throw new Exception("Creator user not found");
+            throw new ResourceNotFoundException("Creator user not found");
         }
         User creator = creatorOptional.get();
         String creatorType = creator.getUsertype();
@@ -206,7 +208,7 @@ public class UserService {
         if (!("superadmin".equalsIgnoreCase(creatorType)
                 && java.util.Set.of("admin", "lecture").contains(requestedRole == null ? "" : requestedRole))
                 && !("admin".equalsIgnoreCase(creatorType) && "lecture".equals(requestedRole))) {
-            throw new Exception("You are not authorized to add users");
+            throw new PublicValidationException("You are not authorized to add users");
         }
         // Lockout state is managed by the server, never by the creation request.
         newUser.setFailedLoginAttempts(0);
@@ -217,10 +219,10 @@ public class UserService {
         AccountValidation.password(newUser.getPassword());
         // Mirror case-insensitive identity uniqueness on the local MySQL database.
         if (userRepository.existsByUsernameIgnoreCase(newUser.getUserID())) {
-            throw new Exception("Username already exists");
+            throw new PublicValidationException("Username already exists");
         }
         if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(newUser.getEmail(), newUser.getUserID())) {
-            throw new Exception("Email already exists");
+            throw new PublicValidationException("Email already exists");
         }
 
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
@@ -237,10 +239,10 @@ public class UserService {
         AccountValidation.password(password);
         // Check if user already exists
         if (userRepository.existsByUsernameIgnoreCase(username)) {
-            throw new Exception("Username already exists");
+            throw new PublicValidationException("Username already exists");
         }
         if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, username)) {
-            throw new Exception("Email already exists");
+            throw new PublicValidationException("Email already exists");
         }
 
         User testUser = new User();
@@ -257,7 +259,7 @@ public class UserService {
             return userRepository.saveAndFlush(user);
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             // The unique database constraints also protect simultaneous duplicate requests.
-            throw new IllegalArgumentException("Username or email already exists, or the account details conflict with an existing record.");
+            throw new PublicValidationException("Username or email already exists, or the account details conflict with an existing record.");
         }
     }
 
@@ -266,7 +268,7 @@ public class UserService {
         if (email != null) {
             accountValidation.email(email);
             if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, user.getUserID()))
-                throw new IllegalArgumentException("Email already exists");
+                throw new PublicValidationException("Email already exists");
         }
         if (password != null && !password.isBlank()) AccountValidation.password(password);
     }

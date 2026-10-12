@@ -329,8 +329,7 @@ public class POAttainmentService {
             if (losIds.isEmpty()) return;
             calculateStudentPOCredits(losIds, batch, 50, 0.0);
         } catch (Exception e) {
-            log.warn("Auto-recalculation of PO attainment failed for module {} batch {}: {}",
-                    moduleId, batch, e.getMessage());
+            com.example.Software.project.Backend.Security.SafeErrors.log(e);
         }
     }
 

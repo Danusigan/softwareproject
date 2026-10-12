@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.PublicValidationException;
 import com.example.Software.project.Backend.Model.PasswordResetToken;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.PasswordResetTokenRepository;
@@ -71,14 +72,14 @@ public class PasswordResetService {
     public void resetPassword(String token, String newPassword) throws Exception {
         AccountValidation.password(newPassword);
         PasswordResetToken resetToken = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new Exception("This reset link is invalid or has expired."));
+                .orElseThrow(() -> new PublicValidationException("This reset link is invalid or has expired."));
 
         if (resetToken.isUsed() || resetToken.isExpired()) {
-            throw new Exception("This reset link is invalid or has expired.");
+            throw new PublicValidationException("This reset link is invalid or has expired.");
         }
 
         User user = userRepository.findByUsername(resetToken.getUserId())
-                .orElseThrow(() -> new Exception("Account no longer exists."));
+                .orElseThrow(() -> new PublicValidationException("Account no longer exists."));
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);

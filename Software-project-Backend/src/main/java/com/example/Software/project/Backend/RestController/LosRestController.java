@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.StudentMark;
 import com.example.Software.project.Backend.Security.JwtUtil;
@@ -68,8 +69,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -88,8 +90,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -115,8 +118,9 @@ public class LosRestController {
                 "status", "ERROR"
             )));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -143,8 +147,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -168,8 +173,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -192,8 +198,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -217,8 +224,9 @@ public class LosRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -275,10 +283,11 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of(
                             "message", "Failed to import student marks for LO",
-                            "error", e.getMessage(),
+                            "error", SafeErrors.message(e),
                             "status", "ERROR"
                     ));
         }
@@ -337,10 +346,11 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of(
                             "message", "Failed to update batch",
-                            "error", e.getMessage(),
+                            "error", SafeErrors.message(e),
                             "status", "ERROR"
                     ));
         }
@@ -374,10 +384,11 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of(
                             "message", "Failed to delete batch",
-                            "error", e.getMessage(),
+                            "error", SafeErrors.message(e),
                             "status", "ERROR"
                     ));
         }
@@ -416,8 +427,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }
@@ -456,8 +468,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }
@@ -509,8 +522,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }
@@ -548,8 +562,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }
@@ -591,8 +606,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }
@@ -630,8 +646,9 @@ public class LosRestController {
                     "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                    "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                    "message", "Error: " + SafeErrors.message(e),
                     "status", "ERROR"
             ));
         }

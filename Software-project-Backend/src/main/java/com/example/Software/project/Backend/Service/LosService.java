@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.AssessmentItem;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.Module;
@@ -50,7 +51,7 @@ public class LosService {
     private String resolveStoredLosId(String id) throws Exception {
         String normalized = normalizeLoId(id);
         if (normalized == null || normalized.isEmpty()) {
-            throw new Exception("Los ID is required");
+            throw new IllegalArgumentException("Los ID is required");
         }
 
         if (losRepository.existsById(normalized)) {
@@ -62,26 +63,26 @@ public class LosService {
             return suffixMatches.get(0).getId();
         }
         if (suffixMatches.size() > 1) {
-            throw new Exception("Multiple modules contain Los ID '" + normalized + "'. Use module-specific Los ID.");
+            throw new IllegalArgumentException("Multiple modules contain Los ID '" + normalized + "'. Use module-specific Los ID.");
         }
 
-        throw new Exception("Los not found");
+        throw new ResourceNotFoundException("Los not found");
     }
 
     // Create (Lecture) - Add to Module
     public Los addLosToModule(String moduleId, Los los) throws Exception {
         Optional<Module> moduleOptional = moduleRepository.findById(moduleId);
         if (moduleOptional.isEmpty()) {
-            throw new Exception("Module not found");
+            throw new ResourceNotFoundException("Module not found");
         }
         String requestedLoId = normalizeLoId(los.getId());
         if (requestedLoId == null || requestedLoId.isEmpty()) {
-            throw new Exception("Los ID is required");
+            throw new IllegalArgumentException("Los ID is required");
         }
 
         String storedLosId = buildModuleScopedLosId(moduleId, requestedLoId);
         if (losRepository.existsById(storedLosId)) {
-            throw new Exception("Los ID already exists for this module");
+            throw new IllegalArgumentException("Los ID already exists for this module");
         }
 
         los.setId(storedLosId);
@@ -108,7 +109,7 @@ public class LosService {
     public Los updateLos(String id, Los losDetails) throws Exception {
         String storedLosId = resolveStoredLosId(id);
         Los los = losRepository.findById(storedLosId)
-            .orElseThrow(() -> new Exception("Los not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Los not found"));
 
         los.setName(losDetails.getName());
         if (losDetails.getDescription() != null) {
@@ -134,7 +135,7 @@ public class LosService {
     public void deleteLos(String id, String deletedBy) throws Exception {
         String storedLosId = resolveStoredLosId(id);
         Los los = losRepository.findById(storedLosId)
-                .orElseThrow(() -> new Exception("Los not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Los not found"));
 
         // 1. Delete student marks for this LO
         studentMarkRepository.deleteByLos_Id(storedLosId);
@@ -175,9 +176,9 @@ public class LosService {
     // Restore (Lecture/Admin) — reverses deleteLos, including its mapping/CQI cascade
     public void restoreLos(String id) throws Exception {
         Los los = losRepository.findById(id)
-                .orElseThrow(() -> new Exception("Los not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Los not found"));
         if (!Boolean.TRUE.equals(los.getIsDeleted())) {
-            throw new Exception("Los is not deleted");
+            throw new IllegalArgumentException("Los is not deleted");
         }
         los.restore();
         losRepository.save(los);

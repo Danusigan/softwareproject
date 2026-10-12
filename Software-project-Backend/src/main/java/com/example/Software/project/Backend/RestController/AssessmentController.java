@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.AssessmentTemplate;
 import com.example.Software.project.Backend.Service.AssessmentService;
 import com.example.Software.project.Backend.Security.JwtUtil;
@@ -43,7 +44,8 @@ public class AssessmentController {
             AssessmentTemplate t = assessmentService.createTemplate(payload, createdBy);
             return ResponseEntity.ok(Map.of("message", "Template created", "data", t, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Error: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Error: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -60,7 +62,8 @@ public class AssessmentController {
                 "count", templates.size()
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Error: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Error: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -79,7 +82,8 @@ public class AssessmentController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", "Error: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Error: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 

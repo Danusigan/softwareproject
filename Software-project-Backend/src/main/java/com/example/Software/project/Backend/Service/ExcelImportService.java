@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.MarkType;
 import com.example.Software.project.Backend.Model.Module;
@@ -57,7 +58,7 @@ public class ExcelImportService {
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch, String markType) {
         try {
             Los los = losRepository.findById(losId)
-                    .orElseThrow(() -> new Exception("Learning Outcome not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Learning Outcome not found"));
 
             // Default to FINAL_EXAM if not specified
             MarkType type = MarkType.FINAL_EXAM;
@@ -96,7 +97,7 @@ public class ExcelImportService {
                     }
                 }
                 if (!unknownStudents.isEmpty()) {
-                    throw new Exception("Upload rejected — " + unknownStudents.size() +
+                    throw new IllegalArgumentException("Upload rejected — " + unknownStudents.size() +
                             " student(s) not found in the system: " + String.join(", ", unknownStudents) +
                             ". Import these students first, then re-upload.");
                 }
@@ -115,7 +116,7 @@ public class ExcelImportService {
                     double score = parsed == null ? 0.0 : parsed;
 
                     Student student = studentRepository.findById(studentIndex)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentIndex));
 
                     StudentMark mark = new StudentMark();
                     mark.setStudent(student);
@@ -128,8 +129,8 @@ public class ExcelImportService {
                 }
                 return "Successfully imported " + count + " marks.";
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error importing marks: " + e.getMessage());
+        } catch (RuntimeException e) { throw e; } catch (Exception e) {
+            throw new RuntimeException("Unable to import marks", e);
         }
     }
 
@@ -178,7 +179,7 @@ public class ExcelImportService {
                                   String assignmentLabel, Map<String, Double> perLoMaxMarks) {
         try {
             for (String losId : losIds) {
-                if (!losRepository.existsById(losId)) throw new Exception("Learning Outcome not found: " + losId);
+                if (!losRepository.existsById(losId)) throw new IllegalArgumentException("Learning Outcome not found: " + losId);
             }
 
             MarkType tempType = MarkType.FINAL_EXAM;
@@ -198,7 +199,7 @@ public class ExcelImportService {
 
                 // Find header row — may be row 0 (old) or row 1 (new with title)
                 Row headerRow = sheet.getRow(0);
-                if (headerRow == null) throw new Exception("Excel file must have a header row");
+                if (headerRow == null) throw new IllegalArgumentException("Excel file must have a header row");
                 // If row 0 col 0 looks like a title (not "Student Index"), shift to row 1
                 int headerRowIdx = 0;
                 String firstCell = headerRow.getCell(0) != null ? headerRow.getCell(0).toString().trim() : "";
@@ -206,7 +207,7 @@ public class ExcelImportService {
                     headerRowIdx = 1;
                     headerRow = sheet.getRow(1);
                 }
-                if (headerRow == null) throw new Exception("Could not find header row in Excel file");
+                if (headerRow == null) throw new IllegalArgumentException("Could not find header row in Excel file");
 
                 if (losIds.length == 0 || new java.util.HashSet<>(java.util.Arrays.asList(losIds)).size()!=losIds.length)
                     throw new FileValidationService.InvalidUpload("Select distinct learning outcomes for the upload.");
@@ -269,7 +270,7 @@ public class ExcelImportService {
                     }
                 }
                 if (!errors.isEmpty()) {
-                    throw new Exception("Validation failed — " + errors.size() + " error(s):\n" + String.join("\n", errors));
+                    throw new IllegalArgumentException("Validation failed — " + errors.size() + " error(s):\n" + String.join("\n", errors));
                 }
 
                 // Delete existing marks for this exact assignment
@@ -329,7 +330,7 @@ public class ExcelImportService {
                     if (idxCell == null || idxCell.toString().trim().isEmpty()) continue;
                     String studentIndex = idxCell.toString().trim();
                     final Student student = studentRepository.findById(studentIndex)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentIndex));
                     for (int i = 0; i < losIds.length; i++) {
                         final String losId = losIds[i];
                         Cell markCell = row.getCell(i + 1);
@@ -338,7 +339,7 @@ public class ExcelImportService {
                         if (raw.equals("AB") || raw.equals("MC") || raw.equals("N/A")) continue;
                         double score;
                         score = parseScore(markCell);
-                        Los los = losRepository.findById(losId).orElseThrow(() -> new Exception("LO not found: " + losId));
+                        Los los = losRepository.findById(losId).orElseThrow(() -> new ResourceNotFoundException("LO not found: " + losId));
                         StudentMark mark = new StudentMark();
                         mark.setStudent(student); mark.setScore(score); mark.setLos(los);
                         mark.setBatch(batch); mark.setMarkType(finalType); mark.setAssignmentLabel(assignmentLabel);
@@ -354,7 +355,7 @@ public class ExcelImportService {
                     + (assignmentLabel != null ? " for " + assignmentLabel : "");
             }
         } catch (RuntimeException e) { throw e; }
-          catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
+          catch (Exception e) { throw new RuntimeException("Unable to import marks", e); }
     }
 
     @Transactional
@@ -399,7 +400,7 @@ public class ExcelImportService {
     public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType, String assignmentLabel) {
         try {
             if (templateId == null || templateId.trim().isEmpty()) {
-                throw new Exception("templateId is required for question-wise import");
+                throw new IllegalArgumentException("templateId is required for question-wise import");
             }
 
             MarkType type = MarkType.FINAL_EXAM;
@@ -409,7 +410,7 @@ public class ExcelImportService {
 
             List<AssessmentItem> items = assessmentItemRepository.findByAssessmentTemplate_IdOrderByQuestionNumber(templateId.trim());
             if (items.isEmpty()) {
-                throw new Exception("No assessment items found for template: " + templateId);
+                throw new IllegalArgumentException("No assessment items found for template: " + templateId);
             }
 
             // Detect column layout from header row: new templates have Student ID at col 0, Q1 at col 1.
@@ -463,7 +464,7 @@ public class ExcelImportService {
                     }
 
                     Student student = studentRepository.findById(studentId)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentId));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
                     studentsById.put(studentId, student);
 
                     for (int i = 0; i < items.size(); i++) {
@@ -500,7 +501,7 @@ public class ExcelImportService {
 
             // Reject entire upload if any score was out of range
             if (!validationErrors.isEmpty()) {
-                throw new Exception("Upload rejected — invalid marks found:\n" + String.join("\n", validationErrors));
+                throw new IllegalArgumentException("Upload rejected — invalid marks found:\n" + String.join("\n", validationErrors));
             }
 
             studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(templateId.trim());
@@ -549,8 +550,8 @@ public class ExcelImportService {
             retireSupersededTemplates(templateId.trim());
 
             return "Successfully imported " + questionScoresSaved + " question scores and " + aggregatedMarksSaved + " LO marks for " + (assignmentLabel != null ? assignmentLabel : templateId);
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage(), e);
+        } catch (RuntimeException e) { throw e; } catch (Exception e) {
+            throw new RuntimeException("Unable to import marks", e);
         }
     }
 

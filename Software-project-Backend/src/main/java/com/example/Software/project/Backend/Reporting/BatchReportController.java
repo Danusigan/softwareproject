@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Reporting;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -59,6 +60,6 @@ public class BatchReportController {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<?> error(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode()).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", Objects.toString(exception.getReason(), "Report unavailable")));
+                .body(Map.of("message", SafeErrors.message(exception)));
     }
 }

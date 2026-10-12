@@ -40,14 +40,10 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .exceptionHandling(errors -> errors
                 .authenticationEntryPoint((request, response, exception) -> {
-                    response.setStatus(401);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"status\":\"ERROR\",\"message\":\"Authentication required\"}");
+                    SafeErrors.write(request, response, org.springframework.http.HttpStatus.UNAUTHORIZED);
                 })
                 .accessDeniedHandler((request, response, exception) -> {
-                    response.setStatus(403);
-                    response.setContentType("application/json");
-                    response.getWriter().write("{\"status\":\"ERROR\",\"message\":\"Access denied\"}");
+                    SafeErrors.write(request, response, org.springframework.http.HttpStatus.FORBIDDEN);
                 }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck

@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.ModuleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,8 +41,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -66,8 +68,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -89,8 +92,9 @@ public class ModuleRestController {
                 "status", "ERROR"
             )));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -115,8 +119,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -140,8 +145,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -164,8 +170,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -189,8 +196,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }

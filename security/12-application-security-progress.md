@@ -11,7 +11,26 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | 5 | Excel upload validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 6 | Audit logging | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 7 | Environment-based secret protection | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 8 | Safer error handling | Pending |
+| 8 | Safer error handling | Implemented; automated and live obqa checks passed; ready for user commit/push |
+
+## Feature 8: safer error handling - 2026-10-12
+
+Completed safe exception handling across controllers, reporting endpoints, authentication filters and the global MVC boundary. See [19-safer-error-handling.md](19-safer-error-handling.md) for status mapping, compatible response contracts and operational limits.
+
+- Replaced raw exception messages/class-name fallbacks in API responses with shared safe messages. Explicit account/upload validation remains useful; unexpected failures return 500, database constraint conflicts 409, missing records 404, and malformed requests retain the appropriate 4xx status. Authentication/RBAC/lockout behavior remains intact.
+- JSON API errors carry the server-generated audit request ID and no-store headers; filter authentication failures follow the same convention. Existing success responses and legacy plain-text error contracts are preserved.
+- Spring Boot fallback errors exclude exception names, messages, binding details and stack traces even with `?trace=true`. Logging uses exception class/request ID rather than raw exception text or submitted email. The framework exception resolver and request/response body processors no longer emit raw details under general debug mode.
+- Regression testing found legacy Excel exception wrappers hiding validation types; fixed them so invalid workbooks remain 400 with rollback, while genuine infrastructure failures remain 500. Explicit missing-record exceptions distinguish absence from server failures in domain services.
+- Final full backend suite: **359 passed**, zero failures/errors/skips (`mvn -B test`), including **16 safe-error tests** covering injected SQL/token/file-path sentinels, controller-local catches, malformed requests, wrong methods/content types, missing resources, useful validation, conflicts, correlation, log privacy and JWT database lookup failures. Existing hashing, RBAC, lockout, account validation, upload rollback, audit and secret configuration suites passed. The final two body-logger configuration guards were additionally verified in the running application.
+- Frontend regression suite: **42 passed across 7 files** (`npm test -- --maxWorkers=1`). No frontend source or generated build output changed.
+- Backend started via the private environment launcher against **obqa**; health UP, existing schema unchanged. Live 400/401/403/404/405/415 responses were safe, uncached and correlated; fallback `trace`/`message` query parameters exposed no internal details. Database faults/conflicts were injected in automated tests, not by interrupting the real database.
+- Original Admin, Lecturer and SuperAdmin credentials passed browser login/dashboard/API checks. Live account changes, invalid input, failed login, denied actions, module assignments, report access, recovery and audit correlation/privacy passed.
+- Browser/API upload checks passed for file type/empty/size controls, spoofed Excel, actual HTTP 413, student/LO/question templates, valid replacement and invalid-mark rollback. Disposable data was removed; original affected-table counts were restored, with normal audit/access records retained. No outbound email was sent.
+- Runtime logging after live flows contained no DB password, JWT signing key, JWT-shaped tokens or request credential payloads. Ordinary-word matches for legacy passwords occurred only in fixed startup text and were reviewed separately. Git whitespace checks passed and no unmerged entries remain.
+
+Backend/frontend remain on ports 8080/5173. Evidence is in ignored `.codex-tmp/errors-*.log`. All eight selected application features are now implemented; historical credential rotation documented in feature 7 remains a deployment follow-up. No commit or push was performed.
+
+Suggested commit: `feat(security): return safe consistent API errors`
 
 ## Feature 7: environment-based secret protection - 2026-10-12
 

@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -77,9 +78,10 @@ public class ProgramOutcomeRestController {
             auditLogService.log(username, "PO_CREATE", createdPO.getPoId(), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome created successfully", createdPO));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -96,11 +98,13 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_UPDATE", poId, "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome updated successfully", updatedPO));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -117,11 +121,13 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "soft delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome deactivated successfully", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error deleting Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error deleting Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -138,11 +144,13 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "permanent delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome permanently deleted", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error permanently deleting Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error permanently deleting Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -158,9 +166,11 @@ public class ProgramOutcomeRestController {
             ProgramOutcome restoredPO = poService.restorePO(poId);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome restored successfully", restoredPO));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error restoring Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error restoring Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -177,7 +187,8 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
             return ResponseEntity.ok(createSuccessResponse("Default Washington Accord Program Outcomes initialized successfully", defaultPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error initializing default POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error initializing default POs: " + SafeErrors.message(e)));
         }
     }
 
@@ -193,7 +204,8 @@ public class ProgramOutcomeRestController {
             poService.reorderPOs(poIds);
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes reordered successfully", null));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error reordering POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error reordering POs: " + SafeErrors.message(e)));
         }
     }
 
@@ -207,7 +219,8 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> pos = poService.getAllActivePOs();
             return ResponseEntity.ok(createSuccessResponse("Active Program Outcomes retrieved successfully", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
@@ -223,7 +236,8 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> pos = poService.getAllPOs();
             return ResponseEntity.ok(createSuccessResponse("All Program Outcomes retrieved successfully", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
@@ -239,7 +253,8 @@ public class ProgramOutcomeRestController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse("Program Outcome not found"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -251,7 +266,8 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
             return ResponseEntity.ok(createSuccessResponse("Default Washington Accord Program Outcomes retrieved", defaultPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching default POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching default POs: " + SafeErrors.message(e)));
         }
     }
 
@@ -263,7 +279,8 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> customPOs = poService.getCustomPOs();
             return ResponseEntity.ok(createSuccessResponse("Custom Program Outcomes retrieved", customPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching custom POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching custom POs: " + SafeErrors.message(e)));
         }
     }
 
@@ -278,7 +295,8 @@ public class ProgramOutcomeRestController {
                 .toList();
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes for category '" + category + "' retrieved", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching POs by category: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching POs by category: " + SafeErrors.message(e)));
         }
     }
 
@@ -301,7 +319,8 @@ public class ProgramOutcomeRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Program Outcome system is healthy", healthData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Health check failed: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Health check failed: " + SafeErrors.message(e)));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
@@ -128,9 +129,10 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Learning Outcome created with mappings successfully", responseData));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating Learning Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating Learning Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -158,7 +160,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Form data retrieved", formData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving form data: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving form data: " + SafeErrors.message(e)));
         }
     }
 
@@ -190,7 +193,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO details with mappings retrieved", responseData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving LO details: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving LO details: " + SafeErrors.message(e)));
         }
     }
 
@@ -237,9 +241,10 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO mappings updated successfully", createdMappings));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -272,7 +277,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Module overview retrieved", overview));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving module overview: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving module overview: " + SafeErrors.message(e)));
         }
     }
 }

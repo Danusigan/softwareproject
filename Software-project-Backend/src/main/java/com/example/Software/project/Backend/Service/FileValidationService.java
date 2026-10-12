@@ -16,7 +16,7 @@ public class FileValidationService {
     private static final Set<String> TYPES = Set.of("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel", "application/octet-stream");
 
-    public static class InvalidUpload extends IllegalArgumentException {
+    public static class InvalidUpload extends com.example.Software.project.Backend.Security.PublicValidationException {
         public InvalidUpload(String message) { super(message); }
     }
 

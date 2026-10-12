@@ -65,8 +65,18 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                         .setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
             }
+            } catch (org.springframework.security.authentication.InternalAuthenticationServiceException e) {
+                SecurityContextHolder.clearContext();
+                SafeErrors.log(e, request);
+                SafeErrors.write(request, response, org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+                return;
             } catch (org.springframework.security.core.AuthenticationException | io.jsonwebtoken.JwtException | IllegalArgumentException e) {
                 SecurityContextHolder.clearContext();
+            } catch (RuntimeException e) {
+                SecurityContextHolder.clearContext();
+                SafeErrors.log(e, request);
+                SafeErrors.write(request, response, org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR);
+                return;
             }
         }
         chain.doFilter(request, response);

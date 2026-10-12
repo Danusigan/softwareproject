@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Repository.ModuleRepository;
 import com.example.Software.project.Backend.Security.JwtUtil;
@@ -31,7 +32,8 @@ public class CqiActionController {
             List<CqiAction> plans = cqiService.getMyPlans(username(token));
             return ResponseEntity.ok(Map.of("message", "My CQI plans", "data", plans, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -44,7 +46,8 @@ public class CqiActionController {
             CqiAction action = cqiService.submitPlan(id, username(token), dto);
             return ResponseEntity.ok(Map.of("message", "CQI plan submitted", "data", action, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -56,7 +59,8 @@ public class CqiActionController {
         try {
             return ResponseEntity.ok(Map.of("message", "Pending CQI plans", "data", cqiService.getPendingForAdmin(), "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -68,7 +72,8 @@ public class CqiActionController {
         try {
             return ResponseEntity.ok(Map.of("message", "LO CQI history", "data", cqiService.getLoReviewHistory(), "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -81,7 +86,8 @@ public class CqiActionController {
             CqiAction action = cqiService.approvePlan(id, username(token));
             return ResponseEntity.ok(Map.of("message", "CQI plan approved", "data", action, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -95,7 +101,8 @@ public class CqiActionController {
             CqiAction action = cqiService.returnPlan(id, username(token), comment);
             return ResponseEntity.ok(Map.of("message", "CQI plan returned for revision", "data", action, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -109,7 +116,8 @@ public class CqiActionController {
         try {
             return ResponseEntity.ok(Map.of("message", "CQI history", "data", cqiService.getCqiHistoryForModule(moduleId), "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -131,7 +139,8 @@ public class CqiActionController {
             Map<String, Object> result = cqiService.finalizeModuleAttainment(moduleId, batch.trim(), studentPassThreshold, batchTarget);
             return ResponseEntity.ok(Map.of("message", "Attainment finalized", "data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -158,7 +167,8 @@ public class CqiActionController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -182,7 +192,8 @@ public class CqiActionController {
             CqiAction plan = cqiService.createPoCqiPlan(poId, batch, moduleId, currentAttainment, targetAttainment, plannedActions, username(token));
             return ResponseEntity.ok(Map.of("message", "PO CQI plan created", "data", plan, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -195,7 +206,8 @@ public class CqiActionController {
             List<CqiAction> plans = cqiService.getCqiPlansForBatch(batch);
             return ResponseEntity.ok(Map.of("message", "CQI plans for batch", "data", plans, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -209,7 +221,8 @@ public class CqiActionController {
             CqiAction plan = cqiService.updateCqiPlanStatus(id, status);
             return ResponseEntity.ok(Map.of("message", "CQI plan status updated", "data", plan, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -225,7 +238,8 @@ public class CqiActionController {
             CqiAction plan = cqiService.updateCqiPlanDetails(id, plannedActions, targetAttainment);
             return ResponseEntity.ok(Map.of("message", "CQI plan updated", "data", plan, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 

@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Reporting.Progress;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,7 @@ public class ProgressController {
     public ResponseEntity<?> enrolment(@RequestBody ProgressConfiguration.Enrolment body,Authentication auth) {configuration.enrolment(body,auth);return saved();}
     private ResponseEntity<?> saved() {return ok(Map.of("message","Configuration saved"));}
     private ResponseEntity<?> ok(Object body) {return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);}
-    @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<?> invalid(IllegalArgumentException e) {return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(Map.of("message",e.getMessage()==null?"Invalid report input":e.getMessage()));}
+    @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<?> invalid(IllegalArgumentException e) {return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body(Map.of("message",SafeErrors.message(e)));}
     @ExceptionHandler(DataIntegrityViolationException.class) public ResponseEntity<?> conflict() {return ResponseEntity.status(409).cacheControl(CacheControl.noStore()).body(Map.of("message","Configuration conflicts with a saved record or constraint. Check codes, account links and duplicate records."));}
-    @ExceptionHandler(ResponseStatusException.class) public ResponseEntity<?> error(ResponseStatusException e) {return ResponseEntity.status(e.getStatusCode()).cacheControl(CacheControl.noStore()).body(Map.of("message",e.getReason()==null?"Report unavailable":e.getReason()));}
+    @ExceptionHandler(ResponseStatusException.class) public ResponseEntity<?> error(ResponseStatusException e) {return ResponseEntity.status(e.getStatusCode()).cacheControl(CacheControl.noStore()).body(Map.of("message",SafeErrors.message(e)));}
 }

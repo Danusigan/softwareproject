@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Message;
 import com.example.Software.project.Backend.Model.UserAccess;
 import com.example.Software.project.Backend.Repository.MessageRepository;
@@ -32,7 +33,7 @@ public class ProfileRestController {
             userService.changePassword(auth.getName(), body.get("currentPassword"), body.get("newPassword"));
             return ResponseEntity.ok(Map.of("message", "Password changed.", "status", "SUCCESS"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 

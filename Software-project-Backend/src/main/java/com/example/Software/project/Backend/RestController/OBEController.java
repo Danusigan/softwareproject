@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Model.Module; // disambiguate from java.lang.Module
 import com.example.Software.project.Backend.Repository.*;
@@ -74,8 +75,9 @@ public class OBEController {
             ProgramOutcome createdPo = poRepo.save(po);
             return ResponseEntity.ok(Map.of("message", "Program Outcome created successfully", "data", createdPo, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error creating PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error creating PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -89,8 +91,9 @@ public class OBEController {
             }
             return ResponseEntity.ok(Map.of("message", "All Program Outcomes", "data", poRepo.findAll(), "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error fetching POs: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error fetching POs: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -107,8 +110,9 @@ public class OBEController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "PO not found", "status", "ERROR")));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error fetching PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error fetching PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -130,8 +134,9 @@ public class OBEController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "PO not found", "status", "ERROR")));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error updating PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error updating PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -151,8 +156,9 @@ public class OBEController {
                     .body(Map.of("message", "PO not found", "status", "ERROR"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error deleting PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error deleting PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -193,7 +199,8 @@ public class OBEController {
             }
             return ResponseEntity.ok(mapRepo.saveAll(mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error saving mappings: " + e.getMessage());
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body("Error saving mappings: " + SafeErrors.message(e));
         }
     }
 
@@ -225,7 +232,8 @@ public class OBEController {
             excelService.importMarks(file, losId);
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(SafeErrors.message(e));
         }
     }
 
@@ -292,8 +300,9 @@ public class OBEController {
                 "data", Map.of("batch", batch, "markType", markType, "assignmentLabel", assignmentLabel, "templateType", templateType)
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -342,10 +351,11 @@ public class OBEController {
                 )
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
-                    "message", "Failed to import question-wise marks: " + e.getMessage(),
-                    "error", e.getMessage(),
+                    "message", "Failed to import question-wise marks: " + SafeErrors.message(e),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -387,7 +397,7 @@ public class OBEController {
         try {
             return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -411,8 +421,8 @@ public class OBEController {
             return ResponseEntity.ok(trendService.getDashboardGraphs(
                 moduleId, batch, parsedMarkType, threshold, target, loId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "message", "Invalid graph filter: " + e.getMessage(),
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Invalid graph filter: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -442,7 +452,7 @@ public class OBEController {
                     try {
                         threshold = Integer.parseInt(thresholdRaw);
                     } catch (NumberFormatException ex) {
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        return ResponseEntity.status(SafeErrors.status(ex))
                             .body(Map.of("message", "Error: threshold must be an integer between 0 and 100", "status", "ERROR"));
                     }
                 }
@@ -483,7 +493,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
@@ -497,8 +507,9 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate marks report: " + errorDetail,
                     "error", errorDetail,
@@ -542,7 +553,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
             }
 
@@ -582,10 +593,11 @@ public class OBEController {
                 .body(templateBytes);
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate template",
-                    "error", e.getMessage(),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -635,8 +647,9 @@ public class OBEController {
                 "data", Map.of("losCount", losIds.length, "batch", batch.trim(), "markType", markType)
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Failed to import marks: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Failed to import marks: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -662,8 +675,9 @@ public class OBEController {
             }
             return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -696,8 +710,9 @@ public class OBEController {
             poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -715,8 +730,9 @@ public class OBEController {
             poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -740,8 +756,9 @@ public class OBEController {
                 .header("Content-Disposition", "attachment; filename=\"marks_" + moduleId + "_batch" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
                 .body(bytes);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -762,8 +779,9 @@ public class OBEController {
             }
             return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -826,8 +844,9 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
@@ -852,8 +871,9 @@ public class OBEController {
             Map<String, Object> result = poAttainmentService.getStudentPOSummary(studentId.trim());
             return ResponseEntity.ok(Map.of("message", "Student PO summary calculated successfully", "data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate student PO summary: " + errorDetail, "status", "ERROR"));
         }
     }
@@ -915,8 +935,9 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to export PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
@@ -945,7 +966,7 @@ public class OBEController {
                     try {
                         numberOfQuestions = Integer.parseInt(countObj.toString().trim());
                     } catch (NumberFormatException ex) {
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        return ResponseEntity.status(SafeErrors.status(ex))
                             .body(Map.of("message", "numberOfQuestions must be a positive integer", "status", "ERROR"));
                     }
                     if (numberOfQuestions <= 0) {
@@ -1034,10 +1055,11 @@ public class OBEController {
                 .body(templateBytes);
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate question-wise template",
-                    "error", e.getMessage(),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -1106,11 +1128,12 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "LO attainment calculated", "data", result, "status", "SUCCESS"));
 
         } catch (NumberFormatException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            return ResponseEntity.status(SafeErrors.status(ex))
                 .body(Map.of("message", "Invalid numeric input in thresholds", "status", "ERROR"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Failed to calculate LO attainment: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Failed to calculate LO attainment: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -1161,7 +1184,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
@@ -1184,8 +1207,9 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate marks report: " + errorDetail,
                     "error", errorDetail,
@@ -1216,8 +1240,9 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "Overall PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate overall PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }

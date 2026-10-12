@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Student;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.FileValidationService;
@@ -48,9 +49,10 @@ public class StudentController {
                             result.get("created") + " created, " + result.get("updated") + " updated.",
                     "status", "SUCCESS", "data", result));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Could not process the uploaded file: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Could not process the uploaded file: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -68,7 +70,8 @@ public class StudentController {
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(bytes);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Could not generate the template: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Could not generate the template: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -94,7 +97,7 @@ public class StudentController {
             Student s = studentService.create(body);
             return ResponseEntity.ok(Map.of("message", "Student added.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -107,7 +110,7 @@ public class StudentController {
             Student s = studentService.update(id, body);
             return ResponseEntity.ok(Map.of("message", "Student updated.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -123,7 +126,7 @@ public class StudentController {
                     : "Student deleted.";
             return ResponseEntity.ok(Map.of("message", msg, "status", "SUCCESS", "mode", mode));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -135,7 +138,7 @@ public class StudentController {
             Student s = studentService.restore(id);
             return ResponseEntity.ok(Map.of("message", "Student restored.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 

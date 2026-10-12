@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Reporting;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -96,7 +97,7 @@ public class PoReportController {
                 zip.closeEntry();
             }
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the report bundle: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the report bundle: " + SafeErrors.message(e));
         }
 
         String filename = "po-reports-batch-" + batch.trim().replaceAll("[^A-Za-z0-9_-]", "_") + ".zip";
@@ -129,6 +130,6 @@ public class PoReportController {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<?> error(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode()).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", Objects.toString(exception.getReason(), "Report unavailable")));
+                .body(Map.of("message", SafeErrors.message(exception)));
     }
 }
