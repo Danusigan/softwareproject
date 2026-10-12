@@ -4,3 +4,6 @@ target/
 *.iml
 *.log
 src/main/resources/application-dev.properties
+
+.env
+.env.*

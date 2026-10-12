@@ -10,8 +10,27 @@ User-selected scope: implement these eight features one at a time. Test and fix 
 | 4 | Account input validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 5 | Excel upload validation | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 6 | Audit logging | Implemented; automated and live obqa checks passed; ready for user commit/push |
-| 7 | Environment-based secret protection | Pending |
+| 7 | Environment-based secret protection | Implemented; automated and live obqa checks passed; ready for user commit/push |
 | 8 | Safer error handling | Pending |
+
+## Feature 7: environment-based secret protection - 2026-10-12
+
+Implemented required environment configuration, local startup support and build exclusions. See [18-environment-secret-protection.md](18-environment-secret-protection.md) for setup, scope and credential-history limitations.
+
+- Moved the existing local database/JWT values privately from the ignored development properties file to ignored `.env.backend.local`. The new PowerShell launcher loads literal values into the backend process, validates required settings, respects existing shell values and restores loaded variables on exit. The Docker `.env`, obqa database credentials and all application passwords were preserved.
+- MySQL configuration rejects missing/blank/unresolved credentials before datasource creation. JWT validation rejects missing, short and common placeholder keys without returning their contents. Base configuration no longer selects dev implicitly; log verbosity is reduced and management configuration values remain hidden.
+- Local credential files are excluded from Maven resources and Docker build contexts. Expanded environment ignore rules and blank-secret examples prevent accidental commits. Compose requires database/JWT secrets and a separate local MySQL root password.
+- Removed a current database password from the historical asset inventory. Existing Git history was not rewritten and credentials were not rotated: coordinate rotation before deployment. This is an outstanding operational exposure, not something environment placeholders retroactively fix.
+- Full backend suite: **343 passed**, zero failures/errors/skips (`mvn -B test`), including 14 new secret-configuration/JWT cases. Backend packaging passed (`mvn -B -DskipTests package`). JAR inspection confirmed no local development configuration or current backend DB/JWT secrets in packaged application classes/resources.
+- Frontend: **42 passed across 7 files** (`npm test -- --maxWorkers=1`). The first concurrent run passed 36 tests but had one worker-startup timeout; rerunning after the backend suite finished passed all 42. No assertions were disabled and no frontend source/build output changed.
+- PowerShell loader checks passed for literal metacharacters, precedence, restoration on success/failure, duplicate entries, weak keys and safe errors. Local and production Compose configuration validation passed without starting containers; empty required secrets were rejected. The packaged production application also exited with a safe configuration error when database credentials were absent.
+- Backend started using the new launcher against **obqa**; health UP and Flyway V10 unchanged. Original Admin, Lecturer and SuperAdmin browser logins/dashboard API checks passed with unchanged passwords.
+- Live regression checks passed for account validation/updates, failed and successful login, role denial, module assignments, report access, password recovery, audit correlation/privacy, real upload HTTP 413, student/LO/question templates, invalid marks and rollback. Disposable records were removed and original affected-table counts restored; normal audit/access records remain. No external emails were sent.
+- Tracked project files (excluding vendored `.codex-tmp` tools) and the startup log were scanned without printing values: neither current backend database password nor JWT key remained. Environment files are ignored, safe examples are visible to Git, `git diff --check` passed and no unmerged entries remain.
+
+Backend/frontend remain available on ports 8080/5173. Start future local backend sessions from the repository root with `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-backend.ps1`. Test output is in ignored `.codex-tmp/secrets-*.log`; local database backups were retained. Feature 8 has not started; no commit or push was performed.
+
+Suggested commit: `feat(security): externalize and validate backend secrets`
 
 ## Feature 6: audit logging - 2026-10-12
 

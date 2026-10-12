@@ -1,3 +1,8 @@
+> **Local backend startup (security feature 7):** From this folder run
+> `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-backend.ps1`.
+> On a new machine, first copy `.env.backend.example` to `.env.backend.local` and set your private values.
+> See [environment setup](security/18-environment-secret-protection.md) for IDE and Docker configuration.
+
 # Software Project - Full Stack Application
 
 [![CI/CD Pipeline](https://github.com/Danusigan/softwareproject/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Danusigan/softwareproject/actions)
