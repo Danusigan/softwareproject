@@ -1,6 +1,8 @@
 # Multi-stage build for React/Vite application
 # Stage 1: Build
-FROM node:22-alpine AS builder
+# Keep the Node/npm toolchain aligned with the frontend and Sonar CI jobs.
+# npm 10 (Node 22) rejects the npm 11-generated lockfile's optional peer layout.
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 

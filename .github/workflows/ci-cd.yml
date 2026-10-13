@@ -126,6 +126,10 @@ jobs:
           cd softwareproject_frontend
           npm test
 
+      # Exercise the same Linux image build on PRs, before the main-only push job.
+      - name: Validate frontend Docker image
+        run: docker build --tag lopo-frontend:ci ./softwareproject_frontend
+
   # SonarQube Cloud - static analysis + coverage for backend and frontend
   sonar:
     runs-on: ubuntu-latest
