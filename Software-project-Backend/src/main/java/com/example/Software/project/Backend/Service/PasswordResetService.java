@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.PublicValidationException;
 import com.example.Software.project.Backend.Model.PasswordResetToken;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.PasswordResetTokenRepository;
@@ -25,6 +26,9 @@ public class PasswordResetService {
     private static final long TOKEN_EXPIRY_MINUTES = 30;
 
     @Autowired
+    private AuditLogService auditLogService;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -36,11 +40,15 @@ public class PasswordResetService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AccountValidation accountValidation;
+
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
     @Transactional
     public void requestReset(String email) {
+        accountValidation.email(email);
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
             // Don't reveal whether the email exists
@@ -62,20 +70,22 @@ public class PasswordResetService {
 
     @Transactional
     public void resetPassword(String token, String newPassword) throws Exception {
+        AccountValidation.password(newPassword);
         PasswordResetToken resetToken = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new Exception("This reset link is invalid or has expired."));
+                .orElseThrow(() -> new PublicValidationException("This reset link is invalid or has expired."));
 
         if (resetToken.isUsed() || resetToken.isExpired()) {
-            throw new Exception("This reset link is invalid or has expired.");
+            throw new PublicValidationException("This reset link is invalid or has expired.");
         }
 
         User user = userRepository.findByUsername(resetToken.getUserId())
-                .orElseThrow(() -> new Exception("Account no longer exists."));
+                .orElseThrow(() -> new PublicValidationException("Account no longer exists."));
 
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
         resetToken.setUsed(true);
         tokenRepository.save(resetToken);
+        auditLogService.log(user.getUserID(), "PASSWORD_RESET", user.getUserID(), "SUCCESS", null);
     }
 }

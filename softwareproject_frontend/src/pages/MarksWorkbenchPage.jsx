@@ -1,3 +1,4 @@
+import { excelFileError, EXCEL_UPLOAD_HELP } from '../utils/excelValidation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Header from '../components/header'
@@ -175,14 +176,14 @@ export default function MarksWorkbenchPage() {
     e.preventDefault(); e.stopPropagation(); setDragActive(false)
     const f = e.dataTransfer.files?.[0]
     if (!f) return
-    if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) { setUploadFile(f); setMessage({ type: '', text: '' }) }
-    else setMessage({ type: 'error', text: 'Please choose an Excel file (.xlsx or .xls).' })
+    if (!excelFileError(f)) { setUploadFile(f); setMessage({ type: '', text: '' }) }
+    else { resetFile(); setMessage({ type: 'error', text: excelFileError(f) }) }
   }
   const handleFileChange = e => {
     const f = e.target.files?.[0]
     if (!f) return
-    if (f.name.endsWith('.xlsx') || f.name.endsWith('.xls')) { setUploadFile(f); setMessage({ type: '', text: '' }) }
-    else setMessage({ type: 'error', text: 'Please choose an Excel file (.xlsx or .xls).' })
+    if (!excelFileError(f)) { setUploadFile(f); setMessage({ type: '', text: '' }) }
+    else { resetFile(); setMessage({ type: 'error', text: excelFileError(f) }) }
   }
 
   const authHeaders = () => { const t = authService.getToken(); return t ? { Authorization: `Bearer ${t}` } : undefined }
@@ -968,14 +969,14 @@ export default function MarksWorkbenchPage() {
                       className={`w-full group p-8 border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-emerald-500 bg-emerald-50/30':'border-slate-200 hover:border-emerald-400 bg-white/30'}`}
                       onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                       onClick={()=>fileInputRef.current?.click()}>
-                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls"/>
+                      <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} title={EXCEL_UPLOAD_HELP} accept=".xlsx,.xls"/>
                       <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4 text-emerald-600 group-hover:scale-110 transition-transform">
                         <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                         </svg>
                       </div>
                       <h3 className="text-sm font-bold text-slate-800 mb-1">{uploadFile?uploadFile.name:'Drop file here'}</h3>
-                      <p className="text-slate-500 text-xs">{uploadFile?`${(uploadFile.size/1024).toFixed(1)} KB`:'Click to browse (.xlsx)'}</p>
+                      <p className="text-slate-500 text-xs">{uploadFile?`${(uploadFile.size/1024).toFixed(1)} KB`:'Excel .xlsx/.xls, maximum 5 MB'}</p>
                     </button>
                     {uploadFile&&(
                       <button type="button" onClick={resetFile} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-red-50 hover:text-red-500 transition-colors">Clear file</button>
@@ -1003,7 +1004,7 @@ export default function MarksWorkbenchPage() {
                     className={`w-full group p-6 sm:p-12 border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-emerald-500 bg-emerald-50/30':'border-slate-200 hover:border-emerald-400 bg-white/30'}`}
                     onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
                     onClick={()=>fileInputRef.current?.click()}>
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls"/>
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} title={EXCEL_UPLOAD_HELP} accept=".xlsx,.xls"/>
                     <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-6 text-emerald-600 group-hover:scale-110 transition-transform">
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
@@ -1017,7 +1018,7 @@ export default function MarksWorkbenchPage() {
                     ) : (
                       <>
                         <h3 className="text-base font-black text-slate-800 mb-1">Drop your Excel file here</h3>
-                        <p className="text-slate-500 text-sm">or click to browse (.xlsx, .xls)</p>
+                        <p className="text-slate-500 text-sm">Excel .xlsx/.xls, maximum 5 MB. Paste values instead of formulas.</p>
                       </>
                     )}
                   </button>

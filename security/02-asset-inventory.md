@@ -61,7 +61,7 @@ Every non-login endpoint requires *some* valid JWT, but none enforce role — an
 
 | Secret | Current location | Status |
 |---|---|---|
-| DB password (`Kopu2001`) | `application.properties:6-7`, `application-dev.properties:3-4` (plaintext) | Critical — hardcoded; dev file now gitignored but has prior commit history, likely already leaked |
+| DB password (`[REDACTED: configure through DB_PASSWORD]`) | `application.properties:6-7`, `application-dev.properties:3-4` (plaintext) | Critical — hardcoded; dev file now gitignored but has prior commit history, likely already leaked |
 | `jwt.secret` | `application.properties:34` (static string, with an inline comment warning it must change for production) | Critical — hardcoded; anyone with source access can forge tokens |
 | `.env` values (root) | `.env.example` present with dummy/test values; real `.env` gitignored | Medium — process is correct, but backend doesn't use `.env`/env vars yet for its own secrets (see above) |
 

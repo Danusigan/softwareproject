@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
@@ -36,7 +37,7 @@ public class IntegratedLORestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "lecture".equalsIgnoreCase(userRole) || isAdmin(token);
         } catch (Exception e) {
             return false;
@@ -47,7 +48,7 @@ public class IntegratedLORestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "admin".equalsIgnoreCase(userRole) || "superadmin".equalsIgnoreCase(userRole);
         } catch (Exception e) {
             return false;
@@ -82,6 +83,7 @@ public class IntegratedLORestController {
      * Create Learning Outcome with PO mappings in one transaction
      */
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.createLOWithMappings', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> createLOWithMappings(
             @RequestBody Map<String, Object> request,
             @RequestHeader("Authorization") String token) {
@@ -127,9 +129,10 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Learning Outcome created with mappings successfully", responseData));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating Learning Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating Learning Outcome: " + SafeErrors.message(e)));
         }
     }
 
@@ -137,6 +140,7 @@ public class IntegratedLORestController {
      * Get LO creation form data (suggestions based on module)
      */
     @GetMapping("/form-data/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getCreateFormData', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getCreateFormData(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -156,7 +160,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Form data retrieved", formData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving form data: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving form data: " + SafeErrors.message(e)));
         }
     }
 
@@ -164,6 +169,7 @@ public class IntegratedLORestController {
      * Get comprehensive LO details with mappings
      */
     @GetMapping("/{loId}/details")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getLOWithMappings', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getLOWithMappings(@PathVariable String loId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -187,7 +193,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO details with mappings retrieved", responseData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving LO details: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving LO details: " + SafeErrors.message(e)));
         }
     }
 
@@ -195,6 +202,7 @@ public class IntegratedLORestController {
      * Update LO mappings (if not approved)
      */
     @PutMapping("/{loId}/mappings")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.updateLOMappings', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> updateLOMappings(
             @PathVariable String loId,
             @RequestBody Map<String, Object> request,
@@ -233,9 +241,10 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO mappings updated successfully", createdMappings));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating mappings: " + SafeErrors.message(e)));
         }
     }
 
@@ -243,6 +252,7 @@ public class IntegratedLORestController {
      * Get module overview with all LOs and their mapping status
      */
     @GetMapping("/module/{moduleId}/overview")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('IntegratedLORestController.getModuleOverview', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleOverview(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -267,7 +277,8 @@ public class IntegratedLORestController {
 
             return ResponseEntity.ok(createSuccessResponse("Module overview retrieved", overview));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving module overview: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving module overview: " + SafeErrors.message(e)));
         }
     }
 }

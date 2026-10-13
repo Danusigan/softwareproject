@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -64,6 +65,7 @@ public class UserRestController {
     private PasswordResetService passwordResetService;
 
     @PostMapping("/login")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.loginUser', {'loginUser': #p0})")
     public ResponseEntity<?> loginUser(@RequestBody User loginUser) {
         try {
             // Authenticate using Spring Security
@@ -123,16 +125,20 @@ public class UserRestController {
         } catch (org.springframework.security.authentication.LockedException e) {
             auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "account locked");
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Account temporarily locked due to too many failed login attempts. Try again in 15 minutes.");
+            errorResponse.put("message", "Account temporarily locked after too many failed login attempts. Please try again after the 15-minute lockout expires.");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.LOCKED).body(errorResponse);
-        } catch (Exception e) {
+        } catch (org.springframework.security.authentication.BadCredentialsException e) {
             userService.recordFailedLogin(loginUser.getUserID());
             auditLogService.log(loginUser.getUserID(), "LOGIN", loginUser.getUserID(), "FAILURE", "invalid credentials");
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Invalid username or password");
             errorResponse.put("status", "ERROR");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        } catch (Exception e) {
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Unable to sign in right now. Please try again later.", "status", "ERROR"));
         }
     }
 
@@ -140,6 +146,7 @@ public class UserRestController {
     // they all live in the same User table keyed by email. Always returns a
     // generic success message so callers can't use it to discover which emails exist.
     @PostMapping("/forgot-password")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.forgotPassword', {'body': #p0})")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
         String email = body.get("email");
         if (email == null || email.isBlank()) {
@@ -148,8 +155,10 @@ public class UserRestController {
         }
         try {
             passwordResetService.requestReset(email.trim());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         } catch (Exception e) {
-            logger.error("Failed to process forgot-password request for {}", email, e);
+            SafeErrors.log(e);
         }
         return ResponseEntity.ok(Map.of(
             "message", "If an account with that email exists, a password reset link has been sent.",
@@ -159,6 +168,7 @@ public class UserRestController {
 
     // Step 2 of password reset: consumes the emailed token and sets a new password.
     @PostMapping("/reset-password")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.resetPassword', {'body': #p0})")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
         String token = body.get("token");
         String newPassword = body.get("newPassword");
@@ -166,19 +176,17 @@ public class UserRestController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Token and new password are required", "status", "ERROR"));
         }
-        if (newPassword.length() < 6) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Password must be at least 6 characters", "status", "ERROR"));
-        }
         try {
             passwordResetService.resetPassword(token, newPassword);
             return ResponseEntity.ok(Map.of("message", "Password reset successful. You can now log in.", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @PostMapping("/add-admin")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.addAdmin', {'newUser': #p0, 'token': #p1})")
     public ResponseEntity<?> addAdmin(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only superadmin can add admins
@@ -207,14 +215,16 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add admin: " + e.getMessage());
+            errorResponse.put("message", "Failed to add admin: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
     @PostMapping("/add-lecture")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.addLecture', {'newUser': #p0, 'token': #p1})")
     public ResponseEntity<?> addLecture(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             // Only admin/superadmin can add lectures
@@ -243,15 +253,17 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add lecturer: " + e.getMessage());
+            errorResponse.put("message", "Failed to add lecturer: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
     // List lecturers, with their current module assignments, for admin CRUD + the module-assignment picker
     @GetMapping("/lecturers")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.getAllLecturers', {'token': #p0})")
     public ResponseEntity<?> getAllLecturers(@RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -275,6 +287,7 @@ public class UserRestController {
 
     // Update a lecturer's email/password (Admin/Superadmin only)
     @PutMapping("/lecturers/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.updateLecturer', {'username': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> updateLecturer(@PathVariable String username, @RequestBody Map<String, String> body,
                                              @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
@@ -282,6 +295,7 @@ public class UserRestController {
                 .body(Map.of("message", "Access Denied: Only Admin can update lecturers", "status", "ERROR"));
         }
         try {
+            com.example.Software.project.Backend.Service.AccountValidation.updateFields(body);
             User updated = userService.updateLecturer(username, body.get("email"), body.get("password"));
             return ResponseEntity.ok(Map.of(
                 "message", "Lecturer updated successfully",
@@ -289,12 +303,14 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // Delete a lecturer (Admin/Superadmin only)
     @DeleteMapping("/lecturers/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.deleteLecturer', {'username': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteLecturer(@PathVariable String username, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -304,13 +320,15 @@ public class UserRestController {
             userService.deleteLecturer(username);
             return ResponseEntity.ok(Map.of("message", "Lecturer deleted successfully", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // Set exactly which modules a lecturer is assigned to (Admin/Superadmin only) -
     // the reverse direction of PUT /api/modules/{id}'s assignedLecturerUsernames.
     @PutMapping("/lecturers/{username}/modules")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.setLecturerModules', {'username': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> setLecturerModules(@PathVariable String username, @RequestBody Map<String, List<String>> body,
                                                  @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
@@ -325,12 +343,14 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // List admins, for the superadmin's Manage Admins page (Superadmin only)
     @GetMapping("/admins")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.getAllAdmins', {'token': #p0})")
     public ResponseEntity<?> getAllAdmins(@RequestHeader("Authorization") String token) {
         if (!isSuperAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -353,6 +373,7 @@ public class UserRestController {
 
     // Update an admin's email/password (Superadmin only)
     @PutMapping("/admins/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.updateAdmin', {'username': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> updateAdmin(@PathVariable String username, @RequestBody Map<String, String> body,
                                           @RequestHeader("Authorization") String token) {
         if (!isSuperAdmin(token)) {
@@ -360,6 +381,7 @@ public class UserRestController {
                 .body(Map.of("message", "Access Denied: Only Superadmin can update admins", "status", "ERROR"));
         }
         try {
+            com.example.Software.project.Backend.Service.AccountValidation.updateFields(body);
             User updated = userService.updateAdmin(username, body.get("email"), body.get("password"));
             return ResponseEntity.ok(Map.of(
                 "message", "Admin updated successfully",
@@ -367,12 +389,14 @@ public class UserRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // Delete an admin (Superadmin only)
     @DeleteMapping("/admins/{username}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.deleteAdmin', {'username': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteAdmin(@PathVariable String username, @RequestHeader("Authorization") String token) {
         if (!isSuperAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -382,11 +406,13 @@ public class UserRestController {
             userService.deleteAdmin(username);
             return ResponseEntity.ok(Map.of("message", "Admin deleted successfully", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @PostMapping("/add-user")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.addUser', {'newUser': #p0, 'token': #p1})")
     public ResponseEntity<?> addUser(@Valid @RequestBody User newUser, @RequestHeader("Authorization") String token) {
         try {
             String requestedType = newUser.getUsertype() == null ? "" : newUser.getUsertype().toLowerCase().trim();
@@ -419,15 +445,16 @@ public class UserRestController {
             response.put("status", "SUCCESS");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to add user: " + e.getMessage());
+            errorResponse.put("message", "Failed to add user: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
     @GetMapping("/debug/user/{username}")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.debugGetUser', {'username': #p0})")
     public ResponseEntity<?> debugGetUser(@PathVariable String username) {
         try {
             Optional<User> userOptional = userService.findByUserId(username);
@@ -444,33 +471,36 @@ public class UserRestController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", "User not found", "status", "ERROR"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @PostMapping("/create-test-user")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('UserRestController.createTestUser', {:})")
     public ResponseEntity<?> createTestUser() {
-        // Dev/test bootstrap helper only — must never be reachable in a non-dev deployment,
-        // since it creates a known-credential admin account with no authentication required.
+        // Development helper only; also restricted to authenticated SuperAdmin by the policy.
+        // It remains unavailable outside the dev profile.
         if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("dev"))) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("message", "Not available outside the dev profile", "status", "ERROR"));
         }
         try {
-            User testUser = userService.createTestUser("admin", "password123", "admin@test.com", "admin");
+            User testUser = userService.createTestUser("admin", "TestPassword123!", "admin@test.com", "admin");
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Test user created successfully");
             response.put("userId", testUser.getUserID());
             response.put("email", testUser.getEmail());
             response.put("userType", testUser.getUsertype());
             response.put("status", "SUCCESS");
-            response.put("loginInfo", "You can now login with username: admin, password: password123");
+            response.put("loginInfo", "You can now login with username: admin, password: TestPassword123!");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            SafeErrors.log(e);
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Failed to create test user: " + e.getMessage());
+            errorResponse.put("message", "Failed to create test user: " + SafeErrors.message(e));
             errorResponse.put("status", "ERROR");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+            return ResponseEntity.status(SafeErrors.status(e)).body(errorResponse);
         }
     }
 
@@ -480,7 +510,7 @@ public class UserRestController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && role.equals("superadmin");
         } catch (Exception e) {
@@ -494,7 +524,7 @@ public class UserRestController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && ("admin".equals(role) || "superadmin".equals(role));
         } catch (Exception e) {

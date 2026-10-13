@@ -24,7 +24,7 @@ public class NotificationService {
             m.setContent(content.length() > 2000 ? content.substring(0, 2000) : content);
             messageRepository.save(m);
         } catch (Exception e) {
-            System.err.println("Notification failed for " + recipient + ": " + e.getMessage());
+            com.example.Software.project.Backend.Security.SafeErrors.log(e);
         }
     }
 

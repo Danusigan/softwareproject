@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Repository.ProgramOutcomeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,7 +89,7 @@ public class ProgramOutcomeService {
     // Update PO
     public ProgramOutcome updatePO(String poId, ProgramOutcome updateData) {
         ProgramOutcome existingPO = getPOById(poId)
-            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found with ID: " + poId));
 
         // Update fields if provided
         if (updateData.getTitle() != null) existingPO.setTitle(updateData.getTitle());
@@ -108,7 +109,7 @@ public class ProgramOutcomeService {
     // Soft delete PO (set inactive)
     public void softDeletePO(String poId) {
         ProgramOutcome po = getPOById(poId)
-            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found with ID: " + poId));
         
         if (po.getIsDefault()) {
             throw new IllegalArgumentException("Cannot delete default Washington Accord Program Outcomes");
@@ -122,7 +123,7 @@ public class ProgramOutcomeService {
     // Hard delete PO (only for custom POs)
     public void hardDeletePO(String poId) {
         ProgramOutcome po = getPOById(poId)
-            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found with ID: " + poId));
         
         if (po.getIsDefault()) {
             throw new IllegalArgumentException("Cannot delete default Washington Accord Program Outcomes");
@@ -134,7 +135,7 @@ public class ProgramOutcomeService {
     // Restore soft-deleted PO
     public ProgramOutcome restorePO(String poId) {
         ProgramOutcome po = getPOById(poId)
-            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found with ID: " + poId));
         
         po.setIsActive(true);
         po.setUpdatedAt(LocalDateTime.now());
@@ -210,7 +211,7 @@ public class ProgramOutcomeService {
             throw new IllegalArgumentException("Threshold must be between 0 and 100");
         }
         ProgramOutcome po = getPOById(poId)
-            .orElseThrow(() -> new RuntimeException("Program Outcome not found with ID: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found with ID: " + poId));
         po.setAttainmentThreshold(threshold);
         po.setUpdatedAt(LocalDateTime.now());
         return poRepository.save(po);

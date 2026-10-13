@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Reporting;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -22,19 +23,21 @@ public class BatchReportController {
             String token = authorization.substring(7);
             String username = jwt.extractUsername(token);
             if (!Boolean.TRUE.equals(jwt.validateToken(token, username))) throw new IllegalArgumentException();
-            String role = jwt.extractRole(token);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             return new Staff(role == null ? "" : role.trim().toLowerCase(Locale.ROOT), username);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "A valid staff login is required");
         }
     }
     @GetMapping("/modules")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('BatchReportController.modules', {'batch': #p0, 'authorization': #p1})")
     public ResponseEntity<?> modules(@RequestParam String batch,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         Staff staff = staff(authorization);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.options(batch, staff.role(), staff.username()));
     }
     @GetMapping("/attainment")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('BatchReportController.report', {'batch': #p0, 'moduleIds': #p1, 'studentThreshold': #p2, 'loTarget': #p3, 'poTarget': #p4, 'format': #p5, 'authorization': #p6})")
     public ResponseEntity<?> report(@RequestParam String batch,
             @RequestParam(required = false) List<String> moduleIds,
             @RequestParam(defaultValue = "50") double studentThreshold,
@@ -57,6 +60,6 @@ public class BatchReportController {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<?> error(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode()).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", Objects.toString(exception.getReason(), "Report unavailable")));
+                .body(Map.of("message", SafeErrors.message(exception)));
     }
 }

@@ -1,7 +1,8 @@
 # Ignore local environment variables
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 
 # IDE & Editor
 .vscode/

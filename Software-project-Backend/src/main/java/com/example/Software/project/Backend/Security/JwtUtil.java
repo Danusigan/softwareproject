@@ -20,6 +20,11 @@ public class JwtUtil {
     private final Key secretKey;
 
     public JwtUtil(@Value("${jwt.secret}") String jwtSecret) {
+        if (jwtSecret == null || jwtSecret.isBlank() || jwtSecret.startsWith("${")
+                || jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32
+                || jwtSecret.toLowerCase(java.util.Locale.ROOT).matches("^(change[-_]?me|replace[-_]?me|your[-_]).*")) {
+            throw new IllegalArgumentException("JWT_SECRET must be a generated signing key of at least 32 UTF-8 bytes.");
+        }
         this.secretKey = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 

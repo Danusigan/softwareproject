@@ -1,3 +1,4 @@
+import { passwordError, PASSWORD_RULE } from '../utils/accountValidation';
 import React, { useState } from 'react';
 import Header from '../components/header';
 import Footer from '../components/footer';
@@ -25,8 +26,8 @@ export default function ResetPasswordPage() {
       setMessage({ type: 'error', text: 'Passwords do not match.' });
       return;
     }
-    if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters.' });
+    if (passwordError(newPassword)) {
+      setMessage({ type: 'error', text: passwordError(newPassword) });
       return;
     }
 
@@ -63,7 +64,7 @@ export default function ResetPasswordPage() {
             <div className="mb-8 text-center">
               <h2 className="text-3xl font-semibold tracking-tight text-slate-900 mb-3">Reset Password</h2>
               <p className="text-slate-600 text-base">
-                Choose a new password for your account.
+                {PASSWORD_RULE}
               </p>
             </div>
 

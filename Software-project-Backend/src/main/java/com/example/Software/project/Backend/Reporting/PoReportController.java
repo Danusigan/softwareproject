@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Reporting;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -37,7 +38,7 @@ public class PoReportController {
             String token = authorization.substring(7);
             String username = jwt.extractUsername(token);
             if (!Boolean.TRUE.equals(jwt.validateToken(token, username))) throw new IllegalArgumentException();
-            String role = jwt.extractRole(token);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? "" : role.trim().toLowerCase(Locale.ROOT);
             if (!role.equals("admin") && !role.equals("superadmin")) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
@@ -56,6 +57,7 @@ public class PoReportController {
     }
 
     @GetMapping("/student")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('PoReportController.studentReport', {'studentId': #p0, 'studentThreshold': #p1, 'format': #p2, 'authorization': #p3})")
     public ResponseEntity<?> studentReport(
             @RequestParam String studentId,
             @RequestParam(defaultValue = "40") double studentThreshold,
@@ -79,6 +81,7 @@ public class PoReportController {
      * {@link #batchReport} which is a single aggregated PO-success report for the whole batch.
      */
     @GetMapping("/student/batch")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('PoReportController.studentReportsForBatch', {'batch': #p0, 'studentThreshold': #p1, 'authorization': #p2})")
     public ResponseEntity<?> studentReportsForBatch(
             @RequestParam String batch,
             @RequestParam(defaultValue = "40") double studentThreshold,
@@ -94,7 +97,7 @@ public class PoReportController {
                 zip.closeEntry();
             }
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the report bundle: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Could not build the report bundle: " + SafeErrors.message(e));
         }
 
         String filename = "po-reports-batch-" + batch.trim().replaceAll("[^A-Za-z0-9_-]", "_") + ".zip";
@@ -105,6 +108,7 @@ public class PoReportController {
     }
 
     @GetMapping("/batch")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('PoReportController.batchReport', {'batch': #p0, 'studentThreshold': #p1, 'batchTarget': #p2, 'format': #p3, 'authorization': #p4})")
     public ResponseEntity<?> batchReport(
             @RequestParam String batch,
             @RequestParam(defaultValue = "40") double studentThreshold,
@@ -126,6 +130,6 @@ public class PoReportController {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<?> error(ResponseStatusException exception) {
         return ResponseEntity.status(exception.getStatusCode()).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", Objects.toString(exception.getReason(), "Report unavailable")));
+                .body(Map.of("message", SafeErrors.message(exception)));
     }
 }

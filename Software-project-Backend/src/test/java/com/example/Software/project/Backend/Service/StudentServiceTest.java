@@ -32,6 +32,8 @@ class StudentServiceTest {
     @Mock private com.example.Software.project.Backend.Repository.StudentAssessmentScoreRepository assessmentScoreRepository;
     @Mock private com.example.Software.project.Backend.Repository.StudentPoCreditRepository poCreditRepository;
 
+    @org.mockito.Spy private FileValidationService fileValidationService = new FileValidationService();
+
     @InjectMocks
     private StudentService service;
 

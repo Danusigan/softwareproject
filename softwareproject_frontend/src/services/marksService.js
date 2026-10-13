@@ -1,3 +1,4 @@
+import { validateExcelFile } from '../utils/excelValidation'
 import axios from 'axios'
 
 const BASE_URL = ''
@@ -28,6 +29,7 @@ export const marksService = {
   },
 
   async uploadBulk({ excelFile, losIds, batch, markType }, config = {}) {
+    validateExcelFile(excelFile)
     const formData = new FormData()
     formData.append('excelFile', excelFile)
     formData.append('losIds', Array.isArray(losIds) ? losIds.join(',') : losIds)
@@ -41,6 +43,7 @@ export const marksService = {
   },
 
   async uploadQuestionWise({ excelFile, templateId, batch, markType }, config = {}) {
+    validateExcelFile(excelFile)
     const formData = new FormData()
     formData.append('excelFile', excelFile)
     formData.append('templateId', templateId)
@@ -81,6 +84,7 @@ export const marksService = {
   },
 
   async uploadMarks({ excelFile }, config = {}) {
+    validateExcelFile(excelFile)
     const formData = new FormData()
     formData.append('excelFile', excelFile)
     return axios.post(`${BASE_URL}/api/obe/marks/upload`, formData, {

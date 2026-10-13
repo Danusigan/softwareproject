@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -33,7 +34,7 @@ public class ProgramOutcomeRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = jwtUtil.extractRole(jwt);
+            String userRole = com.example.Software.project.Backend.Security.CurrentUser.role();
             return "admin".equalsIgnoreCase(userRole) || "superadmin".equalsIgnoreCase(userRole);
         } catch (Exception e) {
             return false;
@@ -61,6 +62,7 @@ public class ProgramOutcomeRestController {
 
     // Create new PO (Admin only)
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.createPO', {'po': #p0, 'token': #p1})")
     public ResponseEntity<?> createPO(@RequestBody ProgramOutcome po, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -76,14 +78,16 @@ public class ProgramOutcomeRestController {
             auditLogService.log(username, "PO_CREATE", createdPO.getPoId(), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome created successfully", createdPO));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Update PO (Admin only)
     @PutMapping("/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.updatePO', {'poId': #p0, 'poDetails': #p1, 'token': #p2})")
     public ResponseEntity<?> updatePO(@PathVariable String poId, @RequestBody ProgramOutcome poDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -94,16 +98,19 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_UPDATE", poId, "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome updated successfully", updatedPO));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Soft delete PO (Admin only)
     @DeleteMapping("/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.deletePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> deletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -114,17 +121,19 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "soft delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome deactivated successfully", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error deleting Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error deleting Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Hard delete PO (SuperAdmin only — irreversible, more destructive than the other admin-level actions here)
     @DeleteMapping("/{poId}/permanent")
-    @PreAuthorize("hasAuthority('superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.hardDeletePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> hardDeletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -135,16 +144,19 @@ public class ProgramOutcomeRestController {
             auditLogService.log(jwtUtil.extractUsername(token.substring(7)), "PO_DELETE", poId, "SUCCESS", "permanent delete");
             return ResponseEntity.ok(createSuccessResponse("Program Outcome permanently deleted", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error permanently deleting Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error permanently deleting Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Restore PO (Admin only)
     @PutMapping("/{poId}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.restorePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> restorePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -154,14 +166,17 @@ public class ProgramOutcomeRestController {
             ProgramOutcome restoredPO = poService.restorePO(poId);
             return ResponseEntity.ok(createSuccessResponse("Program Outcome restored successfully", restoredPO));
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse(e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error restoring Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error restoring Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Initialize default POs (Admin only)
     @PostMapping("/initialize-defaults")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.initializeDefaultPOs', {'token': #p0})")
     public ResponseEntity<?> initializeDefaultPOs(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -172,12 +187,14 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
             return ResponseEntity.ok(createSuccessResponse("Default Washington Accord Program Outcomes initialized successfully", defaultPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error initializing default POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error initializing default POs: " + SafeErrors.message(e)));
         }
     }
 
     // Reorder POs (Admin only)
     @PutMapping("/reorder")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.reorderPOs', {'poIds': #p0, 'token': #p1})")
     public ResponseEntity<?> reorderPOs(@RequestBody List<String> poIds, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -187,7 +204,8 @@ public class ProgramOutcomeRestController {
             poService.reorderPOs(poIds);
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes reordered successfully", null));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error reordering POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error reordering POs: " + SafeErrors.message(e)));
         }
     }
 
@@ -195,18 +213,20 @@ public class ProgramOutcomeRestController {
 
     // Get all active POs
     @GetMapping("/all")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getAllActivePOs', {'token': #p0})")
     public ResponseEntity<?> getAllActivePOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> pos = poService.getAllActivePOs();
             return ResponseEntity.ok(createSuccessResponse("Active Program Outcomes retrieved successfully", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
     // Get all POs including inactive (Admin only)
     @GetMapping("/all-including-inactive")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getAllPOs', {'token': #p0})")
     public ResponseEntity<?> getAllPOs(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -216,13 +236,14 @@ public class ProgramOutcomeRestController {
             List<ProgramOutcome> pos = poService.getAllPOs();
             return ResponseEntity.ok(createSuccessResponse("All Program Outcomes retrieved successfully", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
     // Get PO by ID
     @GetMapping("/{poId}")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getPOById', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             Optional<ProgramOutcome> po = poService.getPOById(poId);
@@ -232,37 +253,40 @@ public class ProgramOutcomeRestController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(createErrorResponse("Program Outcome not found"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching Program Outcome: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching Program Outcome: " + SafeErrors.message(e)));
         }
     }
 
     // Get default Washington Accord POs
     @GetMapping("/defaults")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getDefaultPOs', {'token': #p0})")
     public ResponseEntity<?> getDefaultPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> defaultPOs = poService.getDefaultPOs();
             return ResponseEntity.ok(createSuccessResponse("Default Washington Accord Program Outcomes retrieved", defaultPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching default POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching default POs: " + SafeErrors.message(e)));
         }
     }
 
     // Get custom POs
     @GetMapping("/custom")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getCustomPOs', {'token': #p0})")
     public ResponseEntity<?> getCustomPOs(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<ProgramOutcome> customPOs = poService.getCustomPOs();
             return ResponseEntity.ok(createSuccessResponse("Custom Program Outcomes retrieved", customPOs));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching custom POs: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching custom POs: " + SafeErrors.message(e)));
         }
     }
 
     // Get POs by category
     @GetMapping("/by-category/{category}")
-    @PreAuthorize("hasAnyAuthority('admin', 'superadmin')")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.getPOsByCategory', {'category': #p0, 'token': #p1})")
     public ResponseEntity<?> getPOsByCategory(@PathVariable String category, @RequestHeader(value = "Authorization", required = false) String token) {
         try {
             // This would require a new method in service
@@ -271,12 +295,14 @@ public class ProgramOutcomeRestController {
                 .toList();
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes for category '" + category + "' retrieved", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error fetching POs by category: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error fetching POs by category: " + SafeErrors.message(e)));
         }
     }
 
     // Health check endpoint
     @GetMapping("/health")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ProgramOutcomeRestController.healthCheck', {:})")
     public ResponseEntity<?> healthCheck() {
         try {
             long totalPOs = poService.getAllPOs().size();
@@ -293,7 +319,8 @@ public class ProgramOutcomeRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Program Outcome system is healthy", healthData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Health check failed: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Health check failed: " + SafeErrors.message(e)));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Repository.*;
@@ -34,7 +35,7 @@ public class CQIService {
     public List<CqiAction> checkAndTriggerCQI(String moduleId, String batch,
                                               Double studentPassThreshold, Double batchTarget) {
         Module module = moduleRepository.findById(moduleId)
-            .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
+            .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
         List<Los> losList = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
 
         List<CqiAction> triggered = new ArrayList<>();
@@ -105,7 +106,7 @@ public class CQIService {
 
     public List<CqiAction> checkAndTriggerCQI_PO(String moduleId, String batch, Double poTargetPercent) {
         Module module = moduleRepository.findById(moduleId)
-            .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
+            .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
         double target = poTargetPercent != null ? poTargetPercent : DEFAULT_PO_TARGET_PERCENT;
 
         List<StudentPoCredit> credits = studentPoCreditRepository.findByModule_ModuleIdAndBatch(moduleId, batch);
@@ -151,15 +152,15 @@ public class CQIService {
 
     public CqiAction submitPlan(Long cqiActionId, String lecturerUsername, CqiPlanDTO dto) {
         CqiAction action = cqiActionRepository.findById(cqiActionId)
-            .orElseThrow(() -> new RuntimeException("CQI action not found: " + cqiActionId));
+            .orElseThrow(() -> new ResourceNotFoundException("CQI action not found: " + cqiActionId));
 
         List<String> moduleLecturers = action.getModule() != null ? action.getModule().getAssignedLecturerUsernames() : null;
         boolean owns = lecturerUsername != null && (
             lecturerUsername.equals(action.getCreatedBy())
             || (moduleLecturers != null && moduleLecturers.contains(lecturerUsername))
         );
-        if (!owns) {
-            throw new RuntimeException("You do not have access to this CQI action");
+        if (!owns && !com.example.Software.project.Backend.Security.CurrentUser.admin()) {
+            throw new org.springframework.security.access.AccessDeniedException("Access denied");
         }
 
         action.setRootCause(dto.getRootCause());
@@ -185,7 +186,7 @@ public class CQIService {
 
     public CqiAction approvePlan(Long cqiActionId, String adminUsername) {
         CqiAction action = cqiActionRepository.findById(cqiActionId)
-            .orElseThrow(() -> new RuntimeException("CQI action not found: " + cqiActionId));
+            .orElseThrow(() -> new ResourceNotFoundException("CQI action not found: " + cqiActionId));
         action.setStatus(CqiStatus.IN_PROGRESS);
         action.setApprovedBy(adminUsername);
         return cqiActionRepository.save(action);
@@ -193,7 +194,7 @@ public class CQIService {
 
     public CqiAction returnPlan(Long cqiActionId, String adminUsername, String comment) {
         CqiAction action = cqiActionRepository.findById(cqiActionId)
-            .orElseThrow(() -> new RuntimeException("CQI action not found: " + cqiActionId));
+            .orElseThrow(() -> new ResourceNotFoundException("CQI action not found: " + cqiActionId));
         action.setAdminComment(comment);
         action.setSubmitted(false);
         action.setStatus(CqiStatus.PLANNED);
@@ -230,7 +231,13 @@ public class CQIService {
     }
 
     public List<CqiAction> getMyPlans(String lecturerUsername) {
-        return cqiActionRepository.findByCreatedByOrderByCreatedAtDesc(lecturerUsername);
+        return cqiActionRepository.findAll().stream().filter(action ->
+                com.example.Software.project.Backend.Security.CurrentUser.admin()
+                || (action.getModule() != null && !Boolean.TRUE.equals(action.getModule().getIsDeleted())
+                    && !Boolean.TRUE.equals(action.getIsDeleted()) && action.getModule().getAssignedLecturerUsernames().contains(lecturerUsername)))
+                .sorted(java.util.Comparator.comparing(CqiAction::getCreatedAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .toList();
     }
 
     // Entry point for POST /api/cqi/finalize/{moduleId}: for every LO in the module, links this
@@ -242,7 +249,7 @@ public class CQIService {
     public Map<String, Object> finalizeModuleAttainment(String moduleId, String batch,
                                                         Double studentPassThreshold, Double batchTarget) {
         moduleRepository.findById(moduleId)
-            .orElseThrow(() -> new RuntimeException("Module not found: " + moduleId));
+            .orElseThrow(() -> new ResourceNotFoundException("Module not found: " + moduleId));
         List<Los> losList = losRepository.findByModule_ModuleIdAndIsDeletedFalse(moduleId);
 
         List<CqiAction> removed = new ArrayList<>();
@@ -315,7 +322,7 @@ public class CQIService {
         // PO report rows identify a PO by its code, not its primary key, so accept either
         ProgramOutcome po = programOutcomeRepository.findById(poId)
             .or(() -> programOutcomeRepository.findByCode(poId))
-            .orElseThrow(() -> new RuntimeException("Program outcome not found: " + poId));
+            .orElseThrow(() -> new ResourceNotFoundException("Program outcome not found: " + poId));
         plan.setProgramOutcome(po);
 
         return cqiActionRepository.save(plan);
@@ -329,21 +336,21 @@ public class CQIService {
     // ADMIN: Update CQI plan status (Created -> In Progress -> Completed -> Closed)
     public CqiAction updateCqiPlanStatus(Long planId, String newStatus) {
         CqiAction plan = cqiActionRepository.findById(planId)
-            .orElseThrow(() -> new RuntimeException("CQI plan not found: " + planId));
+            .orElseThrow(() -> new ResourceNotFoundException("CQI plan not found: " + planId));
 
         try {
             CqiStatus status = CqiStatus.valueOf(newStatus.toUpperCase());
             plan.setStatus(status);
             return cqiActionRepository.save(plan);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid status: " + newStatus);
+            throw new IllegalArgumentException("Invalid status: " + newStatus);
         }
     }
 
     // ADMIN: Update CQI plan details
     public CqiAction updateCqiPlanDetails(Long planId, String plannedActions, Double targetAttainment) {
         CqiAction plan = cqiActionRepository.findById(planId)
-            .orElseThrow(() -> new RuntimeException("CQI plan not found: " + planId));
+            .orElseThrow(() -> new ResourceNotFoundException("CQI plan not found: " + planId));
 
         if (plannedActions != null && !plannedActions.isBlank()) {
             plan.setActionPlan(plannedActions);

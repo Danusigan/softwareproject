@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.ModuleService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ public class ModuleRestController {
 
     // Create (Admin Only)
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.createModule', {'module': #p0, 'token': #p1})")
     public ResponseEntity<?> createModule(@RequestBody com.example.Software.project.Backend.Model.Module module, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -39,8 +41,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -48,10 +51,11 @@ public class ModuleRestController {
 
     // Read All - lecturers only see modules they're assigned to (or unassigned ones); admins see everything
     @GetMapping("/all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.getAllModules', {'token': #p0})")
     public ResponseEntity<?> getAllModules(@RequestHeader("Authorization") String token) {
         try {
             String bearerToken = token != null && token.startsWith("Bearer ") ? token.substring(7) : token;
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
 
             List<com.example.Software.project.Backend.Model.Module> modules = "lecture".equals(role)
@@ -64,8 +68,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -73,6 +78,7 @@ public class ModuleRestController {
 
     // Read One
     @GetMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.getModuleById', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleById(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             java.util.Optional<com.example.Software.project.Backend.Model.Module> module = moduleService.getModuleById(id);
@@ -86,8 +92,9 @@ public class ModuleRestController {
                 "status", "ERROR"
             )));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -95,6 +102,7 @@ public class ModuleRestController {
 
     // Update (Admin Only)
     @PutMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.updateModule', {'id': #p0, 'moduleDetails': #p1, 'token': #p2})")
     public ResponseEntity<?> updateModule(@PathVariable String id, @RequestBody com.example.Software.project.Backend.Model.Module moduleDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -111,8 +119,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -120,6 +129,7 @@ public class ModuleRestController {
 
     // Delete (Admin Only) — soft delete; module moves to the archive, recoverable via /restore
     @DeleteMapping("/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.deleteModule', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteModule(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -135,8 +145,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -144,6 +155,7 @@ public class ModuleRestController {
 
     // Archive (Admin Only) — list soft-deleted modules
     @GetMapping("/admin/deleted")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.getDeletedModules', {'token': #p0})")
     public ResponseEntity<?> getDeletedModules(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -158,8 +170,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -167,6 +180,7 @@ public class ModuleRestController {
 
     // Restore (Admin Only)
     @PutMapping("/{id}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('ModuleRestController.restoreModule', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> restoreModule(@PathVariable String id, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -182,8 +196,9 @@ public class ModuleRestController {
                 "status", "SUCCESS"
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
-                "message", "Error: " + e.getMessage(),
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Error: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -203,7 +218,7 @@ public class ModuleRestController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && ("admin".equals(role) || "superadmin".equals(role));
         } catch (Exception e) {

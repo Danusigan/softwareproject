@@ -299,7 +299,7 @@ export default function AdminDashboard() {
                                         <p className="text-center text-xs text-gray-500 mb-4">
                                             {module.assignedLecturerUsernames?.length
                                                 ? `Assigned: ${module.assignedLecturerUsernames.join(', ')}`
-                                                : 'Visible to all lecturers'}
+                                                : 'Admin and SuperAdmin only'}
                                         </p>
                                         <div className="flex justify-center gap-2 mt-4">
                                             {/* Edit Icon */}
@@ -553,7 +553,7 @@ export default function AdminDashboard() {
                                 selectedValues={moduleData.assignedLecturerUsernames}
                                 onChange={(usernames) => setModuleData({ ...moduleData, assignedLecturerUsernames: usernames })}
                                 placeholder="Type a lecturer's username..."
-                                emptyHint="Leave empty to keep this module visible to all lecturers."
+                                emptyHint="Select lecturers to grant access. If empty, only Admin and SuperAdmin can access this module."
                             />
                         </div>
 
@@ -629,7 +629,7 @@ export default function AdminDashboard() {
                                     selectedValues={moduleData.assignedLecturerUsernames}
                                     onChange={(usernames) => setModuleData({ ...moduleData, assignedLecturerUsernames: usernames })}
                                     placeholder="Type a lecturer's username..."
-                                    emptyHint="Leave empty to keep this module visible to all lecturers."
+                                    emptyHint="Select lecturers to grant access. If empty, only Admin and SuperAdmin can access this module."
                                 />
                             </div>
 

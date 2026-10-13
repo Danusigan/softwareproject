@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.AuditLogService;
@@ -40,7 +41,7 @@ public class LOPOMappingRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            String userRole = normalizeRole(com.example.Software.project.Backend.Security.CurrentUser.role());
             return "lecture".equals(userRole)
                 || "lecturer".equals(userRole)
                 || isAdmin(token);
@@ -53,7 +54,7 @@ public class LOPOMappingRestController {
         try {
             if (token == null || !token.startsWith("Bearer ")) return false;
             String jwt = token.substring(7);
-            String userRole = normalizeRole(jwtUtil.extractRole(jwt));
+            String userRole = normalizeRole(com.example.Software.project.Backend.Security.CurrentUser.role());
             return "admin".equals(userRole) || "superadmin".equals(userRole);
         } catch (Exception e) {
             return false;
@@ -88,6 +89,7 @@ public class LOPOMappingRestController {
 
     // Get all LO-PO mappings
     @GetMapping("/all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getAllMappings', {'moduleId': #p0, 'status': #p1, 'batch': #p2, 'search': #p3, 'token': #p4})")
     public ResponseEntity<?> getAllMappings(
             @RequestParam(required = false) String moduleId,
             @RequestParam(required = false) String status,
@@ -102,12 +104,14 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getAllMappings(moduleId, status, batch, search);
             return ResponseEntity.ok(createSuccessResponse("Mappings retrieved successfully", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Get LO-PO mapping statistics
     @GetMapping("/statistics")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingStatistics', {'token': #p0})")
     public ResponseEntity<?> getMappingStatistics(@RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -122,7 +126,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Mapping statistics retrieved", statistics));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving statistics: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving statistics: " + SafeErrors.message(e)));
         }
     }
 
@@ -130,6 +135,7 @@ public class LOPOMappingRestController {
 
     // Get mapping suggestions for an LO
     @GetMapping("/suggestions")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingSuggestions', {'moduleId': #p0, 'loDescription': #p1, 'token': #p2})")
     public ResponseEntity<?> getMappingSuggestions(
             @RequestParam String moduleId,
             @RequestParam(required = false) String loDescription,
@@ -163,12 +169,14 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Mapping suggestions generated", enrichedSuggestions));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error generating suggestions: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error generating suggestions: " + SafeErrors.message(e)));
         }
     }
 
     // Create mappings for an LO
     @PostMapping("/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.createMappings', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> createMappings(
             @RequestParam String loId,
             @RequestBody Map<String, Object> request,
@@ -187,14 +195,16 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> createdMappings = mappingService.createMappings(loId, mappings, username, remarks);
             return ResponseEntity.ok(createSuccessResponse("Mappings created successfully", createdMappings));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error creating mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error creating mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Get mappings for an LO
     @GetMapping("/lo/{loId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingsForLO', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingsForLO(@PathVariable String loId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -204,12 +214,14 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getMappingsForLO(loId);
             return ResponseEntity.ok(createSuccessResponse("Mappings retrieved", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Get mappings for a module
     @GetMapping("/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingsForModule', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingsForModule(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -219,12 +231,14 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> mappings = mappingService.getMappingsForModule(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Module mappings retrieved", mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Update mapping (if not approved)
     @PutMapping("/{mappingId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.updateMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> updateMapping(
             @PathVariable Long mappingId,
             @RequestBody Map<String, Object> request,
@@ -240,14 +254,16 @@ public class LOPOMappingRestController {
             OutcomeMapping updatedMapping = mappingService.updateMapping(mappingId, newWeight, lecturerRemarks);
             return ResponseEntity.ok(createSuccessResponse("Mapping updated successfully", updatedMapping));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error updating mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error updating mapping: " + SafeErrors.message(e)));
         }
     }
 
     // Delete mapping (if not approved) — soft delete, recoverable via admin restore
     @DeleteMapping("/{mappingId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.deleteMapping', {'mappingId': #p0, 'token': #p1})")
     public ResponseEntity<?> deleteMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -257,14 +273,16 @@ public class LOPOMappingRestController {
             mappingService.deleteMapping(mappingId, extractUsername(token));
             return ResponseEntity.ok(createSuccessResponse("Mapping moved to archive", null));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error deleting mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error deleting mapping: " + SafeErrors.message(e)));
         }
     }
 
     // Get all soft-deleted mappings (Admin only — archive view)
     @GetMapping("/admin/deleted")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getDeletedMappings', {'token': #p0})")
     public ResponseEntity<?> getDeletedMappings(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -273,12 +291,14 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("Deleted mappings retrieved", mappingService.getDeletedMappings()));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving deleted mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving deleted mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Restore a soft-deleted mapping (Admin only)
     @PutMapping("/admin/{mappingId}/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.restoreMapping', {'mappingId': #p0, 'token': #p1})")
     public ResponseEntity<?> restoreMapping(@PathVariable Long mappingId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -288,14 +308,16 @@ public class LOPOMappingRestController {
             OutcomeMapping restored = mappingService.restoreMapping(mappingId);
             return ResponseEntity.ok(createSuccessResponse("Mapping restored from archive", restored));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(createErrorResponse(e.getMessage()));
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse(SafeErrors.message(e)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error restoring mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error restoring mapping: " + SafeErrors.message(e)));
         }
     }
 
     // Get mapping statistics for a module
     @GetMapping("/statistics/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getMappingStatistics', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getMappingStatistics(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isLecturer(token)) {
@@ -305,7 +327,8 @@ public class LOPOMappingRestController {
             Map<String, Object> stats = mappingService.getMappingStatistics(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Statistics retrieved", stats));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving statistics: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving statistics: " + SafeErrors.message(e)));
         }
     }
 
@@ -313,6 +336,7 @@ public class LOPOMappingRestController {
 
     // Get all pending mappings for review
     @GetMapping("/admin/pending")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getPendingMappings', {'token': #p0})")
     public ResponseEntity<?> getPendingMappings(@RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -322,12 +346,14 @@ public class LOPOMappingRestController {
             List<OutcomeMapping> pendingMappings = mappingService.getPendingMappings();
             return ResponseEntity.ok(createSuccessResponse("Pending mappings retrieved", pendingMappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving pending mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving pending mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Approve mapping
     @PutMapping("/admin/{mappingId}/approve")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.approveMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> approveMapping(
             @PathVariable Long mappingId,
             @RequestBody(required = false) Map<String, String> request,
@@ -341,15 +367,17 @@ public class LOPOMappingRestController {
             String adminRemarks = request != null ? request.getOrDefault("adminRemarks", "") : "";
 
             OutcomeMapping approvedMapping = mappingService.approveMapping(mappingId, username, adminRemarks);
-            auditLogService.log(username, "MAPPING_APPROVE", String.valueOf(mappingId), "SUCCESS", adminRemarks);
+            auditLogService.log(username, "MAPPING_APPROVE", String.valueOf(mappingId), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Mapping approved successfully", approvedMapping));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error approving mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error approving mapping: " + SafeErrors.message(e)));
         }
     }
 
     // Reject mapping
     @PutMapping("/admin/{mappingId}/reject")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.rejectMapping', {'mappingId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> rejectMapping(
             @PathVariable Long mappingId,
             @RequestBody Map<String, String> request,
@@ -367,15 +395,17 @@ public class LOPOMappingRestController {
             }
 
             OutcomeMapping rejectedMapping = mappingService.rejectMapping(mappingId, username, adminRemarks);
-            auditLogService.log(username, "MAPPING_REJECT", String.valueOf(mappingId), "SUCCESS", adminRemarks);
+            auditLogService.log(username, "MAPPING_REJECT", String.valueOf(mappingId), "SUCCESS", null);
             return ResponseEntity.ok(createSuccessResponse("Mapping rejected", rejectedMapping));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error rejecting mapping: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error rejecting mapping: " + SafeErrors.message(e)));
         }
     }
 
     // Bulk approve mappings for an LO
     @PutMapping("/admin/lo/{loId}/approve-all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.bulkApproveMappingsForLO', {'loId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> bulkApproveMappingsForLO(
             @PathVariable String loId,
             @RequestBody(required = false) Map<String, String> request,
@@ -394,12 +424,14 @@ public class LOPOMappingRestController {
                 "mappings", approvedMappings
             )));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error bulk approving mappings: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error bulk approving mappings: " + SafeErrors.message(e)));
         }
     }
 
     // Get comprehensive mapping report for a module
     @GetMapping("/admin/report/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getModuleMappingReport', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getModuleMappingReport(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -409,7 +441,8 @@ public class LOPOMappingRestController {
             Map<String, Object> report = mappingService.getModuleMappingReport(moduleId);
             return ResponseEntity.ok(createSuccessResponse("Module mapping report generated", report));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error generating report: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error generating report: " + SafeErrors.message(e)));
         }
     }
 
@@ -417,17 +450,20 @@ public class LOPOMappingRestController {
 
     // Get all available Program Outcomes for mapping interface
     @GetMapping("/program-outcomes")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.getProgramOutcomes', {'token': #p0})")
     public ResponseEntity<?> getProgramOutcomes(@RequestHeader(value = "Authorization", required = false) String token) {
         try {
             List<com.example.Software.project.Backend.Model.ProgramOutcome> pos = poService.getAllActivePOs();
             return ResponseEntity.ok(createSuccessResponse("Program Outcomes retrieved", pos));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Error retrieving Program Outcomes: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Error retrieving Program Outcomes: " + SafeErrors.message(e)));
         }
     }
 
     // Health check for mapping system
     @GetMapping("/health")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('LOPOMappingRestController.healthCheck', {:})")
     public ResponseEntity<?> healthCheck() {
         try {
             List<OutcomeMapping> pendingMappings = mappingService.getPendingMappings();
@@ -438,7 +474,8 @@ public class LOPOMappingRestController {
 
             return ResponseEntity.ok(createSuccessResponse("LO-PO Mapping system is healthy", healthData));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(createErrorResponse("Health check failed: " + e.getMessage()));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(createErrorResponse("Health check failed: " + SafeErrors.message(e)));
         }
     }
 }

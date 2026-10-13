@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.OutcomeMapping;
 import com.example.Software.project.Backend.Model.ProgramOutcome;
 import com.example.Software.project.Backend.Model.Los;
@@ -203,7 +204,7 @@ public class LOPOMappingService {
      */
     public List<OutcomeMapping> createMappings(String loId, Map<String, Integer> mappings, String mappedBy, String remarks) {
         Los los = losRepository.findById(loId)
-            .orElseThrow(() -> new RuntimeException("Learning Outcome not found: " + loId));
+            .orElseThrow(() -> new ResourceNotFoundException("Learning Outcome not found: " + loId));
 
         // Validate mappings
         validateMappings(mappings);
@@ -216,7 +217,7 @@ public class LOPOMappingService {
 
             if (weight > 0) { // Only create mappings with positive weight
                 ProgramOutcome po = poRepository.findById(poId)
-                    .orElseThrow(() -> new RuntimeException("Program Outcome not found: " + poId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Program Outcome not found: " + poId));
 
                 OutcomeMapping mapping = new OutcomeMapping();
                 mapping.setLearningOutcome(los);
@@ -291,7 +292,15 @@ public class LOPOMappingService {
     private List<OutcomeMapping> excludeDeleted(List<OutcomeMapping> mappings) {
         return mappings.stream()
             .filter(m -> !Boolean.TRUE.equals(m.getIsDeleted()))
+            .filter(this::visibleToCurrentUser)
             .collect(Collectors.toList());
+    }
+
+    private boolean visibleToCurrentUser(OutcomeMapping mapping) {
+        if (!"lecture".equals(com.example.Software.project.Backend.Security.CurrentUser.role())) return true;
+        var module = mapping.getLearningOutcome() == null ? null : mapping.getLearningOutcome().getModule();
+        return module != null && !Boolean.TRUE.equals(module.getIsDeleted()) && module.getAssignedLecturers() != null && module.getAssignedLecturers().stream()
+                .anyMatch(u -> u.getUserID().equals(com.example.Software.project.Backend.Security.CurrentUser.username()));
     }
 
     /**
@@ -315,7 +324,7 @@ public class LOPOMappingService {
      */
     public OutcomeMapping approveMapping(Long mappingId, String reviewedBy, String adminRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
-            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+            .orElseThrow(() -> new ResourceNotFoundException("Mapping not found: " + mappingId));
 
         mapping.setStatus(OutcomeMapping.ApprovalStatus.APPROVED);
         mapping.setReviewedBy(reviewedBy);
@@ -332,7 +341,7 @@ public class LOPOMappingService {
      */
     public OutcomeMapping rejectMapping(Long mappingId, String reviewedBy, String adminRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
-            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+            .orElseThrow(() -> new ResourceNotFoundException("Mapping not found: " + mappingId));
 
         mapping.setStatus(OutcomeMapping.ApprovalStatus.REJECTED);
         mapping.setReviewedBy(reviewedBy);
@@ -370,7 +379,7 @@ public class LOPOMappingService {
      */
     public OutcomeMapping updateMapping(Long mappingId, Integer newWeight, String lecturerRemarks) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
-            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+            .orElseThrow(() -> new ResourceNotFoundException("Mapping not found: " + mappingId));
 
         if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED) {
             throw new IllegalArgumentException("Cannot update approved mappings");
@@ -397,7 +406,7 @@ public class LOPOMappingService {
      */
     public void deleteMapping(Long mappingId, String deletedBy) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
-            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+            .orElseThrow(() -> new ResourceNotFoundException("Mapping not found: " + mappingId));
 
         if (mapping.getStatus() == OutcomeMapping.ApprovalStatus.APPROVED) {
             throw new IllegalArgumentException("Cannot delete approved mappings");
@@ -412,7 +421,7 @@ public class LOPOMappingService {
      */
     public OutcomeMapping restoreMapping(Long mappingId) {
         OutcomeMapping mapping = mappingRepository.findById(mappingId)
-            .orElseThrow(() -> new RuntimeException("Mapping not found: " + mappingId));
+            .orElseThrow(() -> new ResourceNotFoundException("Mapping not found: " + mappingId));
 
         if (!Boolean.TRUE.equals(mapping.getIsDeleted())) {
             throw new IllegalArgumentException("Mapping is not deleted");
@@ -534,21 +543,21 @@ public class LOPOMappingService {
      * Get total mappings count
      */
     public long getTotalMappingsCount() {
-        return mappingRepository.count();
+        return excludeDeleted(mappingRepository.findAll()).size();
     }
 
     /**
      * Get pending mappings count
      */
     public long getPendingMappingsCount() {
-        return mappingRepository.countByStatus(OutcomeMapping.ApprovalStatus.PENDING);
+        return excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.PENDING)).size();
     }
 
     /**
      * Get approved mappings count
      */
     public long getApprovedMappingsCount() {
-        return mappingRepository.countByStatus(OutcomeMapping.ApprovalStatus.APPROVED);
+        return excludeDeleted(mappingRepository.findByStatus(OutcomeMapping.ApprovalStatus.APPROVED)).size();
     }
 
     /**

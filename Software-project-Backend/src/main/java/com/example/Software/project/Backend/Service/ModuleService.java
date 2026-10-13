@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.Module;
 import com.example.Software.project.Backend.Model.User;
@@ -49,7 +50,7 @@ public class ModuleService {
 
     public Module createModule(Module module, String createdBy) throws Exception {
         if (moduleRepository.existsById(module.getModuleId())) {
-            throw new Exception("Module ID already exists");
+            throw new IllegalArgumentException("Module ID already exists");
         }
         module.setAssignedLecturers(resolveLecturers(module.getAssignedLecturerUsernamesInput()));
         Module saved = moduleRepository.save(module);
@@ -72,13 +73,11 @@ public class ModuleService {
         return moduleRepository.findByModuleIdAndIsDeletedFalse(id);
     }
 
-    // Read All visible to a lecturer: unassigned modules stay visible to everyone
-    // (so modules created before this feature existed don't suddenly disappear);
-    // assigning at least one lecturer scopes that module to just them.
+    // Lecturers must be explicitly assigned. Unassigned modules remain administrator-only.
     public List<Module> getModulesForLecturer(String username) {
         return moduleRepository.findByIsDeletedFalse().stream()
-                .filter(m -> m.getAssignedLecturers() == null || m.getAssignedLecturers().isEmpty()
-                        || m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
+                .filter(m -> m.getAssignedLecturers() != null
+                        && m.getAssignedLecturers().stream().anyMatch(u -> u.getUserID().equals(username)))
                 .collect(Collectors.toList());
     }
 
@@ -98,9 +97,9 @@ public class ModuleService {
     // those modules are left untouched.
     public void setModulesForLecturer(String username, List<String> moduleIds) throws Exception {
         User lecturer = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found: " + username));
         if (!"lecture".equalsIgnoreCase(lecturer.getUsertype())) {
-            throw new Exception(username + " is not a lecturer");
+            throw new IllegalArgumentException(username + " is not a lecturer");
         }
         List<String> targetIds = moduleIds == null ? new ArrayList<>() : moduleIds;
         for (Module module : moduleRepository.findAll()) {
@@ -141,9 +140,9 @@ public class ModuleService {
         List<User> lecturers = new ArrayList<>();
         for (String username : usernames) {
             User user = userRepository.findByUsername(username)
-                    .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+                    .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found: " + username));
             if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
-                throw new Exception(username + " is not a lecturer");
+                throw new IllegalArgumentException(username + " is not a lecturer");
             }
             lecturers.add(user);
         }
@@ -153,14 +152,14 @@ public class ModuleService {
     // Update (Admin)
     public Module updateModule(String id, Module moduleDetails) throws Exception {
         Module module = moduleRepository.findByModuleIdAndIsDeletedFalse(id)
-                .orElseThrow(() -> new Exception("Module not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Module not found"));
 
         String newModuleId = moduleDetails.getModuleId();
 
         // If moduleId is being changed, check if new ID already exists
         if (newModuleId != null && !newModuleId.equals(id)) {
             if (moduleRepository.existsById(newModuleId)) {
-                throw new Exception("Module ID '" + newModuleId + "' already exists");
+                throw new IllegalArgumentException("Module ID '" + newModuleId + "' already exists");
             }
             // Delete old module and create new one with updated ID
             moduleRepository.deleteById(id);
@@ -181,7 +180,7 @@ public class ModuleService {
     @Transactional
     public void deleteModule(String id, String deletedBy) throws Exception {
         Module module = moduleRepository.findByModuleIdAndIsDeletedFalse(id)
-                .orElseThrow(() -> new Exception("Module not found or already deleted"));
+                .orElseThrow(() -> new ResourceNotFoundException("Module not found or already deleted"));
 
         // 1. Soft-delete CqiAction records tied to this module directly (module-level, not LO-level —
         //    LO-linked ones are handled by the per-LO cascade below).
@@ -212,9 +211,9 @@ public class ModuleService {
     @Transactional
     public void restoreModule(String id) throws Exception {
         Module module = moduleRepository.findById(id)
-                .orElseThrow(() -> new Exception("Module not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Module not found"));
         if (!Boolean.TRUE.equals(module.getIsDeleted())) {
-            throw new Exception("Module is not deleted");
+            throw new IllegalArgumentException("Module is not deleted");
         }
 
         module.restore();

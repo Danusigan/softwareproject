@@ -15,7 +15,12 @@ export const ProtectedRoute = ({ children, requiredRole = null }) => {
     const userRole = userInfo?.userType?.toLowerCase()?.trim();
     const requiredRoleLower = requiredRole.toLowerCase();
 
-    if (userRole !== requiredRoleLower) {
+    const allowedRoles = {
+      superadmin: ['superadmin'],
+      admin: ['admin', 'superadmin'],
+      lecture: ['lecture', 'admin', 'superadmin'],
+    };
+    if (!(allowedRoles[requiredRoleLower] || [requiredRoleLower]).includes(userRole)) {
       return <Navigate to="/" replace />;
     }
   }

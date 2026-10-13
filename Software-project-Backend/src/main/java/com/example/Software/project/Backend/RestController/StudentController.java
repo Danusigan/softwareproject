@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.Student;
 import com.example.Software.project.Backend.Security.JwtUtil;
 import com.example.Software.project.Backend.Service.FileValidationService;
@@ -34,6 +35,7 @@ public class StudentController {
     private JwtUtil jwtUtil;
 
     @PostMapping("/upload")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.upload', {'file': #p0, 'token': #p1})")
     public ResponseEntity<?> upload(@RequestParam("file") MultipartFile file,
                                      @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
@@ -47,13 +49,15 @@ public class StudentController {
                             result.get("created") + " created, " + result.get("updated") + " updated.",
                     "status", "SUCCESS", "data", result));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Could not process the uploaded file: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Could not process the uploaded file: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @GetMapping("/template")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.template', {'token': #p0})")
     public ResponseEntity<?> template(@RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
@@ -66,11 +70,13 @@ public class StudentController {
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                     .body(bytes);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("message", "Could not generate the template: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", "Could not generate the template: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @GetMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.list', {'batch': #p0, 'academicYear': #p1, 'deleted': #p2, 'token': #p3})")
     public ResponseEntity<?> list(@RequestParam(required = false) String batch,
                                    @RequestParam(required = false) String academicYear,
                                    @RequestParam(defaultValue = "false") boolean deleted,
@@ -84,17 +90,19 @@ public class StudentController {
 
     // Student IDs contain slashes (EG/2024/6555), so they travel in the body / query string, not the path.
     @PostMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.create', {'body': #p0, 'token': #p1})")
     public ResponseEntity<?> create(@RequestBody Student body, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
             Student s = studentService.create(body);
             return ResponseEntity.ok(Map.of("message", "Student added.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @PutMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.update', {'id': #p0, 'body': #p1, 'token': #p2})")
     public ResponseEntity<?> update(@RequestParam("id") String id, @RequestBody Student body,
                                     @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
@@ -102,11 +110,12 @@ public class StudentController {
             Student s = studentService.update(id, body);
             return ResponseEntity.ok(Map.of("message", "Student updated.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @DeleteMapping
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.delete', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> delete(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
@@ -117,18 +126,19 @@ public class StudentController {
                     : "Student deleted.";
             return ResponseEntity.ok(Map.of("message", msg, "status", "SUCCESS", "mode", mode));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     @PostMapping("/restore")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('StudentController.restore', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> restore(@RequestParam("id") String id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return forbidden();
         try {
             Student s = studentService.restore(id);
             return ResponseEntity.ok(Map.of("message", "Student restored.", "status", "SUCCESS", "data", s));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -142,7 +152,7 @@ public class StudentController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {

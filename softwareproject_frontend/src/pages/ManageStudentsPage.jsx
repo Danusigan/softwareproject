@@ -1,3 +1,4 @@
+import { excelFileError, EXCEL_UPLOAD_HELP } from '../utils/excelValidation'
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/header'
@@ -141,8 +142,8 @@ export default function ManageStudentsPage() {
 
   const handleFileChange = e => {
     const f = e.target.files?.[0]
-    if (f && !(f.name.endsWith('.xlsx') || f.name.endsWith('.xls'))) {
-      setMessage({ type: 'error', text: 'Only .xlsx or .xls files are allowed.' })
+    if (f && excelFileError(f)) {
+      setMessage({ type: 'error', text: excelFileError(f) })
       e.target.value = ''
       setUploadFile(null)
       return
@@ -196,6 +197,7 @@ export default function ManageStudentsPage() {
             Columns: Student ID, Student Name, Email, Academic Year, Batch. Existing students (matched by Student ID) are updated;
             new ones are created. Leave a cell blank to keep an existing student&apos;s current value for that field.
           </p>
+          <p className="text-sm text-gray-500 mb-3">{EXCEL_UPLOAD_HELP}</p>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             <button
               onClick={handleDownloadTemplate}
@@ -207,7 +209,7 @@ export default function ManageStudentsPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".xlsx,.xls"
+              title={EXCEL_UPLOAD_HELP} accept=".xlsx,.xls"
               onChange={handleFileChange}
               disabled={!!busyAction}
               className="flex-1 text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 file:font-semibold hover:file:bg-indigo-100"

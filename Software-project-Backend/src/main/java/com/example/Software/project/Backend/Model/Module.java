@@ -25,9 +25,8 @@ public class Module {
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private List<Los> losList; // Renamed from losPosList
 
-    // Lecturers allowed to manage this module. An empty list means "unrestricted" -
-    // every lecturer can still see it, preserving behavior for modules created before
-    // this feature existed. Assigning at least one lecturer scopes visibility to them.
+    // Only explicitly assigned lecturers may access this module.
+    // An empty assignment list leaves access to Admin and SuperAdmin.
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "module_lecturers",

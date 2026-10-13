@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
 import com.example.Software.project.Backend.Model.Los;
 import com.example.Software.project.Backend.Model.MarkType;
 import com.example.Software.project.Backend.Model.Module;
@@ -35,6 +36,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class ExcelImportService {
 
     @Autowired
+    private FileValidationService fileValidationService;
+
+    @Autowired
     private StudentMarkRepository markRepository;
     @Autowired
     private LosRepository losRepository;
@@ -50,10 +54,11 @@ public class ExcelImportService {
     private ObjectMapper objectMapper;
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch, String markType) {
         try {
             Los los = losRepository.findById(losId)
-                    .orElseThrow(() -> new Exception("Learning Outcome not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Learning Outcome not found"));
 
             // Default to FINAL_EXAM if not specified
             MarkType type = MarkType.FINAL_EXAM;
@@ -65,8 +70,19 @@ public class ExcelImportService {
                 }
             }
 
-            try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            try (Workbook workbook = fileValidationService.openWorkbook(file)) {
                 Sheet sheet = workbook.getSheetAt(0);
+                FileValidationService.studentHeader(sheet.getRow(0));
+                FileValidationService.columns(sheet.getRow(0), 2);
+                if (!java.util.Set.of("mark", "marks", "score").contains(FileValidationService.text(sheet.getRow(0),1).toLowerCase(java.util.Locale.ROOT)))
+                    throw new FileValidationService.InvalidUpload("Expected a Marks column after Student Index.");
+                FileValidationService.dataRows(sheet, 0, 2);
+                for (Row row : sheet) {
+                    if (row.getRowNum()==0 || FileValidationService.text(row,0).isBlank()) continue;
+                    Double score = parseScore(row.getCell(1));
+                    if (FileValidationService.text(row,1).isBlank()) throw new FileValidationService.InvalidUpload("Row " +(row.getRowNum()+1)+ ": mark is required.");
+                    if (score!=null && (score<0 || score>100)) throw new FileValidationService.InvalidUpload("Row " +(row.getRowNum()+1)+ ": score out of range [0, 100].");
+                }
 
                 // Validate every referenced student already exists before importing anything
                 List<String> unknownStudents = new ArrayList<>();
@@ -81,7 +97,7 @@ public class ExcelImportService {
                     }
                 }
                 if (!unknownStudents.isEmpty()) {
-                    throw new Exception("Upload rejected — " + unknownStudents.size() +
+                    throw new IllegalArgumentException("Upload rejected — " + unknownStudents.size() +
                             " student(s) not found in the system: " + String.join(", ", unknownStudents) +
                             ". Import these students first, then re-upload.");
                 }
@@ -96,28 +112,11 @@ public class ExcelImportService {
                     if (indexCell == null || markCell == null) continue;
 
                     String studentIndex = indexCell.toString().trim();
-                    double score = 0.0;
-
-                    if (markCell.getCellType() == CellType.NUMERIC) {
-                        score = markCell.getNumericCellValue();
-                    } else {
-                        String val = markCell.toString().trim().toUpperCase();
-                        if (val.equals("AB") || val.equals("MC")) {
-                            score = 0.0;
-                        } else {
-                            try {
-                                score = Double.parseDouble(val);
-                            } catch (NumberFormatException e) {
-                                score = 0.0;
-                            }
-                        }
-                    }
-
-                    // Clamp 0-100
-                    score = Math.max(0.0, Math.min(100.0, score));
+                    Double parsed = parseScore(markCell);
+                    double score = parsed == null ? 0.0 : parsed;
 
                     Student student = studentRepository.findById(studentIndex)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentIndex));
 
                     StudentMark mark = new StudentMark();
                     mark.setStudent(student);
@@ -130,8 +129,8 @@ public class ExcelImportService {
                 }
                 return "Successfully imported " + count + " marks.";
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error importing marks: " + e.getMessage());
+        } catch (RuntimeException e) { throw e; } catch (Exception e) {
+            throw new RuntimeException("Unable to import marks", e);
         }
     }
 
@@ -147,36 +146,40 @@ public class ExcelImportService {
     /** Read the METADATA sheet from an uploaded Excel and return key→value map. */
     public Map<String, String> readMetadata(MultipartFile file) {
         Map<String, String> meta = new HashMap<>();
-        try (InputStream is = file.getInputStream(); Workbook wb = WorkbookFactory.create(is)) {
+        try (Workbook wb = fileValidationService.openWorkbook(file)) {
             Sheet sheet = wb.getSheet("METADATA");
             if (sheet == null) return meta;
             for (Row row : sheet) {
                 Cell key = row.getCell(0);
                 Cell val = row.getCell(1);
                 if (key != null && val != null) {
-                    meta.put(key.toString().trim(), val.toString().trim());
+                    if (meta.putIfAbsent(key.toString().trim(), val.toString().trim()) != null)
+                        throw new FileValidationService.InvalidUpload("Duplicate metadata key. Re-download the template.");
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (java.io.IOException e) { throw new FileValidationService.InvalidUpload("Cannot read Excel metadata."); }
         return meta;
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType) {
         return importMarksBulk(file, losIds, batch, markType, null, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType, String assignmentLabel) {
         return importMarksBulk(file, losIds, batch, markType, assignmentLabel, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(#p1)")
     public String importMarksBulk(MultipartFile file, String[] losIds, String batch, String markType,
                                   String assignmentLabel, Map<String, Double> perLoMaxMarks) {
         try {
             for (String losId : losIds) {
-                if (!losRepository.existsById(losId)) throw new Exception("Learning Outcome not found: " + losId);
+                if (!losRepository.existsById(losId)) throw new IllegalArgumentException("Learning Outcome not found: " + losId);
             }
 
             MarkType tempType = MarkType.FINAL_EXAM;
@@ -185,7 +188,7 @@ public class ExcelImportService {
             }
             final MarkType finalType = tempType;
 
-            try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            try (Workbook workbook = fileValidationService.openWorkbook(file)) {
                 // Find the data sheet (skip METADATA, Instructions)
                 Sheet sheet = null;
                 for (int si = 0; si < workbook.getNumberOfSheets(); si++) {
@@ -196,7 +199,7 @@ public class ExcelImportService {
 
                 // Find header row — may be row 0 (old) or row 1 (new with title)
                 Row headerRow = sheet.getRow(0);
-                if (headerRow == null) throw new Exception("Excel file must have a header row");
+                if (headerRow == null) throw new IllegalArgumentException("Excel file must have a header row");
                 // If row 0 col 0 looks like a title (not "Student Index"), shift to row 1
                 int headerRowIdx = 0;
                 String firstCell = headerRow.getCell(0) != null ? headerRow.getCell(0).toString().trim() : "";
@@ -204,7 +207,20 @@ public class ExcelImportService {
                     headerRowIdx = 1;
                     headerRow = sheet.getRow(1);
                 }
-                if (headerRow == null) throw new Exception("Could not find header row in Excel file");
+                if (headerRow == null) throw new IllegalArgumentException("Could not find header row in Excel file");
+
+                if (losIds.length == 0 || new java.util.HashSet<>(java.util.Arrays.asList(losIds)).size()!=losIds.length)
+                    throw new FileValidationService.InvalidUpload("Select distinct learning outcomes for the upload.");
+                FileValidationService.studentHeader(headerRow);
+                FileValidationService.columns(headerRow, losIds.length+1);
+                FileValidationService.dataRows(sheet, headerRowIdx, losIds.length+1);
+                FileValidationService.requireMarkValues(sheet, headerRowIdx, 1, losIds.length);
+                for (int i=0;i<losIds.length;i++) {
+                    String heading = FileValidationService.text(headerRow,i+1).split(" \\(",2)[0].trim();
+                    Los expected = losRepository.findById(losIds[i]).orElseThrow();
+                    if (!heading.equalsIgnoreCase(losIds[i]) && !heading.equalsIgnoreCase(expected.getName()) && !heading.equalsIgnoreCase("LO"+(i+1)))
+                        throw new FileValidationService.InvalidUpload("LO columns do not match the selected learning outcomes. Use the downloaded template.");
+                }
 
                 // Build per-LO max marks from header if not provided
                 Map<String, Double> effectiveLoMax = new java.util.LinkedHashMap<>();
@@ -217,13 +233,17 @@ public class ExcelImportService {
                         double mx = 100.0;
                         if (hCell != null) {
                             String hVal = hCell.toString();
-                            java.util.regex.Matcher m = java.util.regex.Pattern.compile("max=([0-9.]+)").matcher(hVal);
-                            if (m.find()) { try { mx = Double.parseDouble(m.group(1)); } catch (Exception ignored) {} }
+                            java.util.regex.Matcher m = java.util.regex.Pattern.compile("max=([^)]*)").matcher(hVal);
+                            if (m.find()) { try { mx = Double.parseDouble(m.group(1).trim()); } catch (NumberFormatException invalid) { throw new FileValidationService.InvalidUpload("Invalid maximum marks in column header."); } }
                         }
                         effectiveLoMax.put(losIds[i], mx);
                     }
                 }
 
+                for (String loId : losIds) {
+                    Double max = effectiveLoMax.getOrDefault(loId,100.0);
+                    if (max==null || !Double.isFinite(max) || max<=0) throw new FileValidationService.InvalidUpload("Maximum marks must be a finite positive number.");
+                }
                 // Validate all marks first (collect errors, reject whole file if any)
                 List<String> errors = new java.util.ArrayList<>();
                 for (Row row : sheet) {
@@ -241,7 +261,7 @@ public class ExcelImportService {
                         String raw = markCell.toString().trim().toUpperCase();
                         if (raw.equals("AB") || raw.equals("MC") || raw.equals("N/A")) continue;
                         double score;
-                        try { score = Double.parseDouble(raw); } catch (NumberFormatException e) { continue; }
+                        score = parseScore(markCell);
                         double maxMark = effectiveLoMax.getOrDefault(losIds[i], 100.0);
                         if (score < 0 || score > maxMark) {
                             errors.add("Row " + (row.getRowNum() + 1) + ", Student " + studentIndex +
@@ -250,7 +270,7 @@ public class ExcelImportService {
                     }
                 }
                 if (!errors.isEmpty()) {
-                    throw new Exception("Validation failed — " + errors.size() + " error(s):\n" + String.join("\n", errors));
+                    throw new IllegalArgumentException("Validation failed — " + errors.size() + " error(s):\n" + String.join("\n", errors));
                 }
 
                 // Delete existing marks for this exact assignment
@@ -310,7 +330,7 @@ public class ExcelImportService {
                     if (idxCell == null || idxCell.toString().trim().isEmpty()) continue;
                     String studentIndex = idxCell.toString().trim();
                     final Student student = studentRepository.findById(studentIndex)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentIndex));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentIndex));
                     for (int i = 0; i < losIds.length; i++) {
                         final String losId = losIds[i];
                         Cell markCell = row.getCell(i + 1);
@@ -318,8 +338,8 @@ public class ExcelImportService {
                         String raw = markCell.toString().trim().toUpperCase();
                         if (raw.equals("AB") || raw.equals("MC") || raw.equals("N/A")) continue;
                         double score;
-                        try { score = Double.parseDouble(raw); } catch (NumberFormatException e) { continue; }
-                        Los los = losRepository.findById(losId).orElseThrow(() -> new Exception("LO not found: " + losId));
+                        score = parseScore(markCell);
+                        Los los = losRepository.findById(losId).orElseThrow(() -> new ResourceNotFoundException("LO not found: " + losId));
                         StudentMark mark = new StudentMark();
                         mark.setStudent(student); mark.setScore(score); mark.setLos(los);
                         mark.setBatch(batch); mark.setMarkType(finalType); mark.setAssignmentLabel(assignmentLabel);
@@ -335,25 +355,32 @@ public class ExcelImportService {
                     + (assignmentLabel != null ? " for " + assignmentLabel : "");
             }
         } catch (RuntimeException e) { throw e; }
-          catch (Exception e) { throw new RuntimeException(e.getMessage(), e); }
+          catch (Exception e) { throw new RuntimeException("Unable to import marks", e); }
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
     public String importMarksOBEFormat(String losId, MultipartFile file, String batch) {
         return importMarksOBEFormat(losId, file, batch, "FINAL_EXAM");
     }
 
     // Backward compatibility - defaults to null batch
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
+    @Transactional
     public String importMarksOBEFormat(String losId, MultipartFile file) {
         return importMarksOBEFormat(losId, file, null);
     }
 
     // Alias for standard import if needed, or different logic
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
+    @Transactional
     public String importStudentMarksFromExcel(String losId, MultipartFile file) {
         return importMarksOBEFormat(losId, file, null);
     }
 
     // Backward compatibility
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p1})")
+    @Transactional
     public void importMarks(MultipartFile file, String losId) throws Exception {
         importMarksOBEFormat(losId, file, null);
     }
@@ -363,15 +390,17 @@ public class ExcelImportService {
      * Expected Excel layout: Student ID | Student Name | Q1 | Q2 | ...
      */
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importTemplate(#p1)")
     public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType) {
         return importQuestionWiseMarks(file, templateId, batch, markType, null);
     }
 
     @Transactional
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importTemplate(#p1)")
     public String importQuestionWiseMarks(MultipartFile file, String templateId, String batch, String markType, String assignmentLabel) {
         try {
             if (templateId == null || templateId.trim().isEmpty()) {
-                throw new Exception("templateId is required for question-wise import");
+                throw new IllegalArgumentException("templateId is required for question-wise import");
             }
 
             MarkType type = MarkType.FINAL_EXAM;
@@ -381,21 +410,21 @@ public class ExcelImportService {
 
             List<AssessmentItem> items = assessmentItemRepository.findByAssessmentTemplate_IdOrderByQuestionNumber(templateId.trim());
             if (items.isEmpty()) {
-                throw new Exception("No assessment items found for template: " + templateId);
+                throw new IllegalArgumentException("No assessment items found for template: " + templateId);
             }
 
             // Detect column layout from header row: new templates have Student ID at col 0, Q1 at col 1.
             // Old templates (with Student Name) have Q1 at col 2. Detect by reading header.
             final int[] qColOffset = {1}; // default: Q1 at col 1
 
-            studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(templateId.trim());
+            List<StudentAssessmentScore> pendingScores = new ArrayList<>();
 
             Map<String, Double> totalsByStudentAndLo = new HashMap<>();
             Map<String, Student> studentsById = new HashMap<>();
             List<String> validationErrors = new ArrayList<>();
             int questionScoresSaved = 0;
 
-            try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+            try (Workbook workbook = fileValidationService.openWorkbook(file)) {
                 Sheet sheet = workbook.getSheetAt(0);
 
                 // Detect layout from row 2 (header row) col 1
@@ -410,6 +439,16 @@ public class ExcelImportService {
                     }
                 }
 
+                FileValidationService.studentHeader(headerRow);
+                FileValidationService.columns(headerRow, items.size()+qColOffset[0]);
+                for (int i=0;i<items.size();i++) {
+                    String label = FileValidationService.text(headerRow,i+qColOffset[0]);
+                    String expected = "Q" + items.get(i).getQuestionNumber();
+                    if (!label.equalsIgnoreCase(expected) && !label.toUpperCase(java.util.Locale.ROOT).startsWith(expected.toUpperCase(java.util.Locale.ROOT)+" ("))
+                        throw new FileValidationService.InvalidUpload("Question columns do not match the assessment template.");
+                }
+                FileValidationService.dataRows(sheet, 2, items.size()+qColOffset[0]);
+                FileValidationService.requireMarkValues(sheet, 2, qColOffset[0], items.size());
                 int dataStartRow = 3;
                 for (Row row : sheet) {
                     if (row.getRowNum() < dataStartRow) continue;
@@ -425,7 +464,7 @@ public class ExcelImportService {
                     }
 
                     Student student = studentRepository.findById(studentId)
-                            .orElseThrow(() -> new Exception("Student not found: " + studentId));
+                            .orElseThrow(() -> new ResourceNotFoundException("Student not found: " + studentId));
                     studentsById.put(studentId, student);
 
                     for (int i = 0; i < items.size(); i++) {
@@ -438,7 +477,7 @@ public class ExcelImportService {
 
                         double maxForItem = item.getMaxMarks() != null ? item.getMaxMarks() : 100.0;
                         // Validate range — collect all errors before rejecting
-                        if (score < 0 || score > maxForItem) {
+                        if (!Double.isFinite(maxForItem) || maxForItem<=0 || score < 0 || score > maxForItem) {
                             validationErrors.add("Row " + (row.getRowNum() + 1) + ", Student " + studentId +
                                 ", Q" + (i + 1) + ": score " + score + " is out of range [0, " + maxForItem + "]");
                             continue;
@@ -448,7 +487,7 @@ public class ExcelImportService {
                         assessmentScore.setStudent(student);
                         assessmentScore.setAssessmentItem(item);
                         assessmentScore.setScore(score);
-                        studentAssessmentScoreRepository.save(assessmentScore);
+                        pendingScores.add(assessmentScore);
                         questionScoresSaved++;
 
                         String loId = item.getLos() != null ? item.getLos().getId() : null;
@@ -462,8 +501,11 @@ public class ExcelImportService {
 
             // Reject entire upload if any score was out of range
             if (!validationErrors.isEmpty()) {
-                throw new Exception("Upload rejected — invalid marks found:\n" + String.join("\n", validationErrors));
+                throw new IllegalArgumentException("Upload rejected — invalid marks found:\n" + String.join("\n", validationErrors));
             }
+
+            studentAssessmentScoreRepository.deleteByAssessmentItem_AssessmentTemplate_Id(templateId.trim());
+            for (StudentAssessmentScore score : pendingScores) studentAssessmentScoreRepository.save(score);
 
             // Delete only this assignment's LO marks (preserve other assignments)
             List<String> affectedLoIds = new ArrayList<>();
@@ -508,8 +550,8 @@ public class ExcelImportService {
             retireSupersededTemplates(templateId.trim());
 
             return "Successfully imported " + questionScoresSaved + " question scores and " + aggregatedMarksSaved + " LO marks for " + (assignmentLabel != null ? assignmentLabel : templateId);
-        } catch (Exception e) {
-            throw new RuntimeException(e.getMessage(), e);
+        } catch (RuntimeException e) { throw e; } catch (Exception e) {
+            throw new RuntimeException("Unable to import marks", e);
         }
     }
 
@@ -559,17 +601,26 @@ public class ExcelImportService {
 
     private Double parseScore(Cell cell) {
         if (cell == null) return null;
-        if (cell.getCellType() == CellType.NUMERIC) {
-            return cell.getNumericCellValue();
-        }
-        String val = cell.toString().trim().toUpperCase();
-        if (val.isEmpty() || val.equals("N/A") || val.equals("AB") || val.equals("MC")) {
-            return null;
-        }
+        String val = FileValidationService.text(cell.getRow(), cell.getColumnIndex()).toUpperCase(java.util.Locale.ROOT);
+        if (val.isEmpty() || val.equals("N/A") || val.equals("AB") || val.equals("MC")) return null;
         try {
-            return Double.parseDouble(val);
+            double score = cell.getCellType()==CellType.NUMERIC ? cell.getNumericCellValue() : Double.parseDouble(val);
+            if (!Double.isFinite(score)) throw new NumberFormatException();
+            return score;
         } catch (NumberFormatException ex) {
-            return null;
+            throw new FileValidationService.InvalidUpload("Row " +(cell.getRowIndex()+1)+ ", column " +(cell.getColumnIndex()+1)+ ": enter a numeric mark, AB, MC or N/A.");
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.importLos(new String[]{#p0})")
+    public String importMarksWithAttachment(String loId, MultipartFile file, String batch, String replaceBatch) throws Exception {
+        if (replaceBatch != null && !replaceBatch.isBlank()) markRepository.deleteByLos_IdAndBatch(loId, replaceBatch);
+        String result = importMarksOBEFormat(loId, file, batch);
+        Los los = losRepository.findById(loId).orElseThrow();
+        los.setFileName(file.getOriginalFilename());
+        los.setMarksCsvFile(file.getBytes());
+        losRepository.save(los);
+        return result;
     }
 }

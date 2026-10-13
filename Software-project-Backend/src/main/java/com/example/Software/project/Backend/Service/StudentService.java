@@ -28,6 +28,9 @@ import java.util.*;
 public class StudentService {
 
     @Autowired
+    private FileValidationService fileValidationService;
+
+    @Autowired
     private StudentRepository studentRepository;
 
     @Autowired
@@ -54,15 +57,19 @@ public class StudentService {
      * value untouched rather than blanking it out. Rejects the whole file if any row is invalid -
      * same all-or-nothing convention ExcelImportService uses for marks uploads.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> importFromExcel(MultipartFile file) throws Exception {
         List<String> errors = new ArrayList<>();
         List<Student> toSave = new ArrayList<>();
         Set<String> seenIds = new HashSet<>();
         int created = 0, updated = 0, rowCount = 0;
 
-        try (InputStream is = file.getInputStream(); Workbook workbook = WorkbookFactory.create(is)) {
+        try (Workbook workbook = fileValidationService.openWorkbook(file)) {
             Sheet sheet = workbook.getSheetAt(0);
+            FileValidationService.columns(sheet.getRow(0), HEADERS.size());
+            for (int c=0;c<HEADERS.size();c++) if (!HEADERS.get(c).equalsIgnoreCase(FileValidationService.text(sheet.getRow(0), c)))
+                throw new FileValidationService.InvalidUpload("Invalid student headers. Use the downloaded student template.");
+            FileValidationService.dataRows(sheet, 0, HEADERS.size());
             for (Row row : sheet) {
                 if (row.getRowNum() == 0) continue; // header row
                 if (isRowBlank(row)) continue;
@@ -89,6 +96,10 @@ public class StudentService {
                 }
                 if (batch != null && batch.length() > MAX_BATCH_LENGTH) {
                     errors.add("Row " + excelRow + ", Student " + studentId + ": Batch exceeds " + MAX_BATCH_LENGTH + " characters");
+                    continue;
+                }
+                if (studentName.length()>255 || (academicYear!=null && academicYear.length()>255) || (email!=null && (email.length()>254 || !email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")))) {
+                    errors.add("Row " + excelRow + ": invalid email or text field exceeds its allowed length");
                     continue;
                 }
                 if (!seenIds.add(studentId)) {

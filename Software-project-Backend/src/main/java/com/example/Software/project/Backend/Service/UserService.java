@@ -1,5 +1,7 @@
 package com.example.Software.project.Backend.Service;
 
+import com.example.Software.project.Backend.Security.ResourceNotFoundException;
+import com.example.Software.project.Backend.Security.PublicValidationException;
 import com.example.Software.project.Backend.Model.User;
 import com.example.Software.project.Backend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,9 +18,8 @@ public class UserService {
     private static final int MAX_FAILED_LOGIN_ATTEMPTS = 5;
     private static final long LOCKOUT_DURATION_MINUTES = 15;
 
-    // Min 8 chars, at least one lowercase, one uppercase, one digit — per Phase 4 decision.
-    private static final java.util.regex.Pattern PASSWORD_POLICY =
-        java.util.regex.Pattern.compile("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$");
+    @Autowired
+    private AccountValidation accountValidation;
 
     @Autowired
     private UserRepository userRepository;
@@ -32,26 +33,32 @@ public class UserService {
      * Records a failed login attempt; locks the account for 15 minutes after 5 consecutive failures.
      * No-op if the username doesn't exist (avoids revealing account existence via lockout side-effects).
      */
+    @org.springframework.transaction.annotation.Transactional
     public void recordFailedLogin(String username) {
-        userRepository.findByUsername(username).ifPresent(user -> {
-            int attempts = user.getFailedLoginAttempts() + 1;
-            user.setFailedLoginAttempts(attempts);
-            if (attempts >= MAX_FAILED_LOGIN_ATTEMPTS) {
-                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCKOUT_DURATION_MINUTES));
-            }
-            userRepository.save(user);
+        if (username == null || username.isBlank()) return;
+        userRepository.lockLoginState(username).ifPresent(state -> {
+            LocalDateTime now = LocalDateTime.now();
+            if (state.getLockedUntil() != null && state.getLockedUntil().isAfter(now)) return;
+            // An expired lock starts a fresh attempt window. Active locks are never extended.
+            int previous = state.getLockedUntil() == null ? state.getFailedLoginAttempts() : 0;
+            int attempts = Math.min(previous + 1, MAX_FAILED_LOGIN_ATTEMPTS);
+            LocalDateTime until = attempts >= MAX_FAILED_LOGIN_ATTEMPTS ? now.plusMinutes(LOCKOUT_DURATION_MINUTES) : null;
+            userRepository.updateLoginState(username, attempts, until);
         });
     }
 
     /**
      * Clears failed-attempt state on successful login.
      */
+    @org.springframework.transaction.annotation.Transactional
     public void resetFailedLogins(String username) {
-        userRepository.findByUsername(username).ifPresent(user -> {
-            if (user.getFailedLoginAttempts() != 0 || user.getLockedUntil() != null) {
-                user.setFailedLoginAttempts(0);
-                user.setLockedUntil(null);
-                userRepository.save(user);
+        userRepository.lockLoginState(username).ifPresent(state -> {
+            // A concurrent failure may have locked the account after password verification.
+            if (state.getLockedUntil() != null && state.getLockedUntil().isAfter(LocalDateTime.now())) {
+                throw new org.springframework.security.authentication.LockedException("Account temporarily locked");
+            }
+            if (state.getFailedLoginAttempts() != 0 || state.getLockedUntil() != null) {
+                userRepository.updateLoginState(username, 0, null);
             }
         });
     }
@@ -65,7 +72,7 @@ public class UserService {
         if (userOptional.isPresent()) {
             User user = userOptional.get();
 
-            if (passwordEncoder.matches(password, user.getPassword())) {
+            if (!user.isCurrentlyLocked() && passwordEncoder.matches(password, user.getPassword())) {
                 return Optional.of(user);
             }
         }
@@ -93,14 +100,11 @@ public class UserService {
      */
     public void changePassword(String username, String currentPassword, String newPassword) {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Current password is incorrect.");
+            throw new PublicValidationException("Current password is incorrect.");
         }
-        if (newPassword == null || !PASSWORD_POLICY.matcher(newPassword).matches()) {
-            throw new IllegalArgumentException(
-                "New password must be at least 8 characters and include an uppercase letter, a lowercase letter and a number.");
-        }
+        AccountValidation.password(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setFailedLoginAttempts(0);
         user.setLockedUntil(null);
@@ -119,17 +123,18 @@ public class UserService {
      */
     public User updateLecturer(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found"));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not a lecturer");
+            throw new PublicValidationException("The account is not a lecturer");
         }
-        if (email != null && !email.isBlank()) {
+        validateUpdate(user, email, password);
+        if (email != null) {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
-            user.setPassword(password);
+            user.setPassword(passwordEncoder.encode(password));
         }
-        return userRepository.save(user);
+        return saveAccount(user);
     }
 
     /**
@@ -138,9 +143,9 @@ public class UserService {
      */
     public void deleteLecturer(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Lecturer not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Lecturer not found"));
         if (!"lecture".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not a lecturer");
+            throw new PublicValidationException("The account is not a lecturer");
         }
         moduleService.removeLecturerFromAllModules(username);
         userRepository.delete(user);
@@ -158,17 +163,18 @@ public class UserService {
      */
     public User updateAdmin(String username, String email, String password) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not an admin");
+            throw new PublicValidationException("The account is not an admin");
         }
-        if (email != null && !email.isBlank()) {
+        validateUpdate(user, email, password);
+        if (email != null) {
             user.setEmail(email);
         }
         if (password != null && !password.isBlank()) {
-            user.setPassword(password);
+            user.setPassword(passwordEncoder.encode(password));
         }
-        return userRepository.save(user);
+        return saveAccount(user);
     }
 
     /**
@@ -176,9 +182,9 @@ public class UserService {
      */
     public void deleteAdmin(String username) throws Exception {
         User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new Exception("Admin not found: " + username));
+            .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
         if (!"admin".equalsIgnoreCase(user.getUsertype())) {
-            throw new Exception(username + " is not an admin");
+            throw new PublicValidationException("The account is not an admin");
         }
         userRepository.delete(user);
     }
@@ -191,49 +197,52 @@ public class UserService {
     public User addUser(User newUser, String creatorUsername) throws Exception {
         Optional<User> creatorOptional = userRepository.findByUsername(creatorUsername);
         if (creatorOptional.isEmpty()) {
-            throw new Exception("Creator user not found");
+            throw new ResourceNotFoundException("Creator user not found");
         }
         User creator = creatorOptional.get();
         String creatorType = creator.getUsertype();
 
         if (creatorType == null) creatorType = "";
 
-        // Automatically assign role based on creator
-        if (creatorType.equalsIgnoreCase("Superadmin")) {
-            newUser.setUsertype("Admin");
-        } else if (creatorType.equalsIgnoreCase("Admin")) {
-            newUser.setUsertype("Lecture");
-        } else {
-            throw new Exception("You are not authorized to add users");
+        String requestedRole = newUser.getUsertype();
+        if (!("superadmin".equalsIgnoreCase(creatorType)
+                && java.util.Set.of("admin", "lecture").contains(requestedRole == null ? "" : requestedRole))
+                && !("admin".equalsIgnoreCase(creatorType) && "lecture".equals(requestedRole))) {
+            throw new PublicValidationException("You are not authorized to add users");
         }
+        // Lockout state is managed by the server, never by the creation request.
+        newUser.setFailedLoginAttempts(0);
+        newUser.setLockedUntil(null);
 
-        // Check if user exists
-        if (userRepository.findByUsername(newUser.getUserID()).isPresent()) {
-            throw new Exception("Username already exists");
+        AccountValidation.username(newUser.getUserID());
+        accountValidation.email(newUser.getEmail());
+        AccountValidation.password(newUser.getPassword());
+        // Mirror case-insensitive identity uniqueness on the local MySQL database.
+        if (userRepository.existsByUsernameIgnoreCase(newUser.getUserID())) {
+            throw new PublicValidationException("Username already exists");
         }
-        if (userRepository.findByEmail(newUser.getEmail()).isPresent()) {
-            throw new Exception("Email already exists");
-        }
-
-        if (newUser.getPassword() == null || !PASSWORD_POLICY.matcher(newUser.getPassword()).matches()) {
-            throw new Exception("Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number");
+        if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(newUser.getEmail(), newUser.getUserID())) {
+            throw new PublicValidationException("Email already exists");
         }
 
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
 
-        return userRepository.save(newUser);
+        return saveAccount(newUser);
     }
 
     /**
      * Creates a test user - for development/testing only
      */
     public User createTestUser(String username, String password, String email, String userType) throws Exception {
+        AccountValidation.username(username);
+        accountValidation.email(email);
+        AccountValidation.password(password);
         // Check if user already exists
-        if (userRepository.findByUsername(username).isPresent()) {
-            throw new Exception("Username already exists");
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
+            throw new PublicValidationException("Username already exists");
         }
-        if (userRepository.findByEmail(email).isPresent()) {
-            throw new Exception("Email already exists");
+        if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, username)) {
+            throw new PublicValidationException("Email already exists");
         }
 
         User testUser = new User();
@@ -242,6 +251,25 @@ public class UserService {
         testUser.setEmail(email);
         testUser.setUsertype(userType);
 
-        return userRepository.save(testUser);
+        return saveAccount(testUser);
+    }
+
+    private User saveAccount(User user) {
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // The unique database constraints also protect simultaneous duplicate requests.
+            throw new PublicValidationException("Username or email already exists, or the account details conflict with an existing record.");
+        }
+    }
+
+    private void validateUpdate(User user, String email, String password) {
+        // Validate the entire change before mutating the managed entity.
+        if (email != null) {
+            accountValidation.email(email);
+            if (userRepository.existsByEmailIgnoreCaseAndUsernameNot(email, user.getUserID()))
+                throw new PublicValidationException("Email already exists");
+        }
+        if (password != null && !password.isBlank()) AccountValidation.password(password);
     }
 }

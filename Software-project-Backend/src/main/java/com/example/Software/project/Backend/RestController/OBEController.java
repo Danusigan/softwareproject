@@ -1,5 +1,6 @@
 package com.example.Software.project.Backend.RestController;
 
+import com.example.Software.project.Backend.Security.SafeErrors;
 import com.example.Software.project.Backend.Model.*;
 import com.example.Software.project.Backend.Model.Module; // disambiguate from java.lang.Module
 import com.example.Software.project.Backend.Repository.*;
@@ -61,6 +62,7 @@ public class OBEController {
 
     // --- ADMIN ONLY: Create PO (Program Outcome) ---
     @PostMapping("/po/create")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.createPO', {'po': #p0, 'token': #p1})")
     public ResponseEntity<?> createPO(@RequestBody ProgramOutcome po, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -73,44 +75,50 @@ public class OBEController {
             ProgramOutcome createdPo = poRepo.save(po);
             return ResponseEntity.ok(Map.of("message", "Program Outcome created successfully", "data", createdPo, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error creating PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error creating PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- ADMIN ONLY: Read All POs ---
     @GetMapping("/po/all")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getAllPOs', {'token': #p0})")
     public ResponseEntity<?> getAllPOs(@RequestHeader("Authorization") String token) {
         try {
-            if (!isAdmin(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Staff access required", "status", "ERROR"));
             }
             return ResponseEntity.ok(Map.of("message", "All Program Outcomes", "data", poRepo.findAll(), "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error fetching POs: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error fetching POs: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- ADMIN ONLY: Read One PO by ID ---
     @GetMapping("/po/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getPOById', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> getPOById(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
-            if (!isAdmin(token)) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin only", "status", "ERROR"));
+            if (!isLecture(token)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Staff access required", "status", "ERROR"));
             }
             return poRepo.findById(poId)
                 .map(po -> ResponseEntity.ok(Map.of("message", "PO found", "data", po, "status", "SUCCESS")))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "PO not found", "status", "ERROR")));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error fetching PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error fetching PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- ADMIN ONLY: Update PO ---
     @PutMapping("/po/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.updatePO', {'poId': #p0, 'poDetails': #p1, 'token': #p2})")
     public ResponseEntity<?> updatePO(@PathVariable String poId, @RequestBody ProgramOutcome poDetails, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -126,13 +134,15 @@ public class OBEController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "PO not found", "status", "ERROR")));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error updating PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error updating PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- ADMIN ONLY: Delete PO ---
     @DeleteMapping("/po/{poId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.deletePO', {'poId': #p0, 'token': #p1})")
     public ResponseEntity<?> deletePO(@PathVariable String poId, @RequestHeader("Authorization") String token) {
         try {
             if (!isAdmin(token)) {
@@ -146,13 +156,15 @@ public class OBEController {
                     .body(Map.of("message", "PO not found", "status", "ERROR"));
             }
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Error deleting PO: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Error deleting PO: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- LECTURE: Bulk Save Mappings (Pending) ---
     @PostMapping("/mappings/bulk-save")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.saveMappings', {'mappings': #p0, 'token': #p1})")
     public ResponseEntity<?> saveMappings(@RequestBody List<OutcomeMapping> mappings, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
 
@@ -161,10 +173,11 @@ public class OBEController {
             for (OutcomeMapping m : mappings) {
                 m.setStatus(OutcomeMapping.ApprovalStatus.PENDING);
 
-                // Record who submitted the mapping so the admin's decision can notify them
-                if (m.getMappedBy() == null || m.getMappedBy().isBlank()) {
-                    try { m.setMappedBy(jwtUtil.extractUsername(token.startsWith("Bearer ") ? token.substring(7) : token)); } catch (Exception ignored) { }
-                }
+                // Submission identity and review fields belong to the server, never the request body.
+                m.setMappedBy(com.example.Software.project.Backend.Security.CurrentUser.username());
+                m.setReviewedBy(null);
+                m.setReviewedAt(null);
+                m.setAdminRemarks(null);
 
                 // Fetch existing Learning Outcome
                 if (m.getLearningOutcome() != null && m.getLearningOutcome().getId() != null) {
@@ -186,12 +199,14 @@ public class OBEController {
             }
             return ResponseEntity.ok(mapRepo.saveAll(mappings));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Error saving mappings: " + e.getMessage());
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body("Error saving mappings: " + SafeErrors.message(e));
         }
     }
 
     // --- ADMIN: Approve Mappings ---
     @PutMapping("/admin/approve-mapping/{id}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.approveMapping', {'id': #p0, 'token': #p1})")
     public ResponseEntity<?> approveMapping(@PathVariable Long id, @RequestHeader("Authorization") String token) {
         if (!isAdmin(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Admin only");
 
@@ -209,6 +224,7 @@ public class OBEController {
 
     // --- LECTURE: Upload Marks ---
     @PostMapping("/marks/upload/{losId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.uploadMarks', {'losId': #p0, 'file': #p1, 'token': #p2})")
     public ResponseEntity<?> uploadMarks(@PathVariable String losId, @RequestParam("file") MultipartFile file, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
@@ -216,12 +232,14 @@ public class OBEController {
             excelService.importMarks(file, losId);
             return ResponseEntity.ok("Marks uploaded successfully");
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e)).body(SafeErrors.message(e));
         }
     }
 
     // --- MARKS: Unified upload — auto-detects LO-wise vs question-wise from METADATA sheet ---
     @PostMapping("/marks/upload")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.uploadMarksUnified', {'file': #p0, 'token': #p1})")
     public ResponseEntity<?> uploadMarksUnified(
         @RequestParam("excelFile") MultipartFile file,
         @RequestHeader("Authorization") String token) {
@@ -282,13 +300,15 @@ public class OBEController {
                 "data", Map.of("batch", batch, "markType", markType, "assignmentLabel", assignmentLabel, "templateType", templateType)
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- LECTURE: Upload question-wise marks using a template ---
     @PostMapping("/marks/upload-question-wise")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.uploadQuestionWiseMarks', {'file': #p0, 'templateId': #p1, 'batch': #p2, 'markType': #p3, 'token': #p4})")
     public ResponseEntity<?> uploadQuestionWiseMarks(
         @RequestParam("excelFile") MultipartFile file,
         @RequestParam(value = "templateId", required = false) String templateId,
@@ -331,10 +351,11 @@ public class OBEController {
                 )
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
-                    "message", "Failed to import question-wise marks: " + e.getMessage(),
-                    "error", e.getMessage(),
+                    "message", "Failed to import question-wise marks: " + SafeErrors.message(e),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -342,6 +363,7 @@ public class OBEController {
 
     // --- REPORT: Course Attainment (Flat JSON for Charts) ---
     @GetMapping("/reports/course/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getCourseReport', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getCourseReport(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         Map<String, Double> poScores = attainmentService.getPOAttainment(moduleId);
@@ -350,6 +372,7 @@ public class OBEController {
 
     // --- ANALYSIS: Module Trend ---
     @GetMapping("/analysis/trend/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getTrend', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getTrend(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         return ResponseEntity.ok(trendService.getCourseTrend(moduleId));
@@ -357,6 +380,7 @@ public class OBEController {
 
     // --- ANALYSIS: LO Trend (New) ---
     @GetMapping("/analysis/trend/lo/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getLoTrend', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getLoTrend(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         return ResponseEntity.ok(trendService.getLoTrend(moduleId));
@@ -364,6 +388,7 @@ public class OBEController {
 
     // --- ANALYSIS: LO Pass Rate by Batch ---
     @GetMapping("/analysis/pass-rate/lo/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getLoPassRate', {'moduleId': #p0, 'threshold': #p1, 'token': #p2})")
     public ResponseEntity<?> getLoPassRate(
         @PathVariable String moduleId,
         @RequestParam(defaultValue = "50") double threshold,
@@ -372,12 +397,13 @@ public class OBEController {
         try {
             return ResponseEntity.ok(trendService.getLoPassRate(moduleId, threshold));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- GRAPH GENERATION: Filtered university QA dashboard data ---
     @GetMapping("/graphs/dashboard/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getDashboardGraphs', {'moduleId': #p0, 'batch': #p1, 'markType': #p2, 'loId': #p3, 'threshold': #p4, 'target': #p5, 'token': #p6})")
     public ResponseEntity<?> getDashboardGraphs(
         @PathVariable String moduleId,
         @RequestParam(required = false) String batch,
@@ -395,8 +421,8 @@ public class OBEController {
             return ResponseEntity.ok(trendService.getDashboardGraphs(
                 moduleId, batch, parsedMarkType, threshold, target, loId));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "message", "Invalid graph filter: " + e.getMessage(),
+            return ResponseEntity.status(SafeErrors.status(e)).body(Map.of(
+                "message", "Invalid graph filter: " + SafeErrors.message(e),
                 "status", "ERROR"
             ));
         }
@@ -404,6 +430,7 @@ public class OBEController {
 
     // --- EXPORT: Generate Excel with selected LOs and mark type ---
     @PostMapping("/export/marks")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.exportMarks', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> exportMarks(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -425,7 +452,7 @@ public class OBEController {
                     try {
                         threshold = Integer.parseInt(thresholdRaw);
                     } catch (NumberFormatException ex) {
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        return ResponseEntity.status(SafeErrors.status(ex))
                             .body(Map.of("message", "Error: threshold must be an integer between 0 and 100", "status", "ERROR"));
                     }
                 }
@@ -466,7 +493,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
@@ -480,8 +507,9 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate marks report: " + errorDetail,
                     "error", errorDetail,
@@ -492,6 +520,7 @@ public class OBEController {
 
     // --- TEMPLATE: Generate empty Excel template for mark entry ---
     @PostMapping("/template/marks")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.generateMarkTemplate', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> generateMarkTemplate(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -524,7 +553,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType", "status", "ERROR"));
             }
 
@@ -564,10 +593,11 @@ public class OBEController {
                 .body(templateBytes);
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate template",
-                    "error", e.getMessage(),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -575,6 +605,7 @@ public class OBEController {
 
     // --- BULK UPLOAD: Upload marks — reads batch/markType from METADATA sheet if present ---
     @PostMapping("/marks/upload-bulk")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.uploadMarksBulk', {'file': #p0, 'losIdsParam': #p1, 'batch': #p2, 'markType': #p3, 'token': #p4})")
     public ResponseEntity<?> uploadMarksBulk(
         @RequestParam("excelFile") MultipartFile file,
         @RequestParam(value = "losIds", required = false) String losIdsParam,
@@ -616,13 +647,15 @@ public class OBEController {
                 "data", Map.of("losCount", losIds.length, "batch", batch.trim(), "markType", markType)
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Failed to import marks: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Failed to import marks: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- MARKS: List available marks (batch+markType+assignmentLabel groups) for a module ---
     @GetMapping("/marks/available/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getAvailableMarks', {'moduleId': #p0, 'token': #p1})")
     public ResponseEntity<?> getAvailableMarks(@PathVariable String moduleId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
@@ -642,13 +675,15 @@ public class OBEController {
             }
             return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- MARKS: Delete one assignment's marks for a module ---
     @DeleteMapping("/marks/assignment/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.deleteAssignmentMarks', {'moduleId': #p0, 'batch': #p1, 'markType': #p2, 'assignmentLabel': #p3, 'token': #p4})")
     public ResponseEntity<?> deleteAssignmentMarks(
         @PathVariable String moduleId,
         @RequestParam String batch,
@@ -675,13 +710,15 @@ public class OBEController {
             poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Assignment marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- MARKS: Delete all marks for a module+batch+markType ---
     @DeleteMapping("/marks/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.deleteMarksBatch', {'moduleId': #p0, 'batch': #p1, 'markType': #p2, 'token': #p3})")
     public ResponseEntity<?> deleteMarksBatch(
         @PathVariable String moduleId,
         @RequestParam String batch,
@@ -693,13 +730,15 @@ public class OBEController {
             poAttainmentService.recalculateForModule(moduleId, batch);
             return ResponseEntity.ok(Map.of("message", "Marks deleted", "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- MARKS: Download existing marks for a module+batch+markType as Excel ---
     @GetMapping("/marks/export/module/{moduleId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.exportBatchMarks', {'moduleId': #p0, 'batch': #p1, 'markType': #p2, 'threshold': #p3, 'token': #p4})")
     public ResponseEntity<?> exportBatchMarks(
         @PathVariable String moduleId,
         @RequestParam String batch,
@@ -717,13 +756,15 @@ public class OBEController {
                 .header("Content-Disposition", "attachment; filename=\"marks_" + moduleId + "_batch" + batch + "_" + markType.toLowerCase() + ".xlsx\"")
                 .body(bytes);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- MARKS: List available marks for a single LO ---
     @GetMapping("/marks/available/lo/{loId}")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getAvailableMarksForLo', {'loId': #p0, 'token': #p1})")
     public ResponseEntity<?> getAvailableMarksForLo(@PathVariable String loId, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Lecture only");
         try {
@@ -738,8 +779,9 @@ public class OBEController {
             }
             return ResponseEntity.ok(Map.of("data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("message", e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
@@ -750,6 +792,7 @@ public class OBEController {
 
     // --- PO ATTAINMENT: Calculate per-student PO credits based on LO pass/fail ---
     @PostMapping("/po-attainment")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getStudentPOAttainment', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> getStudentPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -801,8 +844,9 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
@@ -811,6 +855,7 @@ public class OBEController {
     // attainment has been calculated and saved. Raw earned/max/percentage only - no achieved/
     // not-achieved verdict and no report; that threshold decision is a separate future feature. ---
     @GetMapping("/po-attainment/student-summary")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getStudentPOSummary', {'studentId': #p0, 'token': #p1})")
     public ResponseEntity<?> getStudentPOSummary(
         @RequestParam String studentId,
         @RequestHeader("Authorization") String token) {
@@ -826,14 +871,16 @@ public class OBEController {
             Map<String, Object> result = poAttainmentService.getStudentPOSummary(studentId.trim());
             return ResponseEntity.ok(Map.of("message", "Student PO summary calculated successfully", "data", result, "status", "SUCCESS"));
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate student PO summary: " + errorDetail, "status", "ERROR"));
         }
     }
 
     // --- EXPORT: Generate Excel with per-student PO attainment credits ---
     @PostMapping("/export/po-attainment")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.exportPOAttainment', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> exportPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -888,14 +935,16 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to export PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
 
     // --- TEMPLATE: Generate question-wise Excel template for mark entry ---
     @PostMapping("/template/marks-question-wise")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.generateQuestionMarkTemplate', {'templateId': #p0, 'request': #p1, 'token': #p2})")
     public ResponseEntity<?> generateQuestionMarkTemplate(@RequestParam(value = "templateId", required = false) String templateId,
                                                           @RequestBody(required = false) Map<String, Object> request,
                                                           @RequestHeader("Authorization") String token) {
@@ -917,7 +966,7 @@ public class OBEController {
                     try {
                         numberOfQuestions = Integer.parseInt(countObj.toString().trim());
                     } catch (NumberFormatException ex) {
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        return ResponseEntity.status(SafeErrors.status(ex))
                             .body(Map.of("message", "numberOfQuestions must be a positive integer", "status", "ERROR"));
                     }
                     if (numberOfQuestions <= 0) {
@@ -1006,10 +1055,11 @@ public class OBEController {
                 .body(templateBytes);
 
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate question-wise template",
-                    "error", e.getMessage(),
+                    "error", SafeErrors.message(e),
                     "status", "ERROR"
                 ));
         }
@@ -1017,6 +1067,7 @@ public class OBEController {
 
     // --- REPORT: LO attainment with configurable thresholds (per-LO or per-item) ---
     @PostMapping("/attainment/lo")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getLoAttainment', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> getLoAttainment(@RequestBody Map<String, Object> request,
                                              @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
@@ -1077,16 +1128,18 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "LO attainment calculated", "data", result, "status", "SUCCESS"));
 
         } catch (NumberFormatException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            return ResponseEntity.status(SafeErrors.status(ex))
                 .body(Map.of("message", "Invalid numeric input in thresholds", "status", "ERROR"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Failed to calculate LO attainment: " + e.getMessage(), "status", "ERROR"));
+            SafeErrors.log(e);
+            return ResponseEntity.status(SafeErrors.status(e))
+                .body(Map.of("message", "Failed to calculate LO attainment: " + SafeErrors.message(e), "status", "ERROR"));
         }
     }
 
     // --- EXPORT: Generate marks report with per-LO thresholds ---
     @PostMapping("/export/marks-per-lo-threshold")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.exportMarksWithPerLoThreshold', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> exportMarksWithPerLoThreshold(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -1131,7 +1184,7 @@ public class OBEController {
             try {
                 MarkType.valueOf(markType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                return ResponseEntity.status(SafeErrors.status(e))
                     .body(Map.of("message", "Error: Invalid markType. Must be FINAL_EXAM or ASSIGNMENT", "status", "ERROR"));
             }
 
@@ -1154,8 +1207,9 @@ public class OBEController {
                 .body(excelBytes);
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of(
                     "message", "Failed to generate marks report: " + errorDetail,
                     "error", errorDetail,
@@ -1166,6 +1220,7 @@ public class OBEController {
 
     // --- REPORT: Overall PO Attainment with Benchmark ---
     @PostMapping("/po-attainment/overall")
+    @org.springframework.security.access.prepost.PreAuthorize("@accessPolicy.allow('OBEController.getOverallPOAttainment', {'request': #p0, 'token': #p1})")
     public ResponseEntity<?> getOverallPOAttainment(@RequestBody Map<String, Object> request, @RequestHeader("Authorization") String token) {
         if (!isLecture(token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -1185,8 +1240,9 @@ public class OBEController {
             return ResponseEntity.ok(Map.of("message", "Overall PO attainment calculated successfully", "data", result, "status", "SUCCESS"));
 
         } catch (Exception e) {
-            String errorDetail = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            SafeErrors.log(e);
+            String errorDetail = SafeErrors.message(e);
+            return ResponseEntity.status(SafeErrors.status(e))
                 .body(Map.of("message", "Failed to calculate overall PO attainment: " + errorDetail, "status", "ERROR"));
         }
     }
@@ -1206,7 +1262,7 @@ public class OBEController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {
@@ -1219,7 +1275,7 @@ public class OBEController {
             if (token != null && token.startsWith("Bearer ")) {
                 bearerToken = token.substring(7);
             }
-            String role = jwtUtil.extractRole(bearerToken);
+            String role = com.example.Software.project.Backend.Security.CurrentUser.role();
             role = role == null ? null : role.trim().toLowerCase();
             return role != null && (role.equals("lecture") || role.equals("admin") || role.equals("superadmin"));
         } catch (Exception e) {

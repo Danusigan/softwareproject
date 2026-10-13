@@ -1,9 +1,11 @@
+import { validateExcelFile } from '../utils/excelValidation'
 import axios from 'axios'
 
 const BASE_URL = ''
 
 export const studentService = {
   async uploadStudents({ file }, config = {}) {
+    validateExcelFile(file)
     const formData = new FormData()
     formData.append('file', file)
     return axios.post(`${BASE_URL}/api/students/upload`, formData, { ...config, headers: config.headers || {} })

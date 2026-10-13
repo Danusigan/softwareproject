@@ -34,10 +34,17 @@ public class SecurityConfig {
     private CustomUserDetailsService userDetailsService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuditTrailFilter auditTrailFilter) throws Exception {
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Enable CORS
             .csrf(AbstractHttpConfigurer::disable)
+            .exceptionHandling(errors -> errors
+                .authenticationEntryPoint((request, response, exception) -> {
+                    SafeErrors.write(request, response, org.springframework.http.HttpStatus.UNAUTHORIZED);
+                })
+                .accessDeniedHandler((request, response, exception) -> {
+                    SafeErrors.write(request, response, org.springframework.http.HttpStatus.FORBIDDEN);
+                }))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll() // Docker/orchestrator healthcheck
                 .requestMatchers("/api/auth/login").permitAll() // Allow login without token
@@ -45,18 +52,29 @@ public class SecurityConfig {
                 // forgot-password always returns a generic response (no email enumeration);
                 // reset-password is guarded by the single-use emailed token.
                 .requestMatchers("/api/auth/forgot-password", "/api/auth/reset-password").permitAll()
-                // create-test-user stays reachable without a token (used to bootstrap the first
-                // test account) but is gated to the dev profile in the controller itself.
-                .requestMatchers("/api/auth/create-test-user").permitAll()
+                // The development account helper requires an authenticated SuperAdmin (method policy).
                 .anyRequest().authenticated() // Everything else, including other /api/auth/** endpoints, needs a valid token
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
             .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(auditTrailFilter, JwtRequestFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public AuditTrailFilter auditTrailFilter(com.example.Software.project.Backend.Service.AuditLogService audit) {
+        return new AuditTrailFilter(audit);
+    }
+
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<AuditTrailFilter> auditFilterRegistration(AuditTrailFilter filter) {
+        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+        registration.setEnabled(false); // Runs only inside the security chain, where the actor is available.
+        return registration;
     }
 
     @Bean

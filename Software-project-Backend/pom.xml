@@ -148,6 +148,16 @@
 </dependencies>
 
 	<build>
+        <!-- Local credentials must never be copied into a distributable JAR. -->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <excludes>
+                    <exclude>application-dev.properties</exclude>
+                    <exclude>.env*</exclude>
+                </excludes>
+            </resource>
+        </resources>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>

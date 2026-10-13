@@ -1,3 +1,4 @@
+import { passwordError, usernameError, PASSWORD_RULE, USERNAME_RULE } from '../utils/accountValidation';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/header';
@@ -58,6 +59,8 @@ export default function ManageAdminsPage() {
 
     const handleAdminSubmit = async (e) => {
         e.preventDefault();
+        const invalid = usernameError(adminData.username) || passwordError(adminData.password);
+        if (invalid) { setMessage({ type: 'error', text: invalid }); return; }
         setLoading(true);
         setMessage({ type: '', text: '' });
 
@@ -281,6 +284,7 @@ export default function ManageAdminsPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
                             <input
                                 type="text"
+                                minLength={3} maxLength={64} title={USERNAME_RULE}
                                 value={adminData.username}
                                 onChange={(e) => setAdminData({ ...adminData, username: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -292,7 +296,7 @@ export default function ManageAdminsPage() {
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                             <input
-                                type="email"
+                                type="email" maxLength={254}
                                 value={adminData.email}
                                 onChange={(e) => setAdminData({ ...adminData, email: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -305,12 +309,14 @@ export default function ManageAdminsPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
                             <input
                                 type="password"
+                                minLength={8} title={PASSWORD_RULE}
                                 value={adminData.password}
                                 onChange={(e) => setAdminData({ ...adminData, password: e.target.value })}
                                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                placeholder="Enter Password"
+                                placeholder="Enter Password" aria-describedby="new-password-rules"
                                 required
                             />
+                            <p id="new-password-rules" className="text-xs text-gray-500 mt-2">{PASSWORD_RULE}</p>
                         </div>
 
                         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 mt-4">
@@ -371,7 +377,7 @@ export default function ManageAdminsPage() {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
                                 <input
-                                    type="email"
+                                    type="email" maxLength={254}
                                     value={adminEditData.email}
                                     onChange={(e) => setAdminEditData({ ...adminEditData, email: e.target.value })}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"

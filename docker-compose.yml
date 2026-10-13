@@ -6,10 +6,10 @@ services:
     image: mysql:8.0
     container_name: softwareproject-db
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the environment}
       MYSQL_DATABASE: ${DB_NAME:-softwareproject}
-      MYSQL_USER: ${DB_USERNAME:-appuser}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in the environment}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment}
     ports:
       - "${DB_HOST_PORT:-3306}:3306"
     volumes:
@@ -30,8 +30,8 @@ services:
     container_name: softwareproject-backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${DB_NAME:-softwareproject}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-appuser}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-password}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:?Set DB_USERNAME in the environment}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the environment}
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILE:-dev}
       # Env var takes precedence over the dev-profile's own local fallback secret — always
       # supply a real one via .env; there is no safe default here.
